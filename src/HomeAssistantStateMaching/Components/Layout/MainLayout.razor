@@ -1,0 +1,24 @@
+﻿@inherits LayoutComponentBase
+
+<RadzenLayout>
+    <RadzenSidebar>
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Text="Home" Icon="home" Click="@(() => NavigationManager.NavigateTo("/"))" />
+            <RadzenPanelMenuItem Text="HA Clients" Icon="device_hub" Click="@(() => NavigationManager.NavigateTo("/haclients"))" />
+        </RadzenPanelMenu>
+    </RadzenSidebar>
+    <RadzenBody>
+        @Body
+    </RadzenBody>
+</RadzenLayout>
+
+<RadzenContextMenu />
+<RadzenNotification />
+<RadzenDialog />
+<RadzenTooltip />
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
