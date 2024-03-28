@@ -47,7 +47,25 @@ public class HAClientService : ServiceDbBase
                     context.SaveChanges();
                     var clientHandler = new HAClientHandler(this, client);
                     _handlers.TryAdd(client.Handle, clientHandler);
-                 });
+
+                    var variable = new Variable
+                    {
+                        Handle = Guid.NewGuid(),
+                        Name = "input_boolean.test",
+                        HAClient = client
+                    };
+                    context.Add(variable);
+                    context.SaveChanges();
+
+                    var variableValue = new VariableValue
+                    {
+                        Handle = Guid.NewGuid(),
+                        Variable = variable,
+                        Update = DateTime.UtcNow
+                    };
+                    context.Add(variableValue);
+                    context.SaveChanges();
+                });
             }
             //END TEMP CODE
 

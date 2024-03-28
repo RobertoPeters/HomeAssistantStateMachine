@@ -1,16 +1,17 @@
 ﻿using HassClient.WS;
+using HassClient.WS.Messages;
 using HomeAssistantStateMachine.Models;
 
 namespace HomeAssistantStateMachine.Services;
 
-public class HAClientHandler : IDisposable
+public class HAClientHandler : IAsyncDisposable
 {
     public HAClientService HAClientService { get; private set; }
     public HAClient HAClient { get; private set; }
 
     private readonly HassWSApi _wsApi;
-
-
+    private bool _started = false;
+  
     public HAClientHandler(HAClientService haClientService, HAClient haClient)
     {
         HAClientService = haClientService;
@@ -24,6 +25,8 @@ public class HAClientHandler : IDisposable
         if (HAClient.Enabled && !string.IsNullOrWhiteSpace(HAClient.Token) && !string.IsNullOrWhiteSpace(HAClient.Host))
         {
             await ConnectAsync();
+            await _wsApi.AddEventHandlerSubscriptionAsync(EventHandlerSubscription);
+            _started = true;
         }
     }
 
@@ -60,8 +63,17 @@ public class HAClientHandler : IDisposable
         }
     }
 
-    public void Dispose()
+    public void EventHandlerSubscription(object? sender, EventResultInfo eventResultInfo)
+    {
+        //todo
+    }
+
+    public async ValueTask DisposeAsync()
     {
         _wsApi.ConnectionStateChanged -= _wsApi_ConnectionStateChanged;
+        if (_started)
+        {
+            await _wsApi.RemoveEventHandlerSubscriptionAsync(EventHandlerSubscription);
+        }
     }
 }
