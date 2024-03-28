@@ -93,4 +93,8 @@ public class HAClientService : ServiceDbBase
         ConnectionChanged?.Invoke(clientHandler, state);
     }
 
+    public List<HAClientHandler> GetClients()
+    {
+        return _handlers.Values.ToList();
+    }
 }

@@ -1,6 +1,48 @@
 ﻿@page "/haclients"
+@using HassClient.WS
+@using HomeAssistantStateMachine.Services
+@inject HAClientService HAClientService
+@implements IDisposable
 
-<PageTitle>Home Assistant Clients</PageTitle>
+<PageTitle>HASM - Home Assistant Clients</PageTitle>
 
-<h1>Test</h1>
+<h1>Home Assistant Clients</h1>
 
+@if (clients != null)
+{
+    foreach(var client in clients.Values)
+    {
+        <RadzenCard>
+            <div>@client.HAClient.Name</div>
+            <div>@client.HAClient.Host</div>
+            <div>@(client.HAClient.Enabled ? "Enabled" : "Disabled")</div>
+            <div>@client.ConnectionState</div>
+        </RadzenCard>
+    }
+}
+
+@code {
+
+    private Dictionary<Guid, HAClientHandler>? clients;
+
+    protected override void OnInitialized()
+    {
+        clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Handle, x => x);
+        HAClientService.ConnectionChanged += ClientConnectionChanged;
+        base.OnInitialized();
+    }
+
+    private void ClientConnectionChanged(object? sender, ConnectionStates e)
+    {
+        var client = sender as HAClientHandler;
+        if (client != null && clients!.ContainsKey(client.HAClient.Handle))
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        HAClientService.ConnectionChanged -= ClientConnectionChanged;
+    }
+}
