@@ -1,7 +1,7 @@
-﻿using HomeAssistantStateMaching.Data;
+﻿using HomeAssistantStateMachine.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace HomeAssistantStateMaching.Services;
+namespace HomeAssistantStateMachine.Services;
 
 public static class Startup
 {

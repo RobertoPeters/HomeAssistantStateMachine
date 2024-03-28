@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.34707.107
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HomeAssistantStateMaching", "HomeAssistantStateMaching\HomeAssistantStateMaching.csproj", "{5AB3F568-19D4-4850-9B3D-844042C2D5E5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HomeAssistantStateMachine", "HomeAssistantStateMachine\HomeAssistantStateMachine.csproj", "{5AB3F568-19D4-4850-9B3D-844042C2D5E5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HassClient", "HassClient\HassClient.csproj", "{92FC1203-7D6B-42A9-84CB-C37B73D569E9}"
 EndProject

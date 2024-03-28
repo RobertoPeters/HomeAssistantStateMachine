@@ -1,8 +1,8 @@
-﻿using HomeAssistantStateMaching.Data;
+﻿using HomeAssistantStateMachine.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.CompilerServices;
 
-namespace HomeAssistantStateMaching.Services;
+namespace HomeAssistantStateMachine.Services;
 
 public class ServiceDbBase
 {

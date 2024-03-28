@@ -1,7 +1,7 @@
 ﻿using HassClient.WS;
-using HomeAssistantStateMaching.Models;
+using HomeAssistantStateMachine.Models;
 
-namespace HomeAssistantStateMaching.Services;
+namespace HomeAssistantStateMachine.Services;
 
 public class HAClientHandler : IDisposable
 {

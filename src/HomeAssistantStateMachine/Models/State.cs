@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace HomeAssistantStateMaching.Models;
+namespace HomeAssistantStateMachine.Models;
 
 public class State
 {

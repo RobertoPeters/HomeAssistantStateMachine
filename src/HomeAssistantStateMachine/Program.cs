@@ -1,5 +1,5 @@
 using Radzen;
-using HomeAssistantStateMaching.Data;
+using HomeAssistantStateMachine.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,8 +24,8 @@ builder.Services.AddDbContextFactory<HasmDbContext>(options =>
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
 
-builder.Services.AddSingleton<HomeAssistantStateMaching.Services.HAClientService>();
-builder.Services.AddSingleton<HomeAssistantStateMaching.Services.StateMachineService>();
+builder.Services.AddSingleton<HomeAssistantStateMachine.Services.HAClientService>();
+builder.Services.AddSingleton<HomeAssistantStateMachine.Services.StateMachineService>();
 builder.Services.AddScoped<ContextMenuService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<DialogService>();
@@ -46,14 +46,14 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-app.MapRazorComponents<HomeAssistantStateMaching.Components.App>()
+app.MapRazorComponents<HomeAssistantStateMachine.Components.App>()
     .AddInteractiveServerRenderMode();
 
-HomeAssistantStateMaching.Services.Startup.Init(app.Services);
+HomeAssistantStateMachine.Services.Startup.Init(app.Services);
 
 Task.Run(async () =>
 {
-    var haClientService = app.Services.GetRequiredService<HomeAssistantStateMaching.Services.HAClientService>();
+    var haClientService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.HAClientService>();
     await haClientService.StartAsync();
 }).Wait();
 

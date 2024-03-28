@@ -1,10 +1,10 @@
 ﻿using HassClient.WS;
-using HomeAssistantStateMaching.Data;
-using HomeAssistantStateMaching.Models;
+using HomeAssistantStateMachine.Data;
+using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 
-namespace HomeAssistantStateMaching.Services;
+namespace HomeAssistantStateMachine.Services;
 
 public class HAClientService : ServiceDbBase
 {

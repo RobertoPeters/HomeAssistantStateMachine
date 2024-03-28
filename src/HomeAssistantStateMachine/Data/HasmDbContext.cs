@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace HomeAssistantStateMaching.Data;
+namespace HomeAssistantStateMachine.Data;
 
 public class HasmDbContext: DbContext
 {

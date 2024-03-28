@@ -1,4 +1,4 @@
-﻿namespace HomeAssistantStateMaching.Models;
+﻿namespace HomeAssistantStateMachine.Models;
 
 public class Transition
 {
