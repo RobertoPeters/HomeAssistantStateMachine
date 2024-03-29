@@ -10,7 +10,7 @@ public class Transition
 
     public string? UIData { get; set; }
 
-    public State FromState { get; set; } = null!;
+    public State? FromState { get; set; }
 
-    public State ToState { get; set; } = null!;
+    public State? ToState { get; set; }
 }

@@ -40,7 +40,7 @@ public class VariableService : ServiceDbBase
                     .ToListAsync();
                 foreach (var variableValue in variableValues)
                 {
-                    _variableValues.TryAdd(variableValue.Variable.Handle, variableValue);
+                    _variableValues.TryAdd(variableValue.Variable!.Handle, variableValue);
                 }
                 return true;
             });
@@ -59,12 +59,18 @@ public class VariableService : ServiceDbBase
                     Handle = handle,
                     Name = name,
                     Data = data,
-                    HAClient = haClient,
-                    StateMachine = stateMachine,
-                    State = state
+                    HAClient = null,
+                    StateMachine = null,
+                    State = null
                 };
-                await context.AddAsync(result);
+                await context.Variables.AddAsync(result);
                 await context.SaveChangesAsync();
+
+                result.HAClient = haClient;
+                result.StateMachine = stateMachine;
+                result.State = state;
+                await context.SaveChangesAsync();
+
                 _variables.TryAdd(handle, result);
             });
             return result;
@@ -77,10 +83,16 @@ public class VariableService : ServiceDbBase
         {
             return await ExecuteWithinTransactionAsync(context, async () =>
             {
+                var v = variableValue.Variable;
+                variableValue.Variable = null;
                 variableValue.Update = DateTime.UtcNow;
                 await context.AddAsync(variableValue);
                 await context.SaveChangesAsync();
-                _variableValues.TryAdd(variableValue.Variable.Handle, variableValue);
+
+                variableValue.Variable = v;
+                await context.SaveChangesAsync();
+
+                _variableValues.TryAdd(variableValue.Variable!.Handle, variableValue);
                 VariableValueChanged?.Invoke(this, variableValue);
             });
          });

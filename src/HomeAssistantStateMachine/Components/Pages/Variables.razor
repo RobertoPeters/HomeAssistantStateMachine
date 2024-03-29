@@ -67,7 +67,7 @@
 
     private void VariableValueChanged(object? sender, VariableValue e)
     {
-        if (variables!.TryGetValue(e.Variable.Handle, out var v))
+        if (variables!.TryGetValue(e.Variable!.Handle, out var v))
         {
             v.VariableValue = e;
         }

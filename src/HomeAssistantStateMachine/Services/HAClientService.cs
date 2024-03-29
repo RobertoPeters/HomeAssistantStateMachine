@@ -36,51 +36,6 @@ public class HAClientService : ServiceDbBase
                     _handlers.TryAdd(client.Handle, clientHandler);
                 }
 
-                // TEMP CODE FOR DEVELEOPMENT
-                //testcode when database is recreated preventing to always add this manually
-                // as soon as we don't reacrteate the database anymore, we will remove this code
-                var testClientHost = _configuration.GetValue<string?>("TestHAClientHost", null);
-                var testClientToken = _configuration.GetValue<string>("TestHAClientToken");
-                if (!string.IsNullOrWhiteSpace(testClientHost)
-                    && !string.IsNullOrWhiteSpace(testClientToken)
-                    && !clients.Exists(x => x.Host == testClientHost))
-                {
-                    ExecuteWithinTransaction(context, () =>
-                    {
-                        var client = new HAClient
-                        {
-                            Handle = Guid.NewGuid(),
-                            Name = "Test",
-                            Enabled = true,
-                            Host = testClientHost,
-                            Token = testClientToken
-                        };
-                        context.Add(client);
-                        context.SaveChanges();
-                        var clientHandler = new HAClientHandler(this, client, _variableService);
-                        _handlers.TryAdd(client.Handle, clientHandler);
-
-                        var variable = new Variable
-                        {
-                            Handle = Guid.NewGuid(),
-                            Name = "input_boolean.test",
-                            HAClient = client
-                        };
-                        context.Add(variable);
-                        context.SaveChanges();
-
-                        var variableValue = new VariableValue
-                        {
-                            Handle = Guid.NewGuid(),
-                            Variable = variable,
-                            Update = DateTime.UtcNow
-                        };
-                        context.Add(variableValue);
-                        context.SaveChanges();
-                    });
-                }
-                //END TEMP CODE
-
                 return true;
             });
 
@@ -88,6 +43,22 @@ public class HAClientService : ServiceDbBase
             {
                 await handler.StartAsync();
             }
+
+            // TEMP CODE FOR DEVELEOPMENT
+            //testcode when database is recreated preventing to always add this manually
+            // as soon as we don't reacrteate the database anymore, we will remove this code
+            var testClientHost = _configuration.GetValue<string?>("TestHAClientHost", null);
+            var testClientToken = _configuration.GetValue<string>("TestHAClientToken");
+            if (!string.IsNullOrWhiteSpace(testClientHost)
+                && !string.IsNullOrWhiteSpace(testClientToken)
+                && !_handlers.Values.ToList().Exists(x => x.HAClient.Name == "Test"))
+            {
+                var handler = await CreateHAClientAsync(Guid.NewGuid(), "Test", true, testClientHost, testClientToken);
+                await handler!.CreateVariableAsync("input_boolean.test", null);
+                await handler!.CreateVariableAsync("input_boolean.test2", null);
+            }
+            //END TEMP CODE
+
         }
     }
 

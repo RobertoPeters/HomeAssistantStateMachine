@@ -1,28 +1,19 @@
-﻿using HassClient.WS;
-using HassClient.WS.Messages;
+﻿using HassClient.Models;
+using HassClient.WS;
+using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
+using Microsoft.Extensions.Logging;
+using Mono.TextTemplating;
 using System.Collections.Concurrent;
 
 namespace HomeAssistantStateMachine.Services;
 
 public class HAClientHandler : IAsyncDisposable
 {
-    private class VariableInfo
+    private sealed class VariableInfo
     {
         public Variable Variable { get; set; } = null!;
         public VariableValue? VariableValue { get; set; }
-    }
-
-    private sealed class EventResultInfoStateChanged
-    {
-        public string? Entity_id { get; set; }
-        public EventResultInfoState? New_state { get; set; }
-     }
-
-    private sealed class EventResultInfoState
-    {
-        public string? Entity_id { get; set; }
-        public string? State { get; set; }
     }
 
     public HAClientService HAClientService { get; private set; }
@@ -31,7 +22,6 @@ public class HAClientHandler : IAsyncDisposable
 
     private HassWSApi? _wsApi;
     private bool _started = false;
-    private bool _firstConnection = true;
     private readonly ConcurrentDictionary<string, VariableInfo> _variables = [];
 
     public HAClientHandler(HAClientService haClientService, HAClient haClient, VariableService variableService)
@@ -60,19 +50,53 @@ public class HAClientHandler : IAsyncDisposable
             if (HAClient.Enabled && !string.IsNullOrWhiteSpace(HAClient.Token) && !string.IsNullOrWhiteSpace(HAClient.Host))
             {
                 await ConnectAsync();
+                foreach (var variable in _variables.Values.ToList())
+                {
+                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Variable.Name, EventHandlerEventStateChanged);
+                }
                 _started = true;
             }
         }
+    }
+
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, HasmDbContext? ctx = null)
+    {
+        Variable? result = null;
+        if (!_variables.TryGetValue(name, out var _))
+        {
+            result = await VariableService.CreateVariableAsync(Guid.NewGuid(), name, data, HAClient, null, null, ctx);
+            if (result != null)
+            {
+                var v = new VariableInfo();
+                v.Variable = result;
+                _variables.TryAdd(name, v);
+
+                if (ConnectionState == ConnectionStates.Connected)
+                {
+                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(result.Name, EventHandlerEventStateChanged);
+                    var states = await _wsApi!.GetStatesAsync();
+                    var state = states.FirstOrDefault(s => s.EntityId == result.Name);
+                    if (state != null)
+                    {
+                        await UpdateVariableValue(state.EntityId, state.State);
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
 
     private async void _wsApi_ConnectionStateChanged(object? sender, ConnectionStates e)
     {
-        if (_firstConnection && e == ConnectionStates.Connected)
+        if (e == ConnectionStates.Connected && _variables.Any())
         {
-            _firstConnection = false;
-            await _wsApi!.AddEventHandlerSubscriptionAsync(EventHandlerSubscriptionStateChanged, HassClient.Models.KnownEventTypes.StateChanged);
+            var states = await _wsApi!.GetStatesAsync();
+            foreach (var state in states)
+            {
+                await UpdateVariableValue(state.EntityId, state.State);
+            }
         }
         HAClientService.ClientHandlerConnectionStateChanged(this, e);
     }
@@ -80,24 +104,10 @@ public class HAClientHandler : IAsyncDisposable
     private async Task ConnectAsync()
     {
         if (_wsApi == null) return;
-
-        var endPoint = HAClient.Host;
-        if (!endPoint.StartsWith("ws://", StringComparison.OrdinalIgnoreCase) && !endPoint.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
-        {
-            endPoint = $"ws://{endPoint}";
-        }
-        if (!endPoint.EndsWith("/api/websocket", StringComparison.OrdinalIgnoreCase))
-        {
-            endPoint = $"{endPoint}/api/websocket";
-        }
         try
         {
-            var conPar = new ConnectionParameters()
-            {
-                Endpoint = new Uri(endPoint),
-                AccessToken = HAClient.Token
-            };
-            await _wsApi.ConnectAsync(conPar);
+            var connectionParameters = ConnectionParameters.CreateFromInstanceBaseUrl(HAClient.Host, HAClient.Token);
+            await _wsApi.ConnectAsync(connectionParameters);
         }
         catch
         {
@@ -105,10 +115,14 @@ public class HAClientHandler : IAsyncDisposable
         }
     }
 
-    public async void EventHandlerSubscriptionStateChanged(object? sender, EventResultInfo eventResultInfo)
+    private async void EventHandlerEventStateChanged(object? sender, StateChangedEvent stateChangedArgs)
     {
-        var data = HassClient.Serialization.HassSerializer.DeserializeObject<EventResultInfoStateChanged>(eventResultInfo.Data);
-        if (data?.New_state?.Entity_id != null && _variables.TryGetValue(data.New_state.Entity_id, out var variable))
+        await UpdateVariableValue(stateChangedArgs.EntityId, stateChangedArgs.NewState.State);
+    }
+
+    private async Task UpdateVariableValue(string eventId, string state)
+    {
+        if (_variables.TryGetValue(eventId, out var variable))
         {
             if (variable.VariableValue == null)
             {
@@ -116,13 +130,13 @@ public class HAClientHandler : IAsyncDisposable
                 {
                     Handle = Guid.NewGuid(),
                     Variable = variable.Variable,
-                    Value = data.New_state.State
+                    Value = state
                 };
                 await VariableService.CreateVariableValueAsync(variable.VariableValue);
             }
             else
             {
-                await VariableService.UpdateVariableValueAsync(variable.VariableValue, data.New_state.State);
+                await VariableService.UpdateVariableValueAsync(variable.VariableValue, state);
             }
         }
     }
@@ -131,11 +145,15 @@ public class HAClientHandler : IAsyncDisposable
     {
         if (_started && _wsApi != null)
         {
-            if (!_firstConnection)
+            _wsApi.ConnectionStateChanged -= _wsApi_ConnectionStateChanged;
+            try
             {
-                _wsApi.ConnectionStateChanged -= _wsApi_ConnectionStateChanged;
+                await _wsApi.CloseAsync();
             }
-            await _wsApi.RemoveEventHandlerSubscriptionAsync(EventHandlerSubscriptionStateChanged);
+            catch
+            {
+                //nothing
+            }
         }
     }
 }

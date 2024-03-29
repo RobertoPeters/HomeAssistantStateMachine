@@ -8,7 +8,7 @@ public class VariableValue
     
     public Guid Handle { get; set; }
 
-    public Variable Variable { get; set; } = null!;
+    public Variable? Variable { get; set; }
 
     public string? Value { get; set; }
 
