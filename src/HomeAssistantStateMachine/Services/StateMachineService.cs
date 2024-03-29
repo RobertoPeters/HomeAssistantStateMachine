@@ -1,4 +1,5 @@
-﻿using HomeAssistantStateMachine.Data;
+﻿using HassClient.WS;
+using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
@@ -10,20 +11,29 @@ public class StateMachineService : ServiceDbBase
     private ConcurrentDictionary<Guid, StateMachineHandler> _handlers = [];
     private readonly HAClientService _haClientService;
 
+    private bool _started = false;
+
     public StateMachineService(IDbContextFactory<HasmDbContext> dbFactory, HAClientService haClientService) : base(dbFactory)
     {
         _haClientService = haClientService;
+    }
 
-        //load data and create state maching handlers
-        ExecuteOnDbContext(null, (context) =>
+    public async Task StartAsync()
+    {
+        if (!_started)
         {
-            var sms = context.StateMachines.ToList();
-            foreach (var sm in sms)
+            _started = true;
+            //load data and create state maching handlers
+            await ExecuteOnDbContextAsync(null, async (context) =>
             {
-                _handlers.TryAdd(sm.Handle, new StateMachineHandler(this, sm));
-            }
-            return true;
-        });
+                var sms = await context.StateMachines.ToListAsync();
+                foreach (var sm in sms)
+                {
+                    _handlers.TryAdd(sm.Handle, new StateMachineHandler(this, sm));
+                }
+                return true;
+            });
+        }
     }
 
     public async Task<StateMachineHandler?> CreateMachineStateAsync(Guid handle, string name, bool enabled, HasmDbContext? ctx = null)

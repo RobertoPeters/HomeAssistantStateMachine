@@ -33,7 +33,9 @@ public static partial class DialogServiceExtensions
     {
         var instance = GetPreRenderedInstance(setParameters);
 
+#pragma warning disable BL0005 // Component parameter should not be set outside of its component.
         instance.Title = title;
+#pragma warning restore BL0005 // Component parameter should not be set outside of its component.
 
         var options = instance.GetDialogOptions();
 

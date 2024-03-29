@@ -1,0 +1,91 @@
+﻿@page "/variables"
+@using HomeAssistantStateMachine.Services
+@using HomeAssistantStateMachine.Models
+@using System.Collections.Concurrent
+@inject VariableService VariableService
+@implements IDisposable
+
+<PageTitle>HASM - Variables</PageTitle>
+
+<h1>Variables</h1>
+
+@if (variables != null)
+{
+    <RadzenDataGrid @ref="grid" AllowFiltering="true"
+                    AllowColumnResize="true"
+                    AllowAlternatingRows="false"
+                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    FilterMode="FilterMode.Simple"
+                    AllowSorting="true"
+                    PageSize="20"
+                    AllowPaging="true"
+                    PagerHorizontalAlign="HorizontalAlign.Left"
+                    ShowPagingSummary="true"
+                    Data="@variables.Values.ToList()"
+                    TItem="VariableInfo"
+                    ColumnWidth="300px">
+        <Columns>
+            <RadzenDataGridColumn TItem="VariableInfo"
+                                  Property="@nameof(VariableInfo.Name)"
+                                  Title="Name" />
+ 
+            <RadzenDataGridColumn TItem="VariableInfo"
+                                  Property="@nameof(VariableInfo.Value)"
+                                  Title="Value" />
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private class VariableInfo
+    {
+        public Variable Variable { get; set; } = null!;
+        public VariableValue? VariableValue { get; set; }
+ 
+        public string Name => Variable.Name;
+        public string? Value => VariableValue?.Value;
+    }
+    private readonly ConcurrentDictionary<Guid, VariableInfo> variables = [];
+
+    private RadzenDataGrid<VariableInfo>? grid;
+
+    protected override void OnInitialized()
+    {
+        var allVariables = VariableService.GetVariables();
+        foreach (var variable in allVariables)
+        {
+            var v = new VariableInfo()
+                {
+                    Variable = variable.variable,
+                    VariableValue = variable.variableValue
+                };
+            variables.TryAdd(variable.variable.Handle, v);
+        }
+        VariableService.VariableValueChanged += VariableValueChanged;
+        base.OnInitialized();
+    }
+
+    private void VariableValueChanged(object? sender, VariableValue e)
+    {
+        if (variables!.TryGetValue(e.Variable.Handle, out var v))
+        {
+            v.VariableValue = e;
+        }
+        else
+        {
+            var newVariable = VariableService.GetVariables().Where(x => x.variable.Handle == e.Variable.Handle).First();
+            var vi = new VariableInfo()
+                {
+                    Variable = newVariable.variable,
+                    VariableValue = newVariable.variableValue
+                };
+            variables.TryAdd(newVariable.variable.Handle, vi);
+        }
+        InvokeAsync(grid!.Reload);
+    }
+
+    public void Dispose()
+    {
+        VariableService.VariableValueChanged -= VariableValueChanged;
+    }
+}

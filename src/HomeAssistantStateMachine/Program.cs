@@ -24,6 +24,7 @@ builder.Services.AddDbContextFactory<HasmDbContext>(options =>
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
 
+builder.Services.AddSingleton<HomeAssistantStateMachine.Services.VariableService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.HAClientService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.StateMachineService>();
 builder.Services.AddScoped<ContextMenuService>();
@@ -53,8 +54,12 @@ HomeAssistantStateMachine.Services.Startup.Init(app.Services);
 
 Task.Run(async () =>
 {
+    var variableService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.VariableService>();
+    await variableService.StartAsync();
     var haClientService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.HAClientService>();
     await haClientService.StartAsync();
+    var stateMachineService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.StateMachineService>();
+    await stateMachineService.StartAsync();
 }).Wait();
 
 app.Run();

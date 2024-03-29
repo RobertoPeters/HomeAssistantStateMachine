@@ -8,76 +8,86 @@ namespace HomeAssistantStateMachine.Services;
 
 public class HAClientService : ServiceDbBase
 {
+    private readonly IConfiguration _configuration;
+    private readonly VariableService _variableService;
     private readonly ConcurrentDictionary<Guid, HAClientHandler> _handlers = [];
+    private bool _started = false;
 
     public event EventHandler<ConnectionStates>? ConnectionChanged;
 
-    public HAClientService(IDbContextFactory<HasmDbContext> dbFactory, IConfiguration configuration) : base(dbFactory)
+    public HAClientService(IDbContextFactory<HasmDbContext> dbFactory, IConfiguration configuration, VariableService variableService) : base(dbFactory)
     {
-        //load data and create state maching handlers
-        ExecuteOnDbContext(null, (context) =>
-        {
-            var clients = context.HAClients.ToList();
-            foreach (var client in clients)
-            {
-                var clientHandler = new HAClientHandler(this, client);
-                _handlers.TryAdd(client.Handle, clientHandler);
-            }
-
-            // TEMP CODE FOR DEVELEOPMENT
-            //testcode when database is recreated preventing to always add this manually
-            // as soon as we don't reacrteate the database anymore, we will remove this code
-            var testClientHost = configuration.GetValue<string?>("TestHAClientHost", null);
-            var testClientToken = configuration.GetValue<string>("TestHAClientToken");
-            if (!string.IsNullOrWhiteSpace(testClientHost) 
-                && !string.IsNullOrWhiteSpace(testClientToken)
-                && !clients.Exists(x => x.Host == testClientHost))
-            {
-                ExecuteWithinTransaction(context, () =>
-                {
-                    var client = new HAClient
-                    {
-                        Handle = Guid.NewGuid(),
-                        Name = "Test",
-                        Enabled = true,
-                        Host = testClientHost,
-                        Token = testClientToken
-                    };
-                    context.Add(client);
-                    context.SaveChanges();
-                    var clientHandler = new HAClientHandler(this, client);
-                    _handlers.TryAdd(client.Handle, clientHandler);
-
-                    var variable = new Variable
-                    {
-                        Handle = Guid.NewGuid(),
-                        Name = "input_boolean.test",
-                        HAClient = client
-                    };
-                    context.Add(variable);
-                    context.SaveChanges();
-
-                    var variableValue = new VariableValue
-                    {
-                        Handle = Guid.NewGuid(),
-                        Variable = variable,
-                        Update = DateTime.UtcNow
-                    };
-                    context.Add(variableValue);
-                    context.SaveChanges();
-                });
-            }
-            //END TEMP CODE
-
-            return true;
-        });
+        _configuration = configuration;
+        _variableService = variableService;
     }
 
     public async Task StartAsync()
     {
-        foreach(var handler in _handlers.Values)
+        if (!_started)
         {
-            await handler.StartAsync();
+            _started = true;
+            //load data and create state maching handlers
+            await ExecuteOnDbContextAsync(null, async (context) =>
+            {
+                var clients = await context.HAClients.ToListAsync();
+                foreach (var client in clients)
+                {
+                    var clientHandler = new HAClientHandler(this, client, _variableService);
+                    _handlers.TryAdd(client.Handle, clientHandler);
+                }
+
+                // TEMP CODE FOR DEVELEOPMENT
+                //testcode when database is recreated preventing to always add this manually
+                // as soon as we don't reacrteate the database anymore, we will remove this code
+                var testClientHost = _configuration.GetValue<string?>("TestHAClientHost", null);
+                var testClientToken = _configuration.GetValue<string>("TestHAClientToken");
+                if (!string.IsNullOrWhiteSpace(testClientHost)
+                    && !string.IsNullOrWhiteSpace(testClientToken)
+                    && !clients.Exists(x => x.Host == testClientHost))
+                {
+                    ExecuteWithinTransaction(context, () =>
+                    {
+                        var client = new HAClient
+                        {
+                            Handle = Guid.NewGuid(),
+                            Name = "Test",
+                            Enabled = true,
+                            Host = testClientHost,
+                            Token = testClientToken
+                        };
+                        context.Add(client);
+                        context.SaveChanges();
+                        var clientHandler = new HAClientHandler(this, client, _variableService);
+                        _handlers.TryAdd(client.Handle, clientHandler);
+
+                        var variable = new Variable
+                        {
+                            Handle = Guid.NewGuid(),
+                            Name = "input_boolean.test",
+                            HAClient = client
+                        };
+                        context.Add(variable);
+                        context.SaveChanges();
+
+                        var variableValue = new VariableValue
+                        {
+                            Handle = Guid.NewGuid(),
+                            Variable = variable,
+                            Update = DateTime.UtcNow
+                        };
+                        context.Add(variableValue);
+                        context.SaveChanges();
+                    });
+                }
+                //END TEMP CODE
+
+                return true;
+            });
+
+            foreach (var handler in _handlers.Values)
+            {
+                await handler.StartAsync();
+            }
         }
     }
 
@@ -98,7 +108,7 @@ public class HAClientService : ServiceDbBase
                 };
                 await context.AddAsync(client);
                 await context.SaveChangesAsync();
-                result = new HAClientHandler(this, client);
+                result = new HAClientHandler(this, client, _variableService);
                 _handlers.TryAdd(handle, result);
                 await result.StartAsync();
             });
