@@ -8,8 +8,8 @@ namespace HomeAssistantStateMachine.Services;
 
 public class VariableService : ServiceDbBase
 {
-    private ConcurrentDictionary<Guid, Variable> _variables = [];
-    private ConcurrentDictionary<Guid, VariableValue> _variableValues = [];
+    private ConcurrentDictionary<int, Variable> _variables = [];
+    private ConcurrentDictionary<int, VariableValue> _variableValues = [];
  
     private bool _started = false;
 
@@ -33,21 +33,21 @@ public class VariableService : ServiceDbBase
                     .ToListAsync();
                 foreach (var variable in variables)
                 {
-                    _variables.TryAdd(variable.Handle, variable);
+                    _variables.TryAdd(variable.Id, variable);
                 }
                 var variableValues = await context.VariableValues
                     .Include(v => v.Variable)
                     .ToListAsync();
                 foreach (var variableValue in variableValues)
                 {
-                    _variableValues.TryAdd(variableValue.Variable!.Handle, variableValue);
+                    _variableValues.TryAdd(variableValue.Variable!.Id, variableValue);
                 }
                 return true;
             });
         }
     }
 
-    public async Task<Variable?> CreateVariableAsync(Guid handle, string name, string? data, HAClient? haClient, StateMachine? stateMachine, State? state, HasmDbContext? ctx = null)
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, HAClient? haClient, StateMachine? stateMachine, State? state, HasmDbContext? ctx = null)
     {
         return await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
@@ -56,22 +56,16 @@ public class VariableService : ServiceDbBase
             {
                 result = new Variable
                 {
-                    Handle = handle,
                     Name = name,
                     Data = data,
-                    HAClient = null,
-                    StateMachine = null,
-                    State = null
+                    HAClientId = haClient?.Id,
+                    StateMachineId = stateMachine?.Id,
+                    StateId = state?.Id
                 };
                 await context.Variables.AddAsync(result);
                 await context.SaveChangesAsync();
 
-                result.HAClient = haClient;
-                result.StateMachine = stateMachine;
-                result.State = state;
-                await context.SaveChangesAsync();
-
-                _variables.TryAdd(handle, result);
+                _variables.TryAdd(result.Id, result);
             });
             return result;
         });
@@ -85,14 +79,12 @@ public class VariableService : ServiceDbBase
             {
                 var v = variableValue.Variable;
                 variableValue.Variable = null;
+                variableValue.VariableId = v.Id;
                 variableValue.Update = DateTime.UtcNow;
                 await context.AddAsync(variableValue);
                 await context.SaveChangesAsync();
-
                 variableValue.Variable = v;
-                await context.SaveChangesAsync();
-
-                _variableValues.TryAdd(variableValue.Variable!.Handle, variableValue);
+                _variableValues.TryAdd(variableValue.Variable!.Id, variableValue);
                 VariableValueChanged?.Invoke(this, variableValue);
             });
          });
@@ -123,7 +115,7 @@ public class VariableService : ServiceDbBase
 
         foreach (var variable in allVariables)
         {
-            _variableValues.TryGetValue(variable.Handle, out var variableValue);
+            _variableValues.TryGetValue(variable.Id, out var variableValue);
             result.Add((variable, variableValue));
         }
 
@@ -135,12 +127,12 @@ public class VariableService : ServiceDbBase
         List<(Variable variable, VariableValue? variableValue)> result = [];
 
         var allVariables = _variables.Values
-            .Where(x => haClient?.Handle == x.HAClient?.Handle && stateMachine?.Handle == x.StateMachine?.Handle && state?.Handle == x.State?.Handle)
+            .Where(x => haClient?.Id == x.HAClient?.Id && stateMachine?.Id == x.StateMachine?.Id && state?.Id == x.State?.Id)
             .ToList();
 
         foreach(var variable in allVariables)
         {
-            _variableValues.TryGetValue(variable.Handle, out var variableValue);
+            _variableValues.TryGetValue(variable.Id, out var variableValue);
             result.Add((variable, variableValue));
         }
 

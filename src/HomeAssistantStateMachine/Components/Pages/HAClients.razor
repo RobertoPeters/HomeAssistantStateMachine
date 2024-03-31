@@ -23,11 +23,11 @@
 
 @code {
 
-    private Dictionary<Guid, HAClientHandler>? clients;
+    private Dictionary<int, HAClientHandler>? clients;
 
     protected override void OnInitialized()
     {
-        clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Handle, x => x);
+        clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Id, x => x);
         HAClientService.ConnectionChanged += ClientConnectionChanged;
         base.OnInitialized();
     }
@@ -35,7 +35,7 @@
     private void ClientConnectionChanged(object? sender, ConnectionStates e)
     {
         var client = sender as HAClientHandler;
-        if (client != null && clients!.ContainsKey(client.HAClient.Handle))
+        if (client != null && clients!.ContainsKey(client.HAClient.Id))
         {
             InvokeAsync(StateHasChanged);
         }
