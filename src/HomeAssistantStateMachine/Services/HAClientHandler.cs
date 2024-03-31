@@ -2,7 +2,6 @@
 using HassClient.WS;
 using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
-using Microsoft.Extensions.Logging;
 using Mono.TextTemplating;
 using System.Collections.Concurrent;
 
@@ -22,7 +21,7 @@ public class HAClientHandler : IAsyncDisposable
 
     private HassWSApi? _wsApi;
     private bool _started = false;
-    private readonly ConcurrentDictionary<string, VariableInfo> _variables = [];
+    private readonly ConcurrentDictionary<string, List<VariableInfo>> _variables = [];
 
     public HAClientHandler(HAClientService haClientService, HAClient haClient, VariableService variableService)
     {
@@ -38,21 +37,29 @@ public class HAClientHandler : IAsyncDisposable
             var variables = VariableService.GetScopedVariables(HAClient, null, null);
             foreach (var variable in variables)
             {
-                var v = new VariableInfo()
+                if (!string.IsNullOrWhiteSpace(variable.variable.Data))
                 {
-                    Variable = variable.variable,
-                    VariableValue = variable.variableValue
-                };
-                _variables.TryAdd(variable.variable.Name, v);
+                    if (!_variables.TryGetValue(variable.variable.Data, out var variableInfos))
+                    {
+                        variableInfos = [];
+                        _variables.TryAdd(variable.variable.Data, variableInfos);
+                    }
+                    var v = new VariableInfo()
+                    {
+                        Variable = variable.variable,
+                        VariableValue = variable.variableValue
+                    };
+                    variableInfos.Add(v);
+                }
             }
             _wsApi = new HassWSApi();
             _wsApi.ConnectionStateChanged += _wsApi_ConnectionStateChanged;
             if (HAClient.Enabled && !string.IsNullOrWhiteSpace(HAClient.Token) && !string.IsNullOrWhiteSpace(HAClient.Host))
             {
                 await ConnectAsync();
-                foreach (var variable in _variables.Values.ToList())
+                foreach (var variable in _variables)
                 {
-                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Variable.Name, EventHandlerEventStateChanged);
+                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Key, EventHandlerEventStateChanged);
                 }
                 _started = true;
             }
@@ -62,24 +69,38 @@ public class HAClientHandler : IAsyncDisposable
     public async Task<Variable?> CreateVariableAsync(string name, string? data, HasmDbContext? ctx = null)
     {
         Variable? result = null;
-        if (!_variables.TryGetValue(name, out var _))
+        result = await VariableService.CreateVariableAsync(name, data, HAClient, null, null, ctx);
+        if (result != null && !string.IsNullOrWhiteSpace(result.Data))
         {
-            result = await VariableService.CreateVariableAsync(Guid.NewGuid(), name, data, HAClient, null, null, ctx);
-            if (result != null)
+            VariableValue? vv = null;
+            if (!_variables.TryGetValue(name, out var variableInfos))
             {
-                var v = new VariableInfo();
-                v.Variable = result;
-                _variables.TryAdd(name, v);
+                variableInfos = [];
+                _variables.TryAdd(result.Data, variableInfos);
+            }
+            else
+            {
+                vv = variableInfos.Find(v => v.VariableValue != null)?.VariableValue;
+            }
+            var v = new VariableInfo()
+            {
+                Variable = result,
+                VariableValue = null
+            };
+            variableInfos.Add(v);
 
-                if (ConnectionState == ConnectionStates.Connected)
+            if (vv != null && vv.Value != null)
+            {
+                await UpdateVariableValue(result.Data, vv.Value);
+            }
+            else if (vv == null && ConnectionState == ConnectionStates.Connected)
+            {
+                _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(result.Data, EventHandlerEventStateChanged);
+                var states = await _wsApi!.GetStatesAsync();
+                var state = states.FirstOrDefault(s => s.EntityId == result.Data);
+                if (state != null)
                 {
-                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(result.Name, EventHandlerEventStateChanged);
-                    var states = await _wsApi!.GetStatesAsync();
-                    var state = states.FirstOrDefault(s => s.EntityId == result.Name);
-                    if (state != null)
-                    {
-                        await UpdateVariableValue(state.EntityId, state.State);
-                    }
+                    await UpdateVariableValue(state.EntityId, state.State);
                 }
             }
         }
@@ -122,21 +143,23 @@ public class HAClientHandler : IAsyncDisposable
 
     private async Task UpdateVariableValue(string eventId, string state)
     {
-        if (_variables.TryGetValue(eventId, out var variable))
+        if (_variables.TryGetValue(eventId, out var variableInfos))
         {
-            if (variable.VariableValue == null)
+            foreach (var variableInfo in variableInfos)
             {
-                variable.VariableValue = new VariableValue()
+                if (variableInfo.VariableValue == null)
                 {
-                    Handle = Guid.NewGuid(),
-                    Variable = variable.Variable,
-                    Value = state
-                };
-                await VariableService.CreateVariableValueAsync(variable.VariableValue);
-            }
-            else
-            {
-                await VariableService.UpdateVariableValueAsync(variable.VariableValue, state);
+                    variableInfo.VariableValue = new VariableValue()
+                    {
+                        Variable = variableInfo.Variable,
+                        Value = state
+                    };
+                    await VariableService.CreateVariableValueAsync(variableInfo.VariableValue);
+                }
+                else
+                {
+                    await VariableService.UpdateVariableValueAsync(variableInfo.VariableValue, state);
+                }
             }
         }
     }

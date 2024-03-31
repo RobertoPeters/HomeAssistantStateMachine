@@ -3,6 +3,7 @@ using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -10,7 +11,7 @@ public class HAClientService : ServiceDbBase
 {
     private readonly IConfiguration _configuration;
     private readonly VariableService _variableService;
-    private readonly ConcurrentDictionary<Guid, HAClientHandler> _handlers = [];
+    private readonly ConcurrentDictionary<int, HAClientHandler> _handlers = [];
     private bool _started = false;
 
     public event EventHandler<ConnectionStates>? ConnectionChanged;
@@ -33,7 +34,7 @@ public class HAClientService : ServiceDbBase
                 foreach (var client in clients)
                 {
                     var clientHandler = new HAClientHandler(this, client, _variableService);
-                    _handlers.TryAdd(client.Handle, clientHandler);
+                    _handlers.TryAdd(client.Id, clientHandler);
                 }
 
                 return true;
@@ -53,16 +54,16 @@ public class HAClientService : ServiceDbBase
                 && !string.IsNullOrWhiteSpace(testClientToken)
                 && !_handlers.Values.ToList().Exists(x => x.HAClient.Name == "Test"))
             {
-                var handler = await CreateHAClientAsync(Guid.NewGuid(), "Test", true, testClientHost, testClientToken);
-                await handler!.CreateVariableAsync("input_boolean.test", null);
-                await handler!.CreateVariableAsync("input_boolean.test2", null);
+                var handler = await CreateHAClientAsync("Test", true, testClientHost, testClientToken);
+                await handler!.CreateVariableAsync("test", "input_boolean.test");
+                await handler!.CreateVariableAsync("test2", "input_boolean.test2");
             }
             //END TEMP CODE
 
         }
     }
 
-    public async Task<HAClientHandler?> CreateHAClientAsync(Guid handle, string name, bool enabled, string host, string token, HasmDbContext? ctx = null)
+    public async Task<HAClientHandler?> CreateHAClientAsync(string name, bool enabled, string host, string token, HasmDbContext? ctx = null)
     {
         return await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
@@ -71,7 +72,6 @@ public class HAClientService : ServiceDbBase
             {
                 var client = new HAClient
                 {
-                    Handle = handle,
                     Name = name,
                     Enabled = enabled,
                     Host = host,
@@ -80,7 +80,7 @@ public class HAClientService : ServiceDbBase
                 await context.AddAsync(client);
                 await context.SaveChangesAsync();
                 result = new HAClientHandler(this, client, _variableService);
-                _handlers.TryAdd(handle, result);
+                _handlers.TryAdd(client.Id, result);
                 await result.StartAsync();
             });
             return result;

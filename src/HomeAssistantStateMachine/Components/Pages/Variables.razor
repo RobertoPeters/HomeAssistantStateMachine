@@ -45,7 +45,7 @@
         public string Name => Variable.Name;
         public string? Value => VariableValue?.Value;
     }
-    private readonly ConcurrentDictionary<Guid, VariableInfo> variables = [];
+    private readonly ConcurrentDictionary<int, VariableInfo> variables = [];
 
     private RadzenDataGrid<VariableInfo>? grid;
 
@@ -59,7 +59,7 @@
                     Variable = variable.variable,
                     VariableValue = variable.variableValue
                 };
-            variables.TryAdd(variable.variable.Handle, v);
+            variables.TryAdd(variable.variable.Id, v);
         }
         VariableService.VariableValueChanged += VariableValueChanged;
         base.OnInitialized();
@@ -67,19 +67,19 @@
 
     private void VariableValueChanged(object? sender, VariableValue e)
     {
-        if (variables!.TryGetValue(e.Variable!.Handle, out var v))
+        if (variables!.TryGetValue(e.Variable!.Id, out var v))
         {
             v.VariableValue = e;
         }
         else
         {
-            var newVariable = VariableService.GetVariables().Where(x => x.variable.Handle == e.Variable.Handle).First();
+            var newVariable = VariableService.GetVariables().Where(x => x.variable.Id == e.Variable.Id).First();
             var vi = new VariableInfo()
                 {
                     Variable = newVariable.variable,
                     VariableValue = newVariable.variableValue
                 };
-            variables.TryAdd(newVariable.variable.Handle, vi);
+            variables.TryAdd(newVariable.variable.Id, vi);
         }
         InvokeAsync(grid!.Reload);
     }

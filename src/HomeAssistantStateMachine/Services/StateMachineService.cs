@@ -8,7 +8,7 @@ namespace HomeAssistantStateMachine.Services;
 
 public class StateMachineService : ServiceDbBase
 {
-    private ConcurrentDictionary<Guid, StateMachineHandler> _handlers = [];
+    private ConcurrentDictionary<int, StateMachineHandler> _handlers = [];
     private readonly HAClientService _haClientService;
 
     private bool _started = false;
@@ -29,7 +29,7 @@ public class StateMachineService : ServiceDbBase
                 var sms = await context.StateMachines.ToListAsync();
                 foreach (var sm in sms)
                 {
-                    _handlers.TryAdd(sm.Handle, new StateMachineHandler(this, sm));
+                    _handlers.TryAdd(sm.Id, new StateMachineHandler(this, sm));
                 }
                 return true;
             });
@@ -45,14 +45,13 @@ public class StateMachineService : ServiceDbBase
             {
                 var sm = new StateMachine
                 {
-                    Handle = handle,
                     Name = name,
                     Enabled = enabled
                 };
                 await context.AddAsync(sm);
                 await context.SaveChangesAsync();
                 result = new StateMachineHandler(this, sm);
-                _handlers.TryAdd(handle, result);
+                _handlers.TryAdd(sm.Id, result);
             });
             return result;
         });
