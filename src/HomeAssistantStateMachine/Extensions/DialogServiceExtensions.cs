@@ -1,4 +1,4 @@
-using HomeAssistantStateMachine.Components;
+using HomeAssistantStateMachine.Components.Dialogs;
 
 public static partial class DialogServiceExtensions
 {
@@ -39,8 +39,8 @@ public static partial class DialogServiceExtensions
 
         var options = instance.GetDialogOptions();
 
-        options.ShowClose = false;
-        options.ShowTitle = false;
+        //options.ShowClose = false;
+        //options.ShowTitle = false;
 
         var parameters = instance.GetParameters();
 

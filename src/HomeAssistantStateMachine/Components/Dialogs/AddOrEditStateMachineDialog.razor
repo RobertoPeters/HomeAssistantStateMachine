@@ -1,0 +1,58 @@
+﻿@using HomeAssistantStateMachine.Models
+@inherits ResultDialogBase<StateMachine>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachine">
+    <RadzenStack>
+        <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name"/>
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="Name" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Enabled" Variant="@Variant.Outlined">
+            <RadzenRadioButtonList @bind-bind-Value="@Model!.Enabled" TValue="bool" class="rz-m-4 rz-mt-8" >
+                <Items>
+                    <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                    <RadzenRadioButtonListItem Text="No" Value="false" />
+                </Items>
+            </RadzenRadioButtonList>
+        </RadzenFormField>
+        <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+
+    [Parameter]
+    public StateMachine? StateMachine { get; set; }
+
+    private StateMachine? Model;
+    private RadzenTemplateForm<StateMachine>? Form;
+
+    protected override void OnInitialized()
+    {
+        if (StateMachine == null)
+        {
+            StateMachine = new StateMachine();
+            StateMachine.Enabled = true;
+        }
+        Model = StateMachine.CopyObject();
+        base.OnInitialized();
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            Close(Model);
+        };
+    }
+
+}

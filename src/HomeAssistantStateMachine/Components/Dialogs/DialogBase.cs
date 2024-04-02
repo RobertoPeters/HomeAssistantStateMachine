@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using System.Reflection;
 
-namespace HomeAssistantStateMachine.Components;
+namespace HomeAssistantStateMachine.Components.Dialogs;
 
 public abstract class ResultDialogBase<TResult> : DialogOptionsBase
 {
@@ -22,7 +22,7 @@ public abstract class DialogBase : DialogOptionsBase
 
 public class DialogOptionsBase : ComponentBase
 {
-     [Inject] private Radzen.DialogService? Service { get; set; }
+    [Inject] private Radzen.DialogService? Service { get; set; }
 
     protected Radzen.DialogService DialogService => Service!;
 
@@ -73,8 +73,6 @@ public class DialogOptionsBase : ComponentBase
     protected virtual bool AutoFocusFirstElement { get; set; } = false;
     /// <summary>Default value: true</summary>
     protected virtual bool ShowTitle { get; set; } = true;
-    protected virtual bool HasSidebar { get; set; } = false;
-    protected virtual bool HasProgressSteps { get; set; } = false;
 
     public void SetIsPersistent(bool isPersistent) => IsPersistent = isPersistent;
 
@@ -100,14 +98,13 @@ public class DialogOptionsBase : ComponentBase
             Left = Left,
             Top = Top,
 
-            CssClass = $"{CssClass} {(HasSidebar ? "echo-dialog-with-sidebar" : string.Empty)} {(HasProgressSteps ? "echo-steps-dialog" : string.Empty)}",
             Style = Style,
 
             ChildContent = ChildContent,
             AutoFocusFirstElement = AutoFocusFirstElement,
 
-            ShowClose = false,
-            ShowTitle = false,
+            //ShowClose = false,
+            //ShowTitle = false,
         };
 
     /// <summary>
@@ -115,7 +112,7 @@ public class DialogOptionsBase : ComponentBase
     /// </summary>
     /// <returns>The dictionary containing all parameters names and current values.</returns>
     public Dictionary<string, object?> GetParameters()
-        => this.GetType()
+        => GetType()
             .GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(property => property.CustomAttributes.Any(attribute => attribute.AttributeType == typeof(ParameterAttribute)))
             .Select(property => new KeyValuePair<string, object?>(property.Name, property.GetValue(this)))

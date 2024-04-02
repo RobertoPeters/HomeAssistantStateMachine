@@ -1,0 +1,92 @@
+﻿@page "/statemachines"
+@using HomeAssistantStateMachine.Services
+@using HomeAssistantStateMachine.Models
+@using System.Collections.Concurrent
+@inject Radzen.DialogService DialogService
+@inject StateMachineService StateMachineService
+@implements IDisposable
+
+<PageTitle>HASM - State Machines</PageTitle>
+
+<h1>State Machines</h1>
+
+@if (statemachines != null)
+{
+    <RadzenButton Text="Add" Click="@AddStateMachineAsync" />
+    <RadzenDataGrid @ref="grid" AllowFiltering="true"
+                    AllowColumnResize="true"
+                    AllowAlternatingRows="false"
+                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    FilterMode="FilterMode.Simple"
+                    AllowSorting="true"
+                    PageSize="20"
+                    RowClick="@OnRowClick"
+                    AllowPaging="true"
+                    PagerHorizontalAlign="HorizontalAlign.Left"
+                    ShowPagingSummary="true"
+                    Data="@statemachines.Values.ToList()"
+                    TItem="StateMachineInfo"
+                    ColumnWidth="300px">
+        <Columns>
+            <RadzenDataGridColumn TItem="StateMachineInfo"
+                                  Property="@nameof(StateMachineInfo.Name)"
+                                  Title="Name" />
+
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private class StateMachineInfo
+    {
+        public StateMachineHandler StateMachineHandler { get; set; } = null!;
+
+        public string Name => StateMachineHandler.StateMachine.Name;
+        public string? State => StateMachineHandler.CurrentState?.Name;
+    }
+    private readonly ConcurrentDictionary<int, StateMachineInfo> statemachines = [];
+
+    private RadzenDataGrid<StateMachineInfo>? grid;
+
+    protected override void OnInitialized()
+    {
+        var allStateMachines = StateMachineService.GetStateMachines();
+        foreach (var statemachine in allStateMachines)
+        {
+            var v = new StateMachineInfo()
+                {
+                    StateMachineHandler = statemachine
+                };
+            statemachines.TryAdd(statemachine.StateMachine.Id, v);
+            statemachine.StateChanged += StateMachineStateChanged;
+        }
+        base.OnInitialized();
+    }
+
+    private void StateMachineStateChanged(object? sender, State? e)
+    {
+        InvokeAsync(grid!.Reload);
+    }
+
+    public void Dispose()
+    {
+        foreach (var statemachine in statemachines.Values.ToList())
+        {
+            statemachine.StateMachineHandler.StateChanged -= StateMachineStateChanged;
+        };
+    }
+
+    private async Task AddStateMachineAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Add State Machine", dialog => { });
+        if (result != null)
+        {
+            await StateMachineService.CreateMachineStateAsync(result);
+        }
+    }
+
+    void OnRowClick(DataGridRowMouseEventArgs< StateMachineInfo> item)
+    {
+        NavigationManager.NavigateTo($"/editstatemachine/{item.Data.StateMachineHandler.StateMachine.Id}");
+    }
+}
