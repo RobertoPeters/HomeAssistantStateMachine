@@ -59,11 +59,16 @@ public class StateMachineHandler : IDisposable
             return false;
         }
 
-        var statesWithoutTransitionEntry = StateMachine.States
-            .Join(StateMachine.Transitions, s => s.Id, t => t.ToStateId, (s, t) => new { State = s, Transition = t })
-            .ToList();
+        var statesWithoutTransitionEntry = 0;
+        foreach (var state in StateMachine.States)
+        {
+            if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
+            {
+                statesWithoutTransitionEntry++;
+            }
+        }
 
-        if (statesWithoutTransitionEntry.Count != 1)
+        if (statesWithoutTransitionEntry != 1)
         {
             return false;
         }
@@ -98,6 +103,7 @@ public class StateMachineHandler : IDisposable
                 try
                 {
                     _engine.Execute(script.ToString());
+                    RunningState = StateMachineRunningState.Running;
                     ChangeToState(startState);
                 }
                 catch

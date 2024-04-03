@@ -32,6 +32,13 @@
                                   Property="@nameof(StateMachineInfo.Name)"
                                   Title="Name" />
 
+            <RadzenDataGridColumn TItem="StateMachineInfo"
+                                  Property="@nameof(StateMachineInfo.Mode)"
+                                  Title="Mode" />
+
+            <RadzenDataGridColumn TItem="StateMachineInfo"
+                                  Property="@nameof(StateMachineInfo.State)"
+                                  Title="State" />
         </Columns>
     </RadzenDataGrid>
 }
@@ -42,6 +49,7 @@
         public StateMachineHandler StateMachineHandler { get; set; } = null!;
 
         public string Name => StateMachineHandler.StateMachine.Name;
+        public string? Mode => StateMachineHandler.RunningState.ToString();
         public string? State => StateMachineHandler.CurrentState?.Name;
     }
     private readonly ConcurrentDictionary<int, StateMachineInfo> statemachines = [];
