@@ -33,7 +33,6 @@ public class StateMachineService : ServiceDbBase
         {
             return await context.StateMachines
                          .Include(sm => sm.States)
-                         .Include(sm => sm.StateMachineHAClients)
                          .Include(sm => sm.Transitions)
                          .FirstAsync(x => x.Id == stateMachineId);
         });
@@ -49,7 +48,6 @@ public class StateMachineService : ServiceDbBase
             {
                 var sms = await context.StateMachines
                     .Include(sm => sm.States)
-                    .Include(sm => sm.StateMachineHAClients)
                     .Include(sm => sm.Transitions)
                     .ToListAsync();
                 foreach (var sm in sms)

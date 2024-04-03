@@ -5,13 +5,11 @@ namespace HomeAssistantStateMachine.Models;
 public class StateMachine
 {
     public int Id { get; set; }
-    
-     [StringLength(255)]
+
+    [StringLength(255)]
     public string Name { get; set; } = null!;
 
     public bool Enabled { get; set; }
-
-    public virtual ICollection<StateMachineHAClient> StateMachineHAClients { get; set; } = [];
 
     public virtual ICollection<State> States { get; set; } = [];
 
