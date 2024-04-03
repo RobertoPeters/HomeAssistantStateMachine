@@ -4,7 +4,7 @@ using System.Text;
 
 namespace HomeAssistantStateMachine.Services;
 
-public class StateMachineHandler: IDisposable
+public class StateMachineHandler : IDisposable
 {
     public enum StateMachineRunningState
     {
@@ -43,7 +43,7 @@ public class StateMachineHandler: IDisposable
 
     public void Dispose()
     {
-        _syncContext.Post((object? state) =>
+        _syncContext.Send((object? state) =>
         {
             RunningState = StateMachineRunningState.NotRunning;
             _engine?.Dispose();
@@ -74,7 +74,7 @@ public class StateMachineHandler: IDisposable
 
     public void Start()
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
             if (ValidateModel())
             {
@@ -116,7 +116,7 @@ public class StateMachineHandler: IDisposable
 
     public void Stop()
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
             RunningState = StateMachineRunningState.NotRunning;
             _engine?.Dispose();
@@ -132,16 +132,23 @@ public class StateMachineHandler: IDisposable
 
             if (RunningState == StateMachineRunningState.Running && CurrentState != null && _engine != null)
             {
-                var transitions = StateMachine.Transitions
-                    .Where(t => t.FromStateId == CurrentState.Id)
-                    .ToList();
-                foreach (var transition in transitions)
+                try
                 {
-                    if (_engine.Invoke($"transitionResult{transition.Id}") == JsBoolean.True)
+                    var transitions = StateMachine.Transitions
+                        .Where(t => t.FromStateId == CurrentState.Id)
+                        .ToList();
+                    foreach (var transition in transitions)
                     {
-                        ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
-                        break;
+                        if (_engine.Invoke($"transitionResult{transition.Id}") == JsBoolean.True)
+                        {
+                            ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
+                            break;
+                        }
                     }
+                }
+                catch
+                {
+                    RunningState = StateMachineRunningState.Error;
                 }
             }
         }, null);
@@ -149,7 +156,7 @@ public class StateMachineHandler: IDisposable
 
     public void UpdateStateMachine(StateMachine stateMachine)
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
             Stop();
             StateMachine = stateMachine;
@@ -159,11 +166,15 @@ public class StateMachineHandler: IDisposable
 
     private void ChangeToState(State? state)
     {
-        if (RunningState == StateMachineRunningState.Running && _engine != null)
+        if (RunningState == StateMachineRunningState.Running && _engine != null && state != null)
         {
-            if (state != null)
+            try
             {
                 _engine.Invoke($"stateEntryAction{state.Id}");
+            }
+            catch
+            {
+                RunningState = StateMachineRunningState.Error;
             }
         }
         CurrentState = state;

@@ -15,9 +15,15 @@ public class StateMachineService : ServiceDbBase
 
     private bool _started = false;
 
-    public StateMachineService(IDbContextFactory<HasmDbContext> dbFactory, HAClientService haClientService) : base(dbFactory)
+    public StateMachineService(IDbContextFactory<HasmDbContext> dbFactory, HAClientService haClientService, VariableService variableService) : base(dbFactory)
     {
         _haClientService = haClientService;
+        variableService.VariableValueChanged += VariableService_VariableValueChanged; ;
+    }
+
+    private void VariableService_VariableValueChanged(object? sender, VariableValue e)
+    {
+        TriggerAllStateMachines();
     }
 
     public async Task StartAsync()
@@ -42,8 +48,36 @@ public class StateMachineService : ServiceDbBase
 
             foreach (var _handler in _handlers.Values)
             {
+                _handler.StateChanged += _handler_StateChanged;
                 _handler.Start();
             }
+        }
+    }
+
+    private void _handler_StateChanged(object? sender, State? e)
+    {
+        TriggerAllStateMachines();
+    }
+
+    private long _triggering = 0;
+    private readonly object _triggerLock = new object();
+    void TriggerAllStateMachines()
+    {
+        var count = Interlocked.Read(ref _triggering);
+        if (count < 3)
+        {
+            Interlocked.Increment(ref _triggering);
+            Task.Factory.StartNew(() =>
+            {
+                lock (_triggerLock)
+                {
+                    foreach (var handler in _handlers.Values.ToList())
+                    {
+                        handler.TriggerProcess();
+                    }
+                }
+                Interlocked.Decrement(ref _triggering);
+            });
         }
     }
 
@@ -60,7 +94,8 @@ public class StateMachineService : ServiceDbBase
                 _handlers.TryAdd(stateMachine.Id, result);
             }))
             {
-                result!.Start();
+                result!.StateChanged += _handler_StateChanged;
+                result.Start();
             }
             return result;
         });
