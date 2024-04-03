@@ -74,7 +74,7 @@ public class StateMachineHandler : IDisposable
 
     public void Start()
     {
-        _syncContext.Send((_) =>
+        _syncContext.Post((_) =>
         {
             if (ValidateModel())
             {

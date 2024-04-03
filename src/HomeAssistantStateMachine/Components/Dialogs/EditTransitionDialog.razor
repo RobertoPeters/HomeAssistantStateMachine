@@ -1,0 +1,44 @@
+﻿@using HomeAssistantStateMachine.Models
+@inherits ResultDialogBase<Transition>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="Transition">
+    <RadzenStack>
+        <RadzenFormField Text="Condition" Variant="@Variant.Outlined">
+            <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Cols="10" />
+        </RadzenFormField>
+        <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+
+    [Parameter]
+    public Transition? Transition { get; set; }
+
+    private Transition? Model;
+    private RadzenTemplateForm<Transition>? Form;
+
+    protected override void OnInitialized()
+    {
+        if (Transition == null)
+        {
+            Transition = new Transition();
+        }
+        Model = Transition.CopyObject();
+        base.OnInitialized();
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            Close(Model);
+        };
+    }
+
+}

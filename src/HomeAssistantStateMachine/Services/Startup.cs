@@ -11,9 +11,7 @@ public static class Startup
         using var context = dbFactory.CreateDbContext();
         context.Database.Migrate();
 
-        //todo check contents (add missging)
+        //todo check contents (add missing)
 
-        //now load state machine
-        serviceProvider.GetRequiredService<StateMachineService>();
-    }
+     }
 }

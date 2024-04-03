@@ -8,6 +8,9 @@ public class Transition
 
     public string? UIData { get; set; }
 
+    public int? StateMachineId { get; set; }
+    public StateMachine? StateMachine { get; set; }
+
     public int? FromStateId { get; set; }
     public State? FromState { get; set; }
 

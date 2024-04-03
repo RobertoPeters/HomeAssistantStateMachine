@@ -2,6 +2,7 @@
 using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
+using Mono.TextTemplating;
 using System.Collections.Concurrent;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
@@ -26,6 +27,18 @@ public class StateMachineService : ServiceDbBase
         TriggerAllStateMachines();
     }
 
+    public async Task<StateMachine> GetStateMachineDataAsync(int stateMachineId, HasmDbContext? ctx = null)
+    {
+        return await ExecuteOnDbContextAsync(ctx, async (context) =>
+        {
+            return await context.StateMachines
+                         .Include(sm => sm.States)
+                         .Include(sm => sm.StateMachineHAClients)
+                         .Include(sm => sm.Transitions)
+                         .FirstAsync(x => x.Id == stateMachineId);
+        });
+    }
+
     public async Task StartAsync()
     {
         if (!_started)
@@ -36,7 +49,7 @@ public class StateMachineService : ServiceDbBase
             {
                 var sms = await context.StateMachines
                     .Include(sm => sm.States)
-                    .Include(sm => sm.HAClients)
+                    .Include(sm => sm.StateMachineHAClients)
                     .Include(sm => sm.Transitions)
                     .ToListAsync();
                 foreach (var sm in sms)
@@ -54,7 +67,7 @@ public class StateMachineService : ServiceDbBase
         }
     }
 
-    private void _handler_StateChanged(object? sender, State? e)
+    private void _handler_StateChanged(object? sender, Models.State? e)
     {
         TriggerAllStateMachines();
     }
@@ -115,48 +128,41 @@ public class StateMachineService : ServiceDbBase
             {
                 StateMachine result = await context.StateMachines
                         .Include(sm => sm.States)
-                        .Include(sm => sm.HAClients)
                         .Include(sm => sm.Transitions)
                         .FirstAsync(x => x.Id == stateMachine.Id);
 
-                foreach(var state in result.States.ToList())
-                {
-                    if (!stateMachine.States.Any(x => x.Id == state.Id))
-                    {
-                        result.States.Remove(state);
-                    }
-                }
+                //for now: just remove all and re-add
                 foreach (var transition in result.Transitions.ToList())
                 {
-                    if (!stateMachine.Transitions.Any(x => x.Id == transition.Id))
-                    {
-                        result.Transitions.Remove(transition);
-                    }
+                    context.Remove(transition);
                 }
 
-                foreach(var stateMachine in stateMachine.States)
+                foreach (var state in result.States.ToList())
                 {
-                    if (stateMachine.Id == 0)
-                    {
-                        result.States.Add(stateMachine);
-                    }
+                    context.Remove(state);
                 }
+
+                foreach (var state in stateMachine.States)
+                {
+                    state.StateMachineId = stateMachine.Id;
+                    state.StateMachine = null;
+                    await context.AddAsync(state);
+                }
+                await context.SaveChangesAsync();
+
                 foreach (var transition in stateMachine.Transitions)
                 {
-                    if (transition.Id == 0)
-                    {
-                        result.Transitions.Add(transition);
-                    }
+                    transition.StateMachineId = stateMachine.Id;
+                    transition.StateMachine = null;
+                    transition.FromStateId = transition.FromState!.Id;
+                    transition.ToStateId = transition.ToState!.Id;
+                    await context.AddAsync(transition);
                 }
 
                 await context.SaveChangesAsync();
             });
 
-            result = await context.StateMachines
-                        .Include(sm => sm.States)
-                        .Include(sm => sm.HAClients)
-                        .Include(sm => sm.Transitions)
-                        .FirstAsync(x => x.Id == stateMachine.Id);
+            result = await GetStateMachineDataAsync(stateMachine.Id, context);
 
             _handlers[stateMachine.Id]!.UpdateStateMachine(result);
 

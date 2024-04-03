@@ -11,9 +11,9 @@ public class StateMachine
 
     public bool Enabled { get; set; }
 
-    public ICollection<HAClient> HAClients { get; set; } = [];
+    public virtual ICollection<StateMachineHAClient> StateMachineHAClients { get; set; } = [];
 
-    public ICollection<State> States { get; set; } = [];
+    public virtual ICollection<State> States { get; set; } = [];
 
-    public ICollection<Transition> Transitions { get; set; } = [];
+    public virtual ICollection<Transition> Transitions { get; set; } = [];
 }

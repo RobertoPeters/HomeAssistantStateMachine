@@ -1,0 +1,56 @@
+﻿@using HomeAssistantStateMachine.Models
+@inherits ResultDialogBase<State>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="State">
+    <RadzenStack>
+        <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name"/>
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="Name" Text="This field is required" />
+                <RadzenCustomValidator Component="Name" Validator="@(() => !ExistingStateNames.Contains(Model!.Name))" Text="Name should be unique" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Entry Action" Variant="@Variant.Outlined">
+            <RadzenTextArea @bind-Value="@Model!.EntryAction" Name="EntryAction" Cols="10" />
+        </RadzenFormField>
+        <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+
+    [Parameter]
+    public State? State { get; set; }
+
+    [Parameter]
+    public HashSet<string> ExistingStateNames { get; set; } = [];
+
+    private State? Model;
+    private RadzenTemplateForm<State>? Form;
+
+    protected override void OnInitialized()
+    {
+        if (State == null)
+        {
+            State = new State();
+        }
+        Model = State.CopyObject();
+        base.OnInitialized();
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            Close(Model);
+        };
+    }
+
+}
