@@ -3,6 +3,7 @@ using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
 using Radzen;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -10,13 +11,26 @@ public class VariableService : ServiceDbBase
 {
     private ConcurrentDictionary<int, Variable> _variables = [];
     private ConcurrentDictionary<int, VariableValue> _variableValues = [];
- 
+    private ConcurrentDictionary<string, int> _variableNameToString = [];
+
     private bool _started = false;
 
     public event EventHandler<VariableValue>? VariableValueChanged;
 
     public VariableService(IDbContextFactory<HasmDbContext> dbFactory) : base(dbFactory)
     {
+    }
+
+    public object? GetVariableValue(string name)
+    {
+        if (_variableNameToString.TryGetValue(name, out var id))
+        {
+            if (_variableValues.TryGetValue(id, out var variableValue))
+            {
+                return variableValue.Value;
+            }
+        }
+        return null;
     }
 
     public async Task StartAsync()
@@ -34,6 +48,7 @@ public class VariableService : ServiceDbBase
                 foreach (var variable in variables)
                 {
                     _variables.TryAdd(variable.Id, variable);
+                    _variableNameToString.TryAdd(variable.Name, variable.Id);
                 }
                 var variableValues = await context.VariableValues
                     .Include(v => v.Variable)
@@ -66,6 +81,7 @@ public class VariableService : ServiceDbBase
                 await context.SaveChangesAsync();
 
                 _variables.TryAdd(result.Id, result);
+                _variableNameToString.TryAdd(result.Name, result.Id);
             });
             return result;
         });

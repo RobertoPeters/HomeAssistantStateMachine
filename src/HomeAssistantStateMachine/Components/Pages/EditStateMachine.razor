@@ -46,6 +46,7 @@ else
 
     private BlazorDiagram Diagram { get; set; } = null!;
     private StateMachine StateMachine = null!;
+    private int newIdForAdd = -1;
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,6 +82,7 @@ else
                         var linkModel = new LinkModel(source2, targetAnchor);
                         linkModel.TargetMarker = LinkMarker.Arrow;
                         linkModel.AddLabel("true");
+
                         return linkModel;
                     }
                 },
@@ -88,6 +90,7 @@ else
 
         Diagram = new BlazorDiagram(options);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
+        Diagram.PointerUp += DiagramPointerUpAsync;
 
         await ReloadDiagramAsync();
 
@@ -101,6 +104,7 @@ else
         StateMachine = await StateMachineService.GetStateMachineDataAsync(Id);
         foreach (var state in StateMachine.States)
         {
+            state.StateMachine = null;
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
             var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
                 {
@@ -110,13 +114,16 @@ else
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
         }
-        foreach(var transition in StateMachine.Transitions)
+        foreach (var transition in StateMachine.Transitions)
         {
-            var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y=> y.Id == transition.FromStateId)!.Name);
+            transition.FromState = null;
+            transition.ToState = null;
+            transition.StateMachine = null;
+            var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.FromStateId)!.Name);
             var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
             var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == PortAlignment.Bottom), target.Ports.First(x => x.Alignment == PortAlignment.Top)));
             link.TargetMarker = LinkMarker.Arrow;
-            link.AddLabel(transition.Condition ?? "true");
+            link.AddLabel(transition.Description ?? transition.Condition ?? "true");
         }
         Diagram.Refresh();
     }
@@ -134,6 +141,8 @@ else
         });
         if (state != null)
         {
+            newIdForAdd--;
+            state.Id = newIdForAdd;
             StateMachine.States.Add(state);
 
             var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(50, 50))
@@ -147,34 +156,79 @@ else
         }
     }
 
+    async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        //check if link is added
+        foreach (var link in Diagram.Links)
+        {
+            var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+            var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
+            var targetState = StateMachine.States.First(x => x.Name == target.Title);
+            var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+            if (transition == null)
+            {
+                transition = new()
+                    {
+                        FromStateId = sourceState.Id,
+                        ToStateId = targetState.Id
+                    };
+                StateMachine.Transitions.Add(transition);
+                await EditTransitionAsync(link);
+            }
+        }
+    }
+
+    async Task EditTransitionAsync(BaseLinkModel link)
+    {
+        var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+        var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+        var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+        var targetState = StateMachine.States.First(x => x.Name == target.Title);
+        var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>("Edit Transition", dialog =>
+        {
+            dialog.Transition = transition;
+        });
+        if (result != null)
+        {
+            transition.Condition = result.Condition;
+            transition.Description = result.Description;
+
+            link.Labels.Clear();
+            link.AddLabel(transition.Description ?? result.Condition ?? "true");
+            link.Refresh();
+        }
+    }
+
+    async Task EditStateAsync(NodeModel node)
+    {
+        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Edit State", dialog =>
+        {
+            dialog.State = state;
+            dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
+        });
+        if (result != null)
+        {
+            state.Name = result.Name;
+            state.Description = result.Description;
+            state.EntryAction = result.EntryAction;
+
+            node.Title = state.Name;
+            node.Refresh();
+        }
+    }
+
     async void DiagramPointerDoubleClickAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
     {
         if (model is NodeModel node)
         {
-            var state = StateMachine.States.First(x => x.Name == node.Title);
-            var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Edit State", dialog =>
-            {
-                dialog.State = state;
-                dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
-            });
-            if (result != null)
-            {
-                state.Name = result.Name;
-                state.EntryAction = result.EntryAction;
-
-                node.Title = state.Name;
-                node.Refresh();
-            }
+            await EditStateAsync(node);
         }
         else if (model is LinkModel link)
         {
-            var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>("Edit Transition", dialog => { });
-            if (result != null)
-            {
-                link.Labels.Clear();
-                link.AddLabel(result.Condition ?? "true");
-                link.Refresh();
-            }
+            await EditTransitionAsync(link);
         }
     }
 
@@ -192,21 +246,6 @@ else
             uiData.X = (int)node.Position.X;
             uiData.Y = (int)node.Position.Y;
             state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
-        }
-        StateMachine.Transitions.Clear();
-        foreach (var link in Diagram.Links)
-        {
-            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
-            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-            var targetState = StateMachine.States.First(x => x.Name == target.Title);
-            var transition = new Transition
-                {
-                    FromState = sourceState,
-                    ToState = targetState,
-                    Condition = link.Labels.First().Content
-                };
-            StateMachine.Transitions.Add(transition);
         }
         await StateMachineService.UpdateMachineStateAsync(StateMachine);
     }

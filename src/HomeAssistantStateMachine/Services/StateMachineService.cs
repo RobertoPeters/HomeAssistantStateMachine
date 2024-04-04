@@ -1,11 +1,7 @@
-﻿using HassClient.WS;
-using HomeAssistantStateMachine.Data;
+﻿using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
-using Mono.TextTemplating;
 using System.Collections.Concurrent;
-using System.Reflection.Metadata;
-using System.Runtime.InteropServices;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -13,12 +9,14 @@ public class StateMachineService : ServiceDbBase
 {
     private ConcurrentDictionary<int, StateMachineHandler> _handlers = [];
     private readonly HAClientService _haClientService;
+    private readonly VariableService _variableService;
 
     private bool _started = false;
 
     public StateMachineService(IDbContextFactory<HasmDbContext> dbFactory, HAClientService haClientService, VariableService variableService) : base(dbFactory)
     {
         _haClientService = haClientService;
+        _variableService = variableService;
         variableService.VariableValueChanged += VariableService_VariableValueChanged; ;
     }
 
@@ -52,7 +50,7 @@ public class StateMachineService : ServiceDbBase
                     .ToListAsync();
                 foreach (var sm in sms)
                 {
-                    _handlers.TryAdd(sm.Id, new StateMachineHandler(sm));
+                    _handlers.TryAdd(sm.Id, new StateMachineHandler(sm, _variableService));
                 }
                 return true;
             });
@@ -101,7 +99,7 @@ public class StateMachineService : ServiceDbBase
             {
                 await context.AddAsync(stateMachine);
                 await context.SaveChangesAsync();
-                result = new StateMachineHandler(stateMachine);
+                result = new StateMachineHandler(stateMachine, _variableService);
                 _handlers.TryAdd(stateMachine.Id, result);
             }))
             {
@@ -140,8 +138,12 @@ public class StateMachineService : ServiceDbBase
                     context.Remove(state);
                 }
 
+                Dictionary<int, State> newIds = [];
+
                 foreach (var state in stateMachine.States)
                 {
+                    newIds.Add(state.Id, state);
+                    state.Id = 0;
                     state.StateMachineId = stateMachine.Id;
                     state.StateMachine = null;
                     await context.AddAsync(state);
@@ -152,8 +154,8 @@ public class StateMachineService : ServiceDbBase
                 {
                     transition.StateMachineId = stateMachine.Id;
                     transition.StateMachine = null;
-                    transition.FromStateId = transition.FromState!.Id;
-                    transition.ToStateId = transition.ToState!.Id;
+                    transition.FromStateId = newIds[transition.FromStateId!.Value].Id;
+                    transition.ToStateId = newIds[transition.ToStateId!.Value].Id;
                     await context.AddAsync(transition);
                 }
 

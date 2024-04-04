@@ -1,5 +1,6 @@
 ﻿using HomeAssistantStateMachine.Models;
 using Jint.Native;
+using System.Collections.Generic;
 using System.Text;
 
 namespace HomeAssistantStateMachine.Services;
@@ -18,6 +19,7 @@ public class StateMachineHandler : IDisposable
 
     private Jint.Engine? _engine = null;
     private readonly SynchronizationContext _syncContext;
+    private readonly VariableService _variableService;
 
     private State? _currentState = null;
     public State? CurrentState
@@ -35,10 +37,27 @@ public class StateMachineHandler : IDisposable
 
     public event EventHandler<State?>? StateChanged;
 
-    public StateMachineHandler(StateMachine stateMachine)
+    public class SystemMethods
+    {
+        private readonly VariableService _variableService;
+
+        public SystemMethods(VariableService variableService)
+        {
+            _variableService = variableService;
+        }
+
+        public object? getVariableValue(string variable)
+        {
+            return _variableService.GetVariableValue(variable);
+        }
+    }
+
+    public StateMachineHandler(StateMachine stateMachine, VariableService variableService)
     {
         StateMachine = stateMachine;
+        _variableService = variableService;
         _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
+
     }
 
     public void Dispose()
@@ -51,6 +70,19 @@ public class StateMachineHandler : IDisposable
         }, null);
     }
 
+    private List<State> ListStatesWithoutEntry()
+    {
+        List<State> result = [];
+        foreach (var state in StateMachine.States)
+        {
+            if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
+            {
+                result.Add(state);
+            }
+        }
+        return result;
+    }
+
     private bool ValidateModel()
     {
         //do we have one start state?
@@ -59,16 +91,9 @@ public class StateMachineHandler : IDisposable
             return false;
         }
 
-        var statesWithoutTransitionEntry = 0;
-        foreach (var state in StateMachine.States)
-        {
-            if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
-            {
-                statesWithoutTransitionEntry++;
-            }
-        }
-
-        if (statesWithoutTransitionEntry != 1)
+        var statesWithoutTransitionEntry = ListStatesWithoutEntry();
+ 
+        if (statesWithoutTransitionEntry.Count != 1)
         {
             return false;
         }
@@ -83,13 +108,12 @@ public class StateMachineHandler : IDisposable
         {
             if (ValidateModel())
             {
-                var startState = StateMachine.States
-                     .Join(StateMachine.Transitions, s => s.Id, t => t.ToStateId, (s, t) => s)
-                     .First();
+                var startState = ListStatesWithoutEntry()[0];
 
                 _engine = new Jint.Engine();
+                _engine.SetValue("system", new SystemMethods(_variableService));
 
-                StringBuilder script = new StringBuilder();
+                var script = new StringBuilder();
                 foreach (var state in StateMachine.States)
                 {
                     script.AppendLine($"function stateEntryAction{state.Id}() {{ {state.EntryAction ?? ""} }}");
