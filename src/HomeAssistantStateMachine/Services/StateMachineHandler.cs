@@ -5,7 +5,7 @@ using System.Text;
 
 namespace HomeAssistantStateMachine.Services;
 
-public class StateMachineHandler : IDisposable
+public partial class StateMachineHandler : IDisposable
 {
     public enum StateMachineRunningState
     {
@@ -37,22 +37,7 @@ public class StateMachineHandler : IDisposable
 
     public event EventHandler<State?>? StateChanged;
 
-    public class SystemMethods
-    {
-        private readonly VariableService _variableService;
-
-        public SystemMethods(VariableService variableService)
-        {
-            _variableService = variableService;
-        }
-
-        public object? getVariableValue(string variable)
-        {
-            return _variableService.GetVariableValue(variable);
-        }
-    }
-
-    public StateMachineHandler(StateMachine stateMachine, VariableService variableService)
+     public StateMachineHandler(StateMachine stateMachine, VariableService variableService)
     {
         StateMachine = stateMachine;
         _variableService = variableService;
@@ -111,7 +96,8 @@ public class StateMachineHandler : IDisposable
                 var startState = ListStatesWithoutEntry()[0];
 
                 _engine = new Jint.Engine();
-                _engine.SetValue("system", new SystemMethods(_variableService));
+                _engine.SetValue("system", NewSystemMethods);
+                _engine.Execute(SystemScript);
 
                 var script = new StringBuilder();
                 foreach (var state in StateMachine.States)

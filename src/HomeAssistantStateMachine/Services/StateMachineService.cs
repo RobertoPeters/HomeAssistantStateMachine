@@ -17,7 +17,13 @@ public class StateMachineService : ServiceDbBase
     {
         _haClientService = haClientService;
         _variableService = variableService;
-        variableService.VariableValueChanged += VariableService_VariableValueChanged; ;
+        variableService.VariableValueChanged += VariableService_VariableValueChanged;
+        variableService.CountdownTimerChanged += VariableService_CountdownTimerChanged;
+    }
+
+    private void VariableService_CountdownTimerChanged(object? sender, EventArgs e)
+    {
+        TriggerAllStateMachines();
     }
 
     private void VariableService_VariableValueChanged(object? sender, VariableValue e)

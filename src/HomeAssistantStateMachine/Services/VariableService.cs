@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace HomeAssistantStateMachine.Services;
 
-public class VariableService : ServiceDbBase
+public partial class VariableService : ServiceDbBase
 {
     private ConcurrentDictionary<int, Variable> _variables = [];
     private ConcurrentDictionary<int, VariableValue> _variableValues = [];
