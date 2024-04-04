@@ -17,18 +17,18 @@ public partial class VariableService
         public string Name { get; set; }
         public DateTime Start { get; set; } = DateTime.UtcNow;
         public TimeSpan Duration { get; set; }
-
+        
         public CountdownTimer(int seconds)
         {
             Duration = TimeSpan.FromSeconds(seconds);
         }
 
-        public bool IsExpired => DateTime.UtcNow - Start > Duration;
-        public int Value => (int)(DateTime.UtcNow - Start).TotalSeconds;
+        public bool IsExpired => (DateTime.UtcNow - Start) > Duration;
+        public int Value => (int)(DateTime.UtcNow - (Start.Add(Duration))).TotalSeconds;
     }
 
     private Dictionary<int, Dictionary<string, CountdownTimer>> CountdownTimers = [];
-    private Timer _timer = null;
+    private Timer? _timer = null;
     private readonly object _lockTimer = new object();
 
     public bool CreateCountdownTimer(int statemachineId, string name, int seconds)
@@ -114,14 +114,11 @@ public partial class VariableService
                                 _timer!.Dispose();
                                 _timer = null;
                             }
-                            else
-                            {
-                                _timer!.Change(1000, Timeout.Infinite);
-                            }
                         }
                     }
                 }
             }
+            _timer?.Change(1000, Timeout.Infinite);
         }
 
         CountdownTimerChanged?.Invoke(this, EventArgs.Empty);

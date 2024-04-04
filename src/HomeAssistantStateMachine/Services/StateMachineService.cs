@@ -2,6 +2,7 @@
 using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
+using System.Reflection.Metadata;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -63,9 +64,14 @@ public class StateMachineService : ServiceDbBase
 
             foreach (var _handler in _handlers.Values)
             {
-                _handler.StateChanged += _handler_StateChanged;
                 _handler.Start();
             }
+
+            foreach (var _handler in _handlers.Values)
+            {
+                _handler.StateChanged += _handler_StateChanged;
+            }
+            TriggerAllStateMachines();
         }
     }
 
@@ -119,6 +125,16 @@ public class StateMachineService : ServiceDbBase
     public List<StateMachineHandler> GetStateMachines()
     {
         return _handlers.Values.ToList();
+    }
+
+    public StateMachineHandler GetStateMachine(int stateMachineId)
+    {
+        return _handlers[stateMachineId];
+    }
+
+    public void RestartMachineState(int stateMachineId)
+    {
+        _handlers[stateMachineId].Start();
     }
 
     public async Task<StateMachine> UpdateMachineStateAsync(StateMachine stateMachine, HasmDbContext? ctx = null)

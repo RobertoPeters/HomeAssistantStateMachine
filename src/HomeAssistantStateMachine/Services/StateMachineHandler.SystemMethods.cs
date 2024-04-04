@@ -27,8 +27,7 @@ public partial class StateMachineHandler
 
         public bool createCountdownTimer(string name, int seconds)
         {
-            return true;
-            //return _variableService.CreateCountdownTimer(_stateMachineHandler.StateMachine.Id, name, seconds);
+            return _variableService.CreateCountdownTimer(_stateMachineHandler.StateMachine.Id, name, seconds);
         }
 
         public bool countdownTimerExpired(string name)

@@ -15,7 +15,21 @@ public partial class StateMachineHandler : IDisposable
     }
 
     public StateMachine StateMachine { get; private set; }
-    public StateMachineRunningState RunningState { get; private set; } = StateMachineRunningState.NotRunning;
+    public string ErrorMessage { get; private set; }
+
+    private StateMachineRunningState _runningState = StateMachineRunningState.NotRunning;
+    public StateMachineRunningState RunningState 
+    {
+        get => _runningState;
+        private set
+        {
+            _runningState = value;
+            if (value != StateMachineRunningState.Error)
+            {
+                ErrorMessage = "";
+            }
+        }
+    }
 
     private Jint.Engine? _engine = null;
     private readonly SynchronizationContext _syncContext;
@@ -91,6 +105,7 @@ public partial class StateMachineHandler : IDisposable
     {
         _syncContext.Post((_) =>
         {
+            ChangeToState(null);
             if (ValidateModel())
             {
                 var startState = ListStatesWithoutEntry()[0];
@@ -116,15 +131,17 @@ public partial class StateMachineHandler : IDisposable
                     RunningState = StateMachineRunningState.Running;
                     ChangeToState(startState);
                 }
-                catch
+                catch (Exception e)
                 {
                     _engine.Dispose();
                     _engine = null;
+                    ErrorMessage = $"Error initializing statemachine: {e.Message}";
                     RunningState = StateMachineRunningState.Error;
                 }
             }
             else
             {
+                ErrorMessage = $"Statemachine is not valid";
                 RunningState = StateMachineRunningState.Error;
             }
         }, null);
@@ -148,6 +165,7 @@ public partial class StateMachineHandler : IDisposable
 
             if (RunningState == StateMachineRunningState.Running && CurrentState != null && _engine != null)
             {
+                Transition? activeTransition = null;
                 try
                 {
                     var transitions = StateMachine.Transitions
@@ -155,15 +173,18 @@ public partial class StateMachineHandler : IDisposable
                         .ToList();
                     foreach (var transition in transitions)
                     {
-                        if (_engine.Invoke($"transitionResult{transition.Id}") == JsBoolean.True)
+                        activeTransition = transition;
+                        var condition = _engine.Evaluate($"transitionResult{transition.Id}()").ToObject();
+                        if ((bool)condition!)
                         {
                             ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
                             break;
                         }
                     }
                 }
-                catch
+                catch (Exception e)
                 {
+                    ErrorMessage = $"Error in transition ({activeTransition?.Description ?? activeTransition?.Condition}): {e.Message}";
                     RunningState = StateMachineRunningState.Error;
                 }
             }
@@ -188,8 +209,9 @@ public partial class StateMachineHandler : IDisposable
             {
                 _engine.Invoke($"stateEntryAction{state.Id}");
             }
-            catch
+            catch (Exception e)
             {
+                ErrorMessage = $"Error in state entry action ({state.Name}): {e.Message}";
                 RunningState = StateMachineRunningState.Error;
             }
         }
