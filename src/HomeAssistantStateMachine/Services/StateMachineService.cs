@@ -1,11 +1,7 @@
-﻿using HassClient.WS;
-using HomeAssistantStateMachine.Data;
+﻿using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
-using Mono.TextTemplating;
 using System.Collections.Concurrent;
-using System.Reflection.Metadata;
-using System.Runtime.InteropServices;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -140,8 +136,12 @@ public class StateMachineService : ServiceDbBase
                     context.Remove(state);
                 }
 
+                Dictionary<int, State> newIds = [];
+
                 foreach (var state in stateMachine.States)
                 {
+                    newIds.Add(state.Id, state);
+                    state.Id = 0;
                     state.StateMachineId = stateMachine.Id;
                     state.StateMachine = null;
                     await context.AddAsync(state);
@@ -152,8 +152,8 @@ public class StateMachineService : ServiceDbBase
                 {
                     transition.StateMachineId = stateMachine.Id;
                     transition.StateMachine = null;
-                    transition.FromStateId = transition.FromState!.Id;
-                    transition.ToStateId = transition.ToState!.Id;
+                    transition.FromStateId = newIds[transition.FromStateId!.Value].Id;
+                    transition.ToStateId = newIds[transition.ToStateId!.Value].Id;
                     await context.AddAsync(transition);
                 }
 

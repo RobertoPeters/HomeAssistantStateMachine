@@ -1,5 +1,6 @@
 ﻿using HomeAssistantStateMachine.Models;
 using Jint.Native;
+using System.Collections.Generic;
 using System.Text;
 
 namespace HomeAssistantStateMachine.Services;
@@ -51,6 +52,19 @@ public class StateMachineHandler : IDisposable
         }, null);
     }
 
+    private List<State> ListStatesWithoutEntry()
+    {
+        List<State> result = [];
+        foreach (var state in StateMachine.States)
+        {
+            if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
+            {
+                result.Add(state);
+            }
+        }
+        return result;
+    }
+
     private bool ValidateModel()
     {
         //do we have one start state?
@@ -59,16 +73,9 @@ public class StateMachineHandler : IDisposable
             return false;
         }
 
-        var statesWithoutTransitionEntry = 0;
-        foreach (var state in StateMachine.States)
-        {
-            if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
-            {
-                statesWithoutTransitionEntry++;
-            }
-        }
-
-        if (statesWithoutTransitionEntry != 1)
+        var statesWithoutTransitionEntry = ListStatesWithoutEntry();
+ 
+        if (statesWithoutTransitionEntry.Count != 1)
         {
             return false;
         }
@@ -83,13 +90,11 @@ public class StateMachineHandler : IDisposable
         {
             if (ValidateModel())
             {
-                var startState = StateMachine.States
-                     .Join(StateMachine.Transitions, s => s.Id, t => t.ToStateId, (s, t) => s)
-                     .First();
+                var startState = ListStatesWithoutEntry()[0];
 
                 _engine = new Jint.Engine();
 
-                StringBuilder script = new StringBuilder();
+                var script = new StringBuilder();
                 foreach (var state in StateMachine.States)
                 {
                     script.AppendLine($"function stateEntryAction{state.Id}() {{ {state.EntryAction ?? ""} }}");
