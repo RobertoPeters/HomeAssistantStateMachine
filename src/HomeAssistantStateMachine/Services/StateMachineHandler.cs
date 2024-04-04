@@ -155,7 +155,8 @@ public partial class StateMachineHandler : IDisposable
                         .ToList();
                     foreach (var transition in transitions)
                     {
-                        if (_engine.Invoke($"transitionResult{transition.Id}") == JsBoolean.True)
+                        var condition = _engine.Invoke($"transitionResult{transition.Id}");
+                        if (condition != null && condition == JsBoolean.True)
                         {
                             ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
                             break;

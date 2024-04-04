@@ -121,6 +121,16 @@ public class StateMachineService : ServiceDbBase
         return _handlers.Values.ToList();
     }
 
+    public StateMachineHandler GetStateMachine(int stateMachineId)
+    {
+        return _handlers[stateMachineId];
+    }
+
+    public void RestartMachineState(int stateMachineId)
+    {
+        _handlers[stateMachineId].Start();
+    }
+
     public async Task<StateMachine> UpdateMachineStateAsync(StateMachine stateMachine, HasmDbContext? ctx = null)
     {
         return await ExecuteOnDbContextAsync(ctx, async (context) =>

@@ -12,20 +12,26 @@
 @using Blazor.Diagrams.Options;
 @using Blazor.Diagrams.Core.Geometry;
 @using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Components.Widgets;
 @implements IDisposable
 
 <PageTitle>HASM - Edit State Machine</PageTitle>
 
 @if (StateMachine != null)
 {
-    <h1>Edit State Machine: @StateMachine.Name</h1>
+    <h1>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.CurrentState?.Name ?? "-"))</h1>
     <RadzenButton Text="Add State" Click="@AddStateAsync" />
     <RadzenButton Text="Save" Click="@SaveAsync" />
+    <RadzenButton Text="Restart" Click="@Restart" />
     <RadzenButton Text="Reload" Click="@ReloadDiagramAsync" />
 
     <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;">
         <CascadingValue Value="Diagram" IsFixed="true">
-            <DiagramCanvas></DiagramCanvas>
+            <DiagramCanvas>
+                <Widgets>
+                    <SelectionBoxWidget />
+                </Widgets>
+            </DiagramCanvas>
         </CascadingValue>
     </div>
 }
@@ -46,10 +52,12 @@ else
 
     private BlazorDiagram Diagram { get; set; } = null!;
     private StateMachine StateMachine = null!;
+    private StateMachineHandler StateMachineHandler = null!;
     private int newIdForAdd = -1;
 
     protected override async Task OnInitializedAsync()
     {
+        StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
             {
                 AllowMultiSelection = false,
@@ -91,10 +99,37 @@ else
         Diagram = new BlazorDiagram(options);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
+        StateMachineHandler.StateChanged += StateChanged;
 
         await ReloadDiagramAsync();
 
         await base.OnInitializedAsync();
+    }
+
+    void StateChanged(object? sender, State? state)
+    {
+        InvokeAsync(() =>
+        {
+            var currentState = StateMachineHandler.CurrentState;
+            if (Diagram != null)
+            {
+                if (currentState != null)
+                {
+                    foreach (var node in Diagram.Nodes)
+                    {
+                        if (node.Title == currentState!.Name)
+                        {
+                            Diagram.SelectModel(node, true);
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    Diagram.UnselectAll();
+                }
+            }
+        });
     }
 
     async Task ReloadDiagramAsync()
@@ -125,11 +160,13 @@ else
             link.TargetMarker = LinkMarker.Arrow;
             link.AddLabel(transition.Description ?? transition.Condition ?? "true");
         }
+        StateChanged(null, null);
         Diagram.Refresh();
     }
 
     public void Dispose()
     {
+        StateMachineHandler.StateChanged -= StateChanged;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
     }
 
@@ -230,6 +267,11 @@ else
         {
             await EditTransitionAsync(link);
         }
+    }
+
+    void Restart()
+    {
+        StateMachineService.RestartMachineState(StateMachine.Id);
     }
 
     async Task SaveAsync()

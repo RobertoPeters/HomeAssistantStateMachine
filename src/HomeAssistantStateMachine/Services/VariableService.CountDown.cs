@@ -23,12 +23,12 @@ public partial class VariableService
             Duration = TimeSpan.FromSeconds(seconds);
         }
 
-        public bool IsExpired => DateTime.UtcNow - Start > Duration;
-        public int Value => (int)(DateTime.UtcNow - Start).TotalSeconds;
+        public bool IsExpired => (Start - DateTime.UtcNow) > Duration;
+        public int Value => (int)(DateTime.UtcNow - (Start.Add(Duration))).TotalSeconds;
     }
 
     private Dictionary<int, Dictionary<string, CountdownTimer>> CountdownTimers = [];
-    private Timer _timer = null;
+    private Timer? _timer = null;
     private readonly object _lockTimer = new object();
 
     public bool CreateCountdownTimer(int statemachineId, string name, int seconds)

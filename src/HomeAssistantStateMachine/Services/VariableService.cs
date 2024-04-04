@@ -23,12 +23,9 @@ public partial class VariableService : ServiceDbBase
 
     public object? GetVariableValue(string name)
     {
-        if (_variableNameToString.TryGetValue(name, out var id))
+        if (_variableNameToString.TryGetValue(name, out var id) && _variableValues.TryGetValue(id, out var variableValue))
         {
-            if (_variableValues.TryGetValue(id, out var variableValue))
-            {
-                return variableValue.Value;
-            }
+            return variableValue.Value;
         }
         return null;
     }
@@ -103,7 +100,7 @@ public partial class VariableService : ServiceDbBase
                 _variableValues.TryAdd(variableValue.Variable!.Id, variableValue);
                 VariableValueChanged?.Invoke(this, variableValue);
             });
-         });
+        });
     }
 
     public async Task<bool> UpdateVariableValueAsync(VariableValue variableValue, string? newValue, HasmDbContext? ctx = null)
@@ -146,7 +143,7 @@ public partial class VariableService : ServiceDbBase
             .Where(x => haClient?.Id == x.HAClient?.Id && stateMachine?.Id == x.StateMachine?.Id && state?.Id == x.State?.Id)
             .ToList();
 
-        foreach(var variable in allVariables)
+        foreach (var variable in allVariables)
         {
             _variableValues.TryGetValue(variable.Id, out var variableValue);
             result.Add((variable, variableValue));
