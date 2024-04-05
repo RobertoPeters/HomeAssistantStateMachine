@@ -9,7 +9,7 @@
 
 <h1>Variables</h1>
 
-@if (variables != null)
+@if (gridData != null)
 {
     <RadzenDataGrid @ref="grid" AllowFiltering="true"
                     AllowColumnResize="true"
@@ -19,9 +19,10 @@
                     AllowSorting="true"
                     PageSize="20"
                     AllowPaging="true"
+                    AllowVirtualization="true"
                     PagerHorizontalAlign="HorizontalAlign.Left"
                     ShowPagingSummary="true"
-                    Data="@variables.Values.ToList()"
+                    Data="@gridData"
                     TItem="VariableInfo"
                     ColumnWidth="300px">
         <Columns>
@@ -60,6 +61,7 @@
     private readonly ConcurrentDictionary<int, VariableInfo> variables = [];
 
     private RadzenDataGrid<VariableInfo>? grid;
+    private List<VariableInfo>? gridData;
 
     protected override void OnInitialized()
     {
@@ -76,11 +78,13 @@
         UpdateCountdownTimers();
         VariableService.VariableValueChanged += VariableValueChanged;
         VariableService.CountdownTimerChanged += CountdownTimerChanged;
+        gridData = variables.Values.ToList();
         base.OnInitialized();
     }
 
-    private void UpdateCountdownTimers()
+    private bool UpdateCountdownTimers()
     {
+        var result = false;
         var allTimers = VariableService.AllCountDownTimers();
         foreach (var timer in allTimers)
         {
@@ -95,6 +99,7 @@
                         Timer = timer
                     };
                 variables.TryAdd(timer.Id, vi);
+                result = true;
             }
         }
         foreach (var v in variables.Values.ToList())
@@ -102,41 +107,58 @@
             if (v.Timer != null && !allTimers.Any(x => x.Id == v.Timer.Id))
             {
                 variables.TryRemove(v.Timer!.Id, out var _);
+                result = true;
             }
         }
+        return result;
     }
 
     private void CountdownTimerChanged(object? sender, EventArgs e)
     {
-        Task.Yield();
-        UpdateCountdownTimers();
+        InvokeAsync(() =>
+        {
+            if (UpdateCountdownTimers())
+            {
+                UpdateGridData();
+            }
+            else
+            {
+                grid.Reload();
+            }
+        });
+    }
+
+    private void UpdateGridData()
+    {
+        gridData = variables.Values.ToList();
         if (grid != null)
         {
-            InvokeAsync(grid.Reload);
+            grid.Data = gridData;
+            grid!.Reload();
         }
     }
 
     private void VariableValueChanged(object? sender, VariableValue e)
     {
-        Task.Yield();
-        if (variables!.TryGetValue(e.Variable!.Id, out var v))
-        {
-            v.VariableValue = e;
-        }
-        else
-        {
-            var newVariable = VariableService.GetVariables().Where(x => x.variable.Id == e.Variable.Id).First();
-            var vi = new VariableInfo()
-                {
-                    Variable = newVariable.variable,
-                    VariableValue = newVariable.variableValue
-                };
-            variables.TryAdd(newVariable.variable.Id, vi);
-        }
-        if (grid != null)
-        {
-            InvokeAsync(grid!.Reload);
-        }
+        InvokeAsync(() =>
+          {
+              if (variables!.TryGetValue(e.Variable!.Id, out var v))
+              {
+                  v.VariableValue = e;
+                  grid!.Reload();
+              }
+              else
+              {
+                  var newVariable = VariableService.GetVariables().Where(x => x.variable.Id == e.Variable.Id).First();
+                  var vi = new VariableInfo()
+                      {
+                          Variable = newVariable.variable,
+                          VariableValue = newVariable.variableValue
+                      };
+                  variables.TryAdd(newVariable.variable.Id, vi);
+                  UpdateGridData();
+              }
+          });
     }
 
     public void Dispose()

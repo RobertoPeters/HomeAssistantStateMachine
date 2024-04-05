@@ -22,6 +22,7 @@
                     PageSize="20"
                     RowClick="@OnRowClick"
                     AllowPaging="true"
+                    AllowVirtualization="true"
                     PagerHorizontalAlign="HorizontalAlign.Left"
                     ShowPagingSummary="true"
                     Data="@statemachines.Values.ToList()"
@@ -89,11 +90,21 @@
         var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Add State Machine", dialog => { });
         if (result != null)
         {
-            await StateMachineService.CreateMachineStateAsync(result);
+            var statemachine = await StateMachineService.CreateMachineStateAsync(result);
+            if (statemachine != null)
+            {
+                var v = new StateMachineInfo()
+                    {
+                        StateMachineHandler = statemachine
+                    };
+                statemachines.TryAdd(statemachine.StateMachine.Id, v);
+                statemachine.StateChanged += StateMachineStateChanged;
+                grid!.Data = statemachines.Values.ToList();
+            }
         }
     }
 
-    void OnRowClick(DataGridRowMouseEventArgs< StateMachineInfo> item)
+    void OnRowClick(DataGridRowMouseEventArgs<StateMachineInfo> item)
     {
         NavigationManager.NavigateTo($"/editstatemachine/{item.Data.StateMachineHandler.StateMachine.Id}");
     }

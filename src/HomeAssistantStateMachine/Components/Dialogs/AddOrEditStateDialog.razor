@@ -12,8 +12,18 @@
                 <RadzenCustomValidator Component="Name" Validator="@(() => !ExistingStateNames.Contains(Model!.Name))" Text="Name should be unique" />
             </Helper>
         </RadzenFormField>
+        <RadzenFormField Text="Enabled" Variant="@Variant.Outlined">
+            <RadzenRadioButtonList @bind-Value="@TypeOfState" TValue="int" class="rz-m-4 rz-mt-8">
+                <Items>
+                    <RadzenRadioButtonListItem Text="Normal" Value="0" />
+                    <RadzenRadioButtonListItem Text="Start" Value="1" />
+                    <RadzenRadioButtonListItem Text="Error" Value="2" />
+                </Items>
+            </RadzenRadioButtonList>
+        </RadzenFormField>
+
         <RadzenFormField Text="Description" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="10" />
+            <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" />
         </RadzenFormField>
         <RadzenFormField Text="Entry Action" Variant="@Variant.Outlined">
             <RadzenTextArea @bind-Value="@Model!.EntryAction" Name="EntryAction" Rows="10" />
@@ -36,6 +46,7 @@
 
     private State? Model;
     private RadzenTemplateForm<State>? Form;
+    private int TypeOfState = 0;
 
     protected override void OnInitialized()
     {
@@ -44,6 +55,7 @@
             State = new State();
         }
         Model = State.CopyObject();
+        TypeOfState = Model!.IsStartState ? 1 : Model.IsErrorState ? 2 : 0;
         base.OnInitialized();
     }
 
@@ -52,6 +64,8 @@
         Form!.EditContext.Validate();
         if (Form.IsValid)
         {
+            Model!.IsErrorState = TypeOfState == 2;
+            Model.IsStartState = TypeOfState == 1;
             Close(Model);
         };
     }

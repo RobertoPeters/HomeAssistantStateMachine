@@ -12,6 +12,10 @@ public class State
     [StringLength(255)]
     public string Name { get; set; } = null!;
 
+    public bool IsErrorState { get; set; }
+
+    public bool IsStartState { get; set; }
+
     public string? Description { get; set; }
 
     public string? EntryAction { get; set; }

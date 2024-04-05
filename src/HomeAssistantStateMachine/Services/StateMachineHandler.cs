@@ -15,18 +15,36 @@ public partial class StateMachineHandler : IDisposable
     }
 
     public StateMachine StateMachine { get; private set; }
-    public string ErrorMessage { get; private set; }
+    public string? ErrorMessage { get; private set; }
 
     private StateMachineRunningState _runningState = StateMachineRunningState.NotRunning;
-    public StateMachineRunningState RunningState 
+    public StateMachineRunningState RunningState
     {
         get => _runningState;
         private set
         {
-            _runningState = value;
-            if (value != StateMachineRunningState.Error)
+            if (_runningState != value)
             {
-                ErrorMessage = "";
+                if (value == StateMachineRunningState.Error && _runningState == StateMachineRunningState.Running)
+                {
+                    var errorState = StateMachine.States.FirstOrDefault(x => x.IsErrorState);
+                    if (errorState != null && CurrentState?.Id != errorState.Id)
+                    {
+                        ChangeToState(errorState);
+                    }
+                    else
+                    {
+                        _runningState = value;
+                    }
+                }
+                else
+                {
+                    _runningState = value;
+                    if (value != StateMachineRunningState.Error)
+                    {
+                        ErrorMessage = "";
+                    }
+                }
             }
         }
     }
@@ -34,6 +52,7 @@ public partial class StateMachineHandler : IDisposable
     private Jint.Engine? _engine = null;
     private readonly SynchronizationContext _syncContext;
     private readonly VariableService _variableService;
+    private readonly HAClientService _haClientService;
 
     private State? _currentState = null;
     public State? CurrentState
@@ -51,10 +70,11 @@ public partial class StateMachineHandler : IDisposable
 
     public event EventHandler<State?>? StateChanged;
 
-     public StateMachineHandler(StateMachine stateMachine, VariableService variableService)
+    public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
     {
         StateMachine = stateMachine;
         _variableService = variableService;
+        _haClientService = haClientService;
         _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
     }
@@ -69,47 +89,59 @@ public partial class StateMachineHandler : IDisposable
         }, null);
     }
 
-    private List<State> ListStatesWithoutEntry()
+    private State? GetStartState()
     {
-        List<State> result = [];
+        var states = StateMachine.States.Where(x => x.IsStartState).ToList();
+        if (states.Count == 1)
+        {
+            return states[0];
+        }
+        else if (states.Count > 1)
+        {
+            return null;
+        }
+
         foreach (var state in StateMachine.States)
         {
             if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
             {
-                result.Add(state);
+                states.Add(state);
             }
         }
-        return result;
+
+        if (states.Count == 1)
+        {
+            return states[0];
+        }
+
+        return null;
     }
 
     private bool ValidateModel()
     {
         //do we have one start state?
-        if (!StateMachine.States.Any())
+        if (GetStartState() == null)
         {
             return false;
         }
 
-        var statesWithoutTransitionEntry = ListStatesWithoutEntry();
- 
-        if (statesWithoutTransitionEntry.Count != 1)
+        //one rror state
+        var states = StateMachine.States.Where(x => x.IsErrorState).ToList();
+        if (states.Count > 1)
         {
             return false;
         }
-
 
         return true;
     }
 
     public void Start()
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
-            ChangeToState(null);
+            _currentState = null;
             if (ValidateModel())
             {
-                var startState = ListStatesWithoutEntry()[0];
-
                 _engine = new Jint.Engine();
                 _engine.SetValue("system", NewSystemMethods);
                 _engine.Execute(SystemScript);
@@ -129,7 +161,7 @@ public partial class StateMachineHandler : IDisposable
                 {
                     _engine.Execute(script.ToString());
                     RunningState = StateMachineRunningState.Running;
-                    ChangeToState(startState);
+                    ChangeToState(GetStartState());
                 }
                 catch (Exception e)
                 {
@@ -160,7 +192,7 @@ public partial class StateMachineHandler : IDisposable
 
     public void TriggerProcess()
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
 
             if (RunningState == StateMachineRunningState.Running && CurrentState != null && _engine != null)
@@ -203,6 +235,7 @@ public partial class StateMachineHandler : IDisposable
 
     private void ChangeToState(State? state)
     {
+        CurrentState = state;
         if (RunningState == StateMachineRunningState.Running && _engine != null && state != null)
         {
             try
@@ -215,7 +248,6 @@ public partial class StateMachineHandler : IDisposable
                 RunningState = StateMachineRunningState.Error;
             }
         }
-        CurrentState = state;
     }
 }
 

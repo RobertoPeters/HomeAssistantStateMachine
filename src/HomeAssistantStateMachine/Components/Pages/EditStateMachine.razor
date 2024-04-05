@@ -256,6 +256,8 @@ else
             state.Name = result.Name;
             state.Description = result.Description;
             state.EntryAction = result.EntryAction;
+            state.IsErrorState = result.IsErrorState;
+            state.IsStartState = result.IsStartState;
 
             node.Title = state.Name;
             node.Refresh();
@@ -295,5 +297,6 @@ else
             state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
         }
         await StateMachineService.UpdateMachineStateAsync(StateMachine);
+        await ReloadDiagramAsync();
     }
 }
