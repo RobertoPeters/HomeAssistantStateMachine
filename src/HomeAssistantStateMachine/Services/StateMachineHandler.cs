@@ -70,7 +70,11 @@ public partial class StateMachineHandler : IDisposable
 
     public event EventHandler<State?>? StateChanged;
 
+<<<<<<< HEAD
     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
+=======
+     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
+>>>>>>> 629dbb3cbd5f00ca9a5f5ae5c7944634658aaa35
     {
         StateMachine = stateMachine;
         _variableService = variableService;
