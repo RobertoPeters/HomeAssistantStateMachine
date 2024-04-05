@@ -34,6 +34,7 @@ public partial class StateMachineHandler : IDisposable
     private Jint.Engine? _engine = null;
     private readonly SynchronizationContext _syncContext;
     private readonly VariableService _variableService;
+    private readonly HAClientService _haClientService;
 
     private State? _currentState = null;
     public State? CurrentState
@@ -51,10 +52,11 @@ public partial class StateMachineHandler : IDisposable
 
     public event EventHandler<State?>? StateChanged;
 
-     public StateMachineHandler(StateMachine stateMachine, VariableService variableService)
+     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
     {
         StateMachine = stateMachine;
         _variableService = variableService;
+        _haClientService = haClientService;
         _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
     }
@@ -103,9 +105,9 @@ public partial class StateMachineHandler : IDisposable
 
     public void Start()
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
-            ChangeToState(null);
+            _currentState = null;
             if (ValidateModel())
             {
                 var startState = ListStatesWithoutEntry()[0];
@@ -160,7 +162,7 @@ public partial class StateMachineHandler : IDisposable
 
     public void TriggerProcess()
     {
-        _syncContext.Post((_) =>
+        _syncContext.Send((_) =>
         {
 
             if (RunningState == StateMachineRunningState.Running && CurrentState != null && _engine != null)

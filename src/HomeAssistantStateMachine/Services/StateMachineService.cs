@@ -47,7 +47,6 @@ public class StateMachineService : ServiceDbBase
     {
         if (!_started)
         {
-            _started = true;
             //load data and create state maching handlers
             await ExecuteOnDbContextAsync(null, async (context) =>
             {
@@ -57,7 +56,7 @@ public class StateMachineService : ServiceDbBase
                     .ToListAsync();
                 foreach (var sm in sms)
                 {
-                    _handlers.TryAdd(sm.Id, new StateMachineHandler(sm, _variableService));
+                    _handlers.TryAdd(sm.Id, new StateMachineHandler(sm, _variableService, _haClientService));
                 }
                 return true;
             });
@@ -71,13 +70,18 @@ public class StateMachineService : ServiceDbBase
             {
                 _handler.StateChanged += _handler_StateChanged;
             }
+
+            _started = true;
             TriggerAllStateMachines();
         }
     }
 
     private void _handler_StateChanged(object? sender, Models.State? e)
     {
-        TriggerAllStateMachines();
+        if (_started)
+        {
+            TriggerAllStateMachines();
+        }
     }
 
     private long _triggering = 0;
@@ -111,7 +115,7 @@ public class StateMachineService : ServiceDbBase
             {
                 await context.AddAsync(stateMachine);
                 await context.SaveChangesAsync();
-                result = new StateMachineHandler(stateMachine, _variableService);
+                result = new StateMachineHandler(stateMachine, _variableService, _haClientService);
                 _handlers.TryAdd(stateMachine.Id, result);
             }))
             {

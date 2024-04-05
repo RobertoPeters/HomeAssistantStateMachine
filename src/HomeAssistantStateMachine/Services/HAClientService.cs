@@ -4,6 +4,8 @@ using HomeAssistantStateMachine.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -11,7 +13,7 @@ public class HAClientService : ServiceDbBase
 {
     private readonly IConfiguration _configuration;
     private readonly VariableService _variableService;
-    private readonly ConcurrentDictionary<int, HAClientHandler> _handlers = [];
+    private readonly ConcurrentDictionary<string, HAClientHandler> _handlers = [];
     private bool _started = false;
 
     public event EventHandler<ConnectionStates>? ConnectionChanged;
@@ -34,7 +36,7 @@ public class HAClientService : ServiceDbBase
                 foreach (var client in clients)
                 {
                     var clientHandler = new HAClientHandler(this, client, _variableService);
-                    _handlers.TryAdd(client.Id, clientHandler);
+                    _handlers.TryAdd(client.Name, clientHandler);
                 }
 
                 return true;
@@ -80,7 +82,7 @@ public class HAClientService : ServiceDbBase
                 await context.AddAsync(client);
                 await context.SaveChangesAsync();
                 result = new HAClientHandler(this, client, _variableService);
-                _handlers.TryAdd(client.Id, result);
+                _handlers.TryAdd(client.Name, result);
                 await result.StartAsync();
             });
             return result;
@@ -95,5 +97,40 @@ public class HAClientService : ServiceDbBase
     public List<HAClientHandler> GetClients()
     {
         return _handlers.Values.ToList();
+    }
+
+    private HAClientHandler? GetClientHandler(string? name)
+    {
+        HAClientHandler? result = null;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            if (_handlers.Count == 1)
+            {
+                return _handlers.Values.First();
+            }
+            return null;
+        }
+        _handlers.TryGetValue(name, out result);
+        return result;
+    }
+
+    public async Task<bool> CallServiceAsync(string? clientName, string name, string service, object? data = null)
+    {
+        var client = GetClientHandler(clientName);
+        if (client != null)
+        {
+            return await client.CallServiceAsync(name, service, data);
+        }
+        return false;
+   }
+
+    public async Task<bool> CallServiceForEntitiesAsync(string? clientName, string name, string service, params string[] entityIds)
+    {
+        var client = GetClientHandler(clientName);
+        if (client != null)
+        {
+            return await client.CallServiceForEntitiesAsync(name, service, entityIds);
+        }
+        return false;
     }
 }

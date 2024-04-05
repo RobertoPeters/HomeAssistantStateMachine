@@ -295,5 +295,6 @@ else
             state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
         }
         await StateMachineService.UpdateMachineStateAsync(StateMachine);
+        await ReloadDiagramAsync();
     }
 }

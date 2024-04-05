@@ -107,6 +107,39 @@ public class HAClientHandler : IAsyncDisposable
         return result;
     }
 
+    public async Task<bool> CallServiceAsync(string name, string service, object? data = null)
+    {
+        var result = false;
+        if (ConnectionState == ConnectionStates.Connected)
+        {
+            try
+            {
+                var callResult = await _wsApi!.CallServiceAsync(name, service, data);
+                result = callResult != null;
+            }
+            catch
+            {//ignore
+            }
+        }
+        return result;
+    }
+
+    public async Task<bool> CallServiceForEntitiesAsync(string name, string service, params string[] entityIds)
+    {
+        var result = false;
+        if (ConnectionState == ConnectionStates.Connected)
+        {
+            try
+            {
+                result = await _wsApi!.CallServiceForEntitiesAsync(name, service, entityIds);
+            }
+            catch
+            {//ignore
+            }
+        }
+        return result;
+    }
+
     public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
 
     private async void _wsApi_ConnectionStateChanged(object? sender, ConnectionStates e)
