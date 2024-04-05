@@ -15,7 +15,7 @@
                     AllowColumnResize="true"
                     AllowAlternatingRows="false"
                     FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                    FilterMode="FilterMode.Simple"
+                    FilterMode="FilterMode.SimpleWithMenu"
                     AllowSorting="true"
                     PageSize="20"
                     AllowPaging="true"
@@ -28,7 +28,7 @@
             <RadzenDataGridColumn TItem="VariableInfo"
                                   Property="@nameof(VariableInfo.Name)"
                                   Title="Name" />
- 
+
             <RadzenDataGridColumn TItem="VariableInfo"
                                   Property="@nameof(VariableInfo.Data)"
                                   Title="Data" />
@@ -38,6 +38,7 @@
                                   Title="Value" />
 
             <RadzenDataGridColumn TItem="VariableInfo"
+                                  Filterable="false"
                                   Property="@nameof(VariableInfo.Update)"
                                   Title="Update" FormatString="{0:HH:mm.sss}" />
         </Columns>
@@ -47,13 +48,14 @@
 @code {
     private class VariableInfo
     {
-        public Variable Variable { get; set; } = null!;
+        public Variable? Variable { get; set; } = null!;
         public VariableValue? VariableValue { get; set; }
- 
-        public string Name => Variable.Name;
-        public string? Data => Variable.Data;
-        public string? Value => VariableValue?.Value;
-        public DateTime? Update => VariableValue?.Update;
+        public VariableService.CountdownTimer? Timer { get; set; }
+
+        public string Name => Variable?.Name ?? Timer?.Name ?? "";
+        public string? Data => Variable?.Data ?? "";
+        public string? Value => VariableValue?.Value ?? Timer?.Value.ToString() ?? "";
+        public DateTime? Update => (VariableValue?.Update ?? Timer?.Start)?.ToLocalTime();
     }
     private readonly ConcurrentDictionary<int, VariableInfo> variables = [];
 
@@ -71,12 +73,52 @@
                 };
             variables.TryAdd(variable.variable.Id, v);
         }
+        UpdateCountdownTimers();
         VariableService.VariableValueChanged += VariableValueChanged;
+        VariableService.CountdownTimerChanged += CountdownTimerChanged;
         base.OnInitialized();
+    }
+
+    private void UpdateCountdownTimers()
+    {
+        var allTimers = VariableService.AllCountDownTimers();
+        foreach (var timer in allTimers)
+        {
+            if (variables!.TryGetValue(timer!.Id, out var v))
+            {
+                v.Timer = timer;
+            }
+            else
+            {
+                var vi = new VariableInfo()
+                    {
+                        Timer = timer
+                    };
+                variables.TryAdd(timer.Id, vi);
+            }
+        }
+        foreach (var v in variables.Values.ToList())
+        {
+            if (v.Timer != null && !allTimers.Any(x => x.Id == v.Timer.Id))
+            {
+                variables.TryRemove(v.Timer!.Id, out var _);
+            }
+        }
+    }
+
+    private void CountdownTimerChanged(object? sender, EventArgs e)
+    {
+        Task.Yield();
+        UpdateCountdownTimers();
+        if (grid != null)
+        {
+            InvokeAsync(grid.Reload);
+        }
     }
 
     private void VariableValueChanged(object? sender, VariableValue e)
     {
+        Task.Yield();
         if (variables!.TryGetValue(e.Variable!.Id, out var v))
         {
             v.VariableValue = e;
@@ -91,11 +133,15 @@
                 };
             variables.TryAdd(newVariable.variable.Id, vi);
         }
-        InvokeAsync(grid!.Reload);
+        if (grid != null)
+        {
+            InvokeAsync(grid!.Reload);
+        }
     }
 
     public void Dispose()
     {
+        VariableService.CountdownTimerChanged -= CountdownTimerChanged;
         VariableService.VariableValueChanged -= VariableValueChanged;
     }
 }

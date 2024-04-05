@@ -9,27 +9,32 @@ namespace HomeAssistantStateMachine.Services;
 
 public partial class VariableService
 {
-    public event EventHandler CountdownTimerChanged;
+    public event EventHandler? CountdownTimerChanged;
 
-    private sealed class CountdownTimer
+    public class CountdownTimer
     {
-        public int MachineStateId { get; set; }
-        public string Name { get; set; }
+        public int Id { get; private set; }
+        public int StateMachineId { get; private set; }
+        public string Name { get; private set; }
         public DateTime Start { get; set; } = DateTime.UtcNow;
         public TimeSpan Duration { get; set; }
         
-        public CountdownTimer(int seconds)
+        public CountdownTimer(int id, int machineStateId, string name, int seconds)
         {
             Duration = TimeSpan.FromSeconds(seconds);
+            Name = name;
+            StateMachineId = machineStateId;
+            Id = id;
         }
 
         public bool IsExpired => (DateTime.UtcNow - Start) > Duration;
-        public int Value => (int)(DateTime.UtcNow - (Start.Add(Duration))).TotalSeconds;
+        public int Value => (int)((Start.Add(Duration)) - DateTime.UtcNow).TotalSeconds;
     }
 
     private Dictionary<int, Dictionary<string, CountdownTimer>> CountdownTimers = [];
     private Timer? _timer = null;
     private readonly object _lockTimer = new object();
+    private int _timerId = 0;
 
     public bool CreateCountdownTimer(int statemachineId, string name, int seconds)
     {
@@ -43,11 +48,12 @@ public partial class VariableService
             }
             if (!timers.TryGetValue(name, out var timer))
             {
-                timer = new CountdownTimer(seconds)
+                _timerId--;
+                if (_timerId == int.MinValue)
                 {
-                    MachineStateId = statemachineId,
-                    Name = name
-                };
+                    _timerId = -1;
+                }
+                timer = new CountdownTimer(_timerId, statemachineId, name, seconds);
                 timers.Add(name, timer);
             }
             timer.Start = DateTime.UtcNow;
@@ -55,6 +61,19 @@ public partial class VariableService
             if (_timer == null)
             {
                 _timer = new Timer(CheckCountdownTimers, null, 1000, Timeout.Infinite);
+            }
+        }
+        return result;
+    }
+
+    public List<CountdownTimer> AllCountDownTimers()
+    {
+        List<CountdownTimer> result = [];
+        lock (_lockTimer)
+        {
+            foreach (var timers in CountdownTimers.Values)
+            {
+                result.AddRange(timers.Values);
             }
         }
         return result;
@@ -107,7 +126,7 @@ public partial class VariableService
                         timers.Remove(timer.Name);
                         if (timers.Count == 0)
                         {
-                            CountdownTimers.Remove(timer.MachineStateId);
+                            CountdownTimers.Remove(timer.StateMachineId);
 
                             if (CountdownTimers.Count == 0)
                             {
