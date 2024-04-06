@@ -22,6 +22,27 @@ public partial class StateMachineHandler
             _haClientService = haClientService;
         }
 
+        public bool createHAVariable(string? clientName, string name, string? data)
+        {
+            var result = false;
+            var haClientHandler = _haClientService.GetClientHandler(clientName);
+            if (haClientHandler != null)
+            {
+                return haClientHandler.CreateVariableAsync(name, data).Result != null;
+            }
+            return result;
+        }
+
+        public bool createVariable(string name)
+        {
+            return _variableService.CreateVariableAsync(name, null, (int?)null, null, null).Result != null;
+        }
+
+        public bool setVariable(string name, string? v)
+        {
+            return _variableService.UpdateVariableValueAsync(name, v).Result;
+        }
+
         public object? getVariableValue(string variable)
         {
             return _variableService.GetVariableValue(variable);
@@ -39,7 +60,7 @@ public partial class StateMachineHandler
 
         public bool haClientCallService(string? clientName, string name, string service, object? data = null)
         {
-            return _haClientService.CallServiceAsync(clientName, name, service, data).Result;   
+            return _haClientService.CallServiceAsync(clientName, name, service, data).Result;
         }
 
         public bool haClientCallServiceForEntities(string? clientName, string name, string service, params string[] entityIds)
@@ -57,14 +78,27 @@ public partial class StateMachineHandler
             return system.createCountdownTimer(name, seconds);
         }
 
-        startTimer = function(name, seconds) {
-            return system.createCountdownTimer(name, seconds);
-        }
+        startTimer = createTimer
         
         timerExpired = function(name) {
             return system.countdownTimerExpired(name);
         }
 
+        createVariable = function(name) {
+            //e.g. createVariable('test'); this will create a persistant variable
+            return system.createVariable(name);
+        }
+
+        setVariable = function(name, newValue) {
+            //e.g. setVariable('test', 10); update the value of the given variable
+            return system.setVariable(name, newValue);
+        }
+        
+        createHAVariable = function(clientname, name, entityId) {
+            //e.g. createHAVariable(null, 'kitchenLight', 'light.my_light');
+            return system.createHAVariable(clientname, name, entityId);
+        }
+        
         haClientCallService = function(clientname, name, service, data) {
             //e.g. haClientCallService(null, 'light', 'turn_on', { entity_id = "light.my_light", brightness_pct = 20});
             return system.haClientCallService(clientname, name, service, data);

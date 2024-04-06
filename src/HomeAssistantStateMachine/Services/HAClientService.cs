@@ -99,7 +99,7 @@ public class HAClientService : ServiceDbBase
         return _handlers.Values.ToList();
     }
 
-    private HAClientHandler? GetClientHandler(string? name)
+    public HAClientHandler? GetClientHandler(string? name)
     {
         HAClientHandler? result = null;
         if (string.IsNullOrWhiteSpace(name))

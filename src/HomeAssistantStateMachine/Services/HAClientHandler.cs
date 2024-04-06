@@ -69,14 +69,24 @@ public class HAClientHandler : IAsyncDisposable
     public async Task<Variable?> CreateVariableAsync(string name, string? data, HasmDbContext? ctx = null)
     {
         Variable? result = null;
+        var haEntityId = data ?? name;
+
+        var existingVariable = VariableService.GetVariable(name);
+        if (existingVariable == null || (existingVariable.Data == data && existingVariable.HAClientId == HAClient.Id))
+        {
+            return existingVariable;
+        }
+
+        //todo: check data has changed!
+
         result = await VariableService.CreateVariableAsync(name, data, HAClient, null, null, ctx);
         if (result != null && !string.IsNullOrWhiteSpace(result.Data))
         {
             VariableValue? vv = null;
-            if (!_variables.TryGetValue(name, out var variableInfos))
+            if (!_variables.TryGetValue(haEntityId, out var variableInfos))
             {
                 variableInfos = [];
-                _variables.TryAdd(result.Data, variableInfos);
+                _variables.TryAdd(haEntityId, variableInfos);
             }
             else
             {
@@ -91,11 +101,11 @@ public class HAClientHandler : IAsyncDisposable
 
             if (vv != null && vv.Value != null)
             {
-                await UpdateVariableValue(result.Data, vv.Value);
+                await UpdateVariableValue(haEntityId, vv.Value);
             }
             else if (vv == null && ConnectionState == ConnectionStates.Connected)
             {
-                _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(result.Data, EventHandlerEventStateChanged);
+                _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(haEntityId, EventHandlerEventStateChanged);
                 var states = await _wsApi!.GetStatesAsync();
                 var state = states.FirstOrDefault(s => s.EntityId == result.Data);
                 if (state != null)

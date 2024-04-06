@@ -24,14 +24,14 @@
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
-    <RadzenButton Text="Edit Properties" Click="@EditStateMachineAsync" />
     <RadzenButton Text="Add State" Click="@AddStateAsync" />
     <RadzenButton Text="Save" Click="@SaveAsync" />
     <RadzenButton Text="Restart" Click="@Restart" />
     <RadzenButton Text="Reload" Click="@ReloadDiagramAsync" />
+    <RadzenButton Text="Edit Properties" Click="@EditStateMachineAsync" />
     <RadzenButton Text="Script" Click="@ShowStateMachineAsync" />
 
-    <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;">
+    <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
         <CascadingValue Value="Diagram" IsFixed="true">
             <DiagramCanvas>
                 <Widgets>
@@ -101,6 +101,7 @@ else
 
                         var linkModel = new LinkModel(source2, targetAnchor);
                         linkModel.TargetMarker = LinkMarker.Arrow;
+                        //linkModel.Segmentable = true;
                         linkModel.AddLabel("true");
 
                         return linkModel;
@@ -174,6 +175,7 @@ else
             var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
             var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == uiData!.SourcePort), target.Ports.First(x => x.Alignment == uiData!.TargetPort)));
             link.TargetMarker = LinkMarker.Arrow;
+            //link.Segmentable = true;
             link.AddLabel(transition.Description ?? transition.Condition ?? "true");
         }
         StateChanged(null, null);
@@ -211,26 +213,49 @@ else
         }
     }
 
+    Model? modelOnPointerUp = null;
+    async Task OnContextMenuAsync()
+    {
+        //for now
+        if (modelOnPointerUp is NodeModel node)
+        {
+            await EditStateAsync(node);
+        }
+        else if (modelOnPointerUp is LinkModel link)
+        {
+            await EditTransitionAsync(link);
+        }
+        modelOnPointerUp = null;
+    }
+
     async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
     {
-        //check if link is added
-        foreach (var link in Diagram.Links)
+        modelOnPointerUp = null;
+        if (args.Button == 0)
         {
-            var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
-            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-            var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
-            var targetState = StateMachine.States.First(x => x.Name == target.Title);
-            var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-            if (transition == null)
+            //check if link is added
+            foreach (var link in Diagram.Links)
             {
-                transition = new()
-                    {
-                        FromStateId = sourceState.Id,
-                        ToStateId = targetState.Id
-                    };
-                StateMachine.Transitions.Add(transition);
-                await EditTransitionAsync(link);
+                var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
+                var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                if (transition == null)
+                {
+                    transition = new()
+                        {
+                            FromStateId = sourceState.Id,
+                            ToStateId = targetState.Id
+                        };
+                    StateMachine.Transitions.Add(transition);
+                    await EditTransitionAsync(link);
+                }
             }
+        }
+        else if (args.Button == 2)
+        {
+            modelOnPointerUp = model;
         }
     }
 
@@ -333,6 +358,10 @@ else
         });
         if (result != null)
         {
+            StateMachine.Enabled = result.Enabled;
+            StateMachine.Name = result.Name;
+            StateMachine.PreScheduleAction = result.PreScheduleAction;
+            StateMachine.PreStartAction = result.PreStartAction;
             await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
             await ReloadDiagramAsync();
         }

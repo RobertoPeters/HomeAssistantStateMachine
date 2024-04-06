@@ -30,6 +30,15 @@ public partial class VariableService : ServiceDbBase
         return null;
     }
 
+    public Variable? GetVariable(string name)
+    {
+        if (_variableNameToString.TryGetValue(name, out var id) && _variables.TryGetValue(id, out var variable))
+        {
+            return variable;
+        }
+        return null;
+    }
+
     public async Task StartAsync()
     {
         if (!_started)
@@ -61,25 +70,41 @@ public partial class VariableService : ServiceDbBase
 
     public async Task<Variable?> CreateVariableAsync(string name, string? data, HAClient? haClient, StateMachine? stateMachine, State? state, HasmDbContext? ctx = null)
     {
+        return await CreateVariableAsync(name, data, haClient?.Id, stateMachine?.Id, state?.Id, ctx);
+    }
+
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
+    {
         return await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
-            Variable? result = null;
-            await ExecuteWithinTransactionAsync(context, async () =>
+            Variable? result = _variables.Values.FirstOrDefault(x => x.Name == name);
+            if (result != null)
             {
-                result = new Variable
+                if (result.HAClientId != haClientId || result.StateMachineId != stateMachineId || result.StateId != stateId || result.Data != data)
                 {
-                    Name = name,
-                    Data = data,
-                    HAClientId = haClient?.Id,
-                    StateMachineId = stateMachine?.Id,
-                    StateId = state?.Id
-                };
-                await context.Variables.AddAsync(result);
-                await context.SaveChangesAsync();
+                    return null;
+                }
+                return result;
+            }
+            else
+            {
+                await ExecuteWithinTransactionAsync(context, async () =>
+                {
+                    result = new Variable
+                    {
+                        Name = name,
+                        Data = data,
+                        HAClientId = haClientId,
+                        StateMachineId = stateMachineId,
+                        StateId = stateId
+                    };
+                    await context.Variables.AddAsync(result);
+                    await context.SaveChangesAsync();
 
-                _variables.TryAdd(result.Id, result);
-                _variableNameToString.TryAdd(result.Name, result.Id);
-            });
+                    _variables.TryAdd(result.Id, result);
+                    _variableNameToString.TryAdd(result.Name, result.Id);
+                });
+            }
             return result;
         });
     }
@@ -101,6 +126,36 @@ public partial class VariableService : ServiceDbBase
                 VariableValueChanged?.Invoke(this, variableValue);
             });
         });
+    }
+
+    public async Task<bool> UpdateVariableValueAsync(string name, string? newValue, HasmDbContext? ctx = null)
+    {
+        var result = true;
+        if (_variableNameToString.TryGetValue(name, out var id))
+        {
+            if (_variableValues.TryGetValue(id, out var variableValue))
+            {
+                if (variableValue.Value != newValue)
+                {
+                    result = await UpdateVariableValueAsync(variableValue, newValue, ctx);
+                }
+            }
+            else
+            {
+                variableValue = new VariableValue
+                {
+                    Value = newValue,
+                    Variable = _variables[id],
+                    VariableId = id
+                };
+                result = await CreateVariableValueAsync(variableValue, ctx);
+            }
+        }
+        else
+        {
+            result = false;
+        }
+        return result;
     }
 
     public async Task<bool> UpdateVariableValueAsync(VariableValue variableValue, string? newValue, HasmDbContext? ctx = null)
