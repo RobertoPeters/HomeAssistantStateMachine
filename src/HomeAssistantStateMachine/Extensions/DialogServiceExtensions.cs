@@ -44,7 +44,7 @@ public static partial class DialogServiceExtensions
 
         var parameters = instance.GetParameters();
 
-        return await service.OpenAsync<TDialog>(null, parameters, options);
+        return await service.OpenAsync<TDialog>(title, parameters, options);
     }
 
     private static TDialog GetPreRenderedInstance<TDialog>(

@@ -26,6 +26,7 @@
     }
     <RadzenButton Text="Add State" Click="@AddStateAsync" />
     <RadzenButton Text="Save" Click="@SaveAsync" />
+    <RadzenButton Text="Stop" Click="@Stop" />
     <RadzenButton Text="Restart" Click="@Restart" />
     <RadzenButton Text="Reload" Click="@ReloadDiagramAsync" />
     <RadzenButton Text="Edit Properties" Click="@EditStateMachineAsync" />
@@ -72,7 +73,7 @@ else
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
             {
-                AllowMultiSelection = false,
+                AllowMultiSelection = true,
                 Zoom =
                 {
                     Enabled = true,
@@ -266,7 +267,7 @@ else
         var sourceState = StateMachine.States.First(x => x.Name == source.Title);
         var targetState = StateMachine.States.First(x => x.Name == target.Title);
         var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>("Edit Transition", dialog =>
+        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
         {
             dialog.Transition = transition;
         });
@@ -284,7 +285,7 @@ else
     async Task EditStateAsync(NodeModel node)
     {
         var state = StateMachine.States.First(x => x.Name == node.Title);
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Edit State", dialog =>
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>($"Edit State: {state.Name}", dialog =>
         {
             dialog.State = state;
             dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
@@ -317,6 +318,11 @@ else
     void Restart()
     {
         StateMachineService.RestartMachineState(StateMachine.Id);
+    }
+
+    void Stop()
+    {
+        StateMachineHandler.Stop();
     }
 
     async Task SaveAsync()
