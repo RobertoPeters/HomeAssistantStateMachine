@@ -1,6 +1,4 @@
 ﻿using HomeAssistantStateMachine.Models;
-using Jint.Native;
-using System.Collections.Generic;
 using System.Text;
 
 namespace HomeAssistantStateMachine.Services;
@@ -50,6 +48,7 @@ public partial class StateMachineHandler : IDisposable
     }
 
     private Jint.Engine? _engine = null;
+    private volatile bool _readyForTriggers = false;
     private readonly SynchronizationContext _syncContext;
     private readonly VariableService _variableService;
     private readonly HAClientService _haClientService;
@@ -70,11 +69,7 @@ public partial class StateMachineHandler : IDisposable
 
     public event EventHandler<State?>? StateChanged;
 
-<<<<<<< HEAD
     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
-=======
-     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
->>>>>>> 629dbb3cbd5f00ca9a5f5ae5c7944634658aaa35
     {
         StateMachine = stateMachine;
         _variableService = variableService;
@@ -85,6 +80,7 @@ public partial class StateMachineHandler : IDisposable
 
     public void Dispose()
     {
+        _readyForTriggers = false;
         _syncContext.Send((object? state) =>
         {
             RunningState = StateMachineRunningState.NotRunning;
@@ -139,8 +135,63 @@ public partial class StateMachineHandler : IDisposable
         return true;
     }
 
+    public string BuildEngineScript(StateMachine stateMachine)
+    {
+        var script = new StringBuilder();
+
+        script.AppendLine(SystemScript);
+
+        foreach (var state in stateMachine.States)
+        {
+            script.AppendLine();
+            script.AppendLine($"//State Entry [{state.Name}]");
+            script.AppendLine($"function stateEntryAction{state.Id}() {{ ");
+            if (state.EntryAction != null)
+            {
+                var allLines = state.EntryAction.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in allLines)
+                {
+                    script.AppendLine($"  {line}");
+                }
+            }
+            script.AppendLine($"}}");
+        }
+
+        foreach (var transition in stateMachine.Transitions)
+        {
+            script.AppendLine();
+            var fromState = stateMachine.States.First(s => s.Id == transition.FromStateId);
+            var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
+            script.AppendLine($"//Transition from [{fromState.Name}] to [{toState.Name}]");
+            script.AppendLine($"function transitionResult{transition.Id}() {{ ");
+            script.AppendLine($"  return {transition.Condition ?? "true"} ;");
+            script.AppendLine($"}}");
+        }
+
+        script.AppendLine();
+        script.AppendLine($"//Pre schedule action");
+        script.AppendLine($"function preScheduleAction() {{ ");
+        if (stateMachine.PreScheduleAction != null)
+        {
+            var allLines = stateMachine.PreScheduleAction.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in allLines)
+            {
+                script.AppendLine($"  {line}");
+            }
+        }
+        script.AppendLine($"}}");
+
+
+        script.AppendLine();
+        script.AppendLine("// Pre-start statemachine action");
+        script.AppendLine($"{stateMachine.PreStartAction ?? ""}");
+
+        return script.ToString();
+    }
+
     public void Start()
     {
+        _readyForTriggers = false;
         _syncContext.Send((_) =>
         {
             _currentState = null;
@@ -148,23 +199,12 @@ public partial class StateMachineHandler : IDisposable
             {
                 _engine = new Jint.Engine();
                 _engine.SetValue("system", NewSystemMethods);
-                _engine.Execute(SystemScript);
-
-                var script = new StringBuilder();
-                foreach (var state in StateMachine.States)
-                {
-                    script.AppendLine($"function stateEntryAction{state.Id}() {{ {state.EntryAction ?? ""} }}");
-                }
-
-                foreach (var transition in StateMachine.Transitions)
-                {
-                    script.AppendLine($"function transitionResult{transition.Id}() {{ return {transition.Condition ?? "true"} ; }}");
-                }
 
                 try
                 {
-                    _engine.Execute(script.ToString());
+                    _engine.Execute(BuildEngineScript(StateMachine));
                     RunningState = StateMachineRunningState.Running;
+                    _engine.Invoke("preScheduleAction");
                     ChangeToState(GetStartState());
                 }
                 catch (Exception e)
@@ -181,10 +221,12 @@ public partial class StateMachineHandler : IDisposable
                 RunningState = StateMachineRunningState.Error;
             }
         }, null);
+        _readyForTriggers = true;
     }
 
     public void Stop()
     {
+        _readyForTriggers = false;
         _syncContext.Send((_) =>
         {
             RunningState = StateMachineRunningState.NotRunning;
@@ -196,6 +238,8 @@ public partial class StateMachineHandler : IDisposable
 
     public void TriggerProcess()
     {
+        if (!_readyForTriggers) return;
+
         _syncContext.Send((_) =>
         {
 
@@ -204,6 +248,7 @@ public partial class StateMachineHandler : IDisposable
                 Transition? activeTransition = null;
                 try
                 {
+                    _engine.Invoke("preScheduleAction");
                     var transitions = StateMachine.Transitions
                         .Where(t => t.FromStateId == CurrentState.Id)
                         .ToList();

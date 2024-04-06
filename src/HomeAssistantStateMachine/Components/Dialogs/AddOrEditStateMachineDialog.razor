@@ -19,6 +19,12 @@
                 </Items>
             </RadzenRadioButtonList>
         </RadzenFormField>
+        <RadzenFormField Text="Pre Start Action" Variant="@Variant.Outlined">
+            <RadzenTextArea @bind-Value="@Model!.PreStartAction" Name="PreStartAction" Rows="10" />
+        </RadzenFormField>
+        <RadzenFormField Text="Pre Schedule Action" Variant="@Variant.Outlined">
+            <RadzenTextArea @bind-Value="@Model!.PreScheduleAction" Name="PreScheduleAction" Rows="10" />
+        </RadzenFormField>
         <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     </RadzenStack>
 </RadzenTemplateForm>
@@ -28,6 +34,7 @@
     protected override bool ShowClose => true;
     protected override bool IsPersistent => false;
     protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
 
     [Parameter]
     public StateMachine? StateMachine { get; set; }

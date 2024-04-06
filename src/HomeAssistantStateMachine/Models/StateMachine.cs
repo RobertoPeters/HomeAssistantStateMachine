@@ -11,6 +11,10 @@ public class StateMachine
 
     public bool Enabled { get; set; }
 
+    public string? PreStartAction { get; set; }
+
+    public string? PreScheduleAction { get; set; }
+
     public virtual ICollection<State> States { get; set; } = [];
 
     public virtual ICollection<Transition> Transitions { get; set; } = [];

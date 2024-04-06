@@ -24,10 +24,12 @@
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
+    <RadzenButton Text="Edit Properties" Click="@EditStateMachineAsync" />
     <RadzenButton Text="Add State" Click="@AddStateAsync" />
     <RadzenButton Text="Save" Click="@SaveAsync" />
     <RadzenButton Text="Restart" Click="@Restart" />
     <RadzenButton Text="Reload" Click="@ReloadDiagramAsync" />
+    <RadzenButton Text="Script" Click="@ShowStateMachineAsync" />
 
     <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;">
         <CascadingValue Value="Diagram" IsFixed="true">
@@ -52,6 +54,12 @@ else
     {
         public int X { get; set; } = 50;
         public int Y { get; set; } = 50;
+    }
+
+    private sealed class LinkUIData
+    {
+        public PortAlignment SourcePort { get; set; } = PortAlignment.Bottom;
+        public PortAlignment TargetPort { get; set; } = PortAlignment.Top;
     }
 
     private BlazorDiagram Diagram { get; set; } = null!;
@@ -153,15 +161,18 @@ else
 
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
+            node.AddPort(PortAlignment.Left);
+            node.AddPort(PortAlignment.Right);
         }
         foreach (var transition in StateMachine.Transitions)
         {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
             transition.FromState = null;
             transition.ToState = null;
             transition.StateMachine = null;
             var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.FromStateId)!.Name);
             var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
-            var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == PortAlignment.Bottom), target.Ports.First(x => x.Alignment == PortAlignment.Top)));
+            var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == uiData!.SourcePort), target.Ports.First(x => x.Alignment == uiData!.TargetPort)));
             link.TargetMarker = LinkMarker.Arrow;
             link.AddLabel(transition.Description ?? transition.Condition ?? "true");
         }
@@ -194,6 +205,8 @@ else
 
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
+            node.AddPort(PortAlignment.Left);
+            node.AddPort(PortAlignment.Right);
             Diagram.Refresh();
         }
     }
@@ -296,7 +309,46 @@ else
             uiData.Y = (int)node.Position.Y;
             state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
         }
+        foreach( var link in Diagram.Links)
+        {
+            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+            var targetState = StateMachine.States.First(x => x.Name == target.Title);
+            var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+            var uiData = new LinkUIData();
+            uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
+            uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
+            transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
         await StateMachineService.UpdateMachineStateAsync(StateMachine);
         await ReloadDiagramAsync();
+    }
+
+    async Task EditStateMachineAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Edit State Machine", dialog =>
+        {
+            dialog.StateMachine = StateMachine;
+        });
+        if (result != null)
+        {
+            await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
+            await ReloadDiagramAsync();
+        }
+    }
+
+    async Task ShowStateMachineAsync()
+    {
+        var copy = StateMachine.CopyObject();
+        var removedStates = copy!.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
+        foreach (var state in removedStates)
+        {
+            copy.States.Remove(state);
+        }
+        await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
+         {
+             dialog.Script = StateMachineHandler.BuildEngineScript(copy);
+         });
     }
 }

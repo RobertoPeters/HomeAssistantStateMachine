@@ -120,7 +120,6 @@ public class StateMachineService : ServiceDbBase
             }))
             {
                 result!.StateChanged += _handler_StateChanged;
-                result.Start();
             }
             return result;
         });
@@ -139,6 +138,29 @@ public class StateMachineService : ServiceDbBase
     public void RestartMachineState(int stateMachineId)
     {
         _handlers[stateMachineId].Start();
+    }
+
+    public async Task<StateMachine> UpdateMachineStatePropertiesAsync(StateMachine stateMachine, HasmDbContext? ctx = null)
+    {
+        return await ExecuteOnDbContextAsync(ctx, async (context) =>
+        {
+            StateMachine result = null!;
+            await ExecuteWithinTransactionAsync(context, async () =>
+            {
+                StateMachine result = await context.StateMachines.FirstAsync(x => x.Id == stateMachine.Id);
+                result.PreStartAction = stateMachine.PreStartAction;
+                result.PreStartAction = stateMachine.PreStartAction;
+                result.Name = stateMachine.Name;
+                result.Enabled = stateMachine.Enabled;
+                await context.SaveChangesAsync();
+            });
+
+            result = await GetStateMachineDataAsync(stateMachine.Id, context);
+
+            _handlers[stateMachine.Id]!.UpdateStateMachine(result);
+
+            return result;
+        });
     }
 
     public async Task<StateMachine> UpdateMachineStateAsync(StateMachine stateMachine, HasmDbContext? ctx = null)
