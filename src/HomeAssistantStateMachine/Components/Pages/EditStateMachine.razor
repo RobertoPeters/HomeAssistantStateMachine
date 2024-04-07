@@ -1,6 +1,7 @@
 ﻿@page "/editstatemachine/{Id:int}"
 @inject StateMachineService StateMachineService
 @inject DialogService DialogService
+@inject ContextMenuService ContextMenuService
 @using Blazor.Diagrams.Core.Anchors
 @using Blazor.Diagrams.Core.Models
 @using Blazor.Diagrams.Core.Models.Base
@@ -72,17 +73,17 @@ else
     {
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
-            {
-                AllowMultiSelection = true,
-                Zoom =
                 {
+                    AllowMultiSelection = true,
+                    Zoom =
+                    {
                     Enabled = true,
-                },
-                Links =
-                {
+                    },
+                    Links =
+                    {
                     DefaultRouter = new NormalRouter(),
                     DefaultPathGenerator = new SmoothPathGenerator(),
-                    RequireTarget = true,
+                    RequireTarget = false,
                     Factory = (diagram, source, targetAnchor) =>
                     {
                         Anchor? source2;
@@ -107,8 +108,8 @@ else
 
                         return linkModel;
                     }
-                },
-            };
+                    },
+                };
 
         Diagram = new BlazorDiagram(options);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
@@ -123,28 +124,28 @@ else
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
+    {
+        var currentState = StateMachineHandler.CurrentState;
+        if (Diagram != null)
         {
-            var currentState = StateMachineHandler.CurrentState;
-            if (Diagram != null)
+            if (currentState != null)
             {
-                if (currentState != null)
+                foreach (var node in Diagram.Nodes)
                 {
-                    foreach (var node in Diagram.Nodes)
+                    if (node.Title == currentState!.Name)
                     {
-                        if (node.Title == currentState!.Name)
-                        {
-                            Diagram.SelectModel(node, true);
-                            break;
-                        }
+                        Diagram.SelectModel(node, true);
+                        break;
                     }
                 }
-                else
-                {
-                    Diagram.UnselectAll();
-                }
             }
-            StateHasChanged();
-        });
+            else
+            {
+                Diagram.UnselectAll();
+            }
+        }
+        StateHasChanged();
+    });
     }
 
     async Task ReloadDiagramAsync()
@@ -157,9 +158,9 @@ else
             state.StateMachine = null;
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
             var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
-                {
-                    Title = state.Name
-                });
+                    {
+                        Title = state.Name
+                    });
 
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
@@ -172,15 +173,20 @@ else
             transition.FromState = null;
             transition.ToState = null;
             transition.StateMachine = null;
-            var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.FromStateId)!.Name);
-            var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
-            var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == uiData!.SourcePort), target.Ports.First(x => x.Alignment == uiData!.TargetPort)));
-            link.TargetMarker = LinkMarker.Arrow;
-            //link.Segmentable = true;
-            link.AddLabel(transition.Description ?? transition.Condition ?? "true");
+            AddLink(transition, uiData!.SourcePort, uiData!.TargetPort);
         }
         StateChanged(null, null);
         Diagram.Refresh();
+    }
+
+    private void AddLink(Transition transition, PortAlignment sourcePortAllignment, PortAlignment targetPortAllignment)
+    {
+        var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.FromStateId)!.Name);
+        var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
+        var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == sourcePortAllignment), target.Ports.First(x => x.Alignment == targetPortAllignment)));
+        link.TargetMarker = LinkMarker.Arrow;
+        //link.Segmentable = true;
+        link.AddLabel(transition.Description ?? transition.Condition ?? "true");
     }
 
     public void Dispose()
@@ -192,9 +198,9 @@ else
     async Task AddStateAsync()
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
-        {
-            dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-        });
+    {
+        dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+    });
         if (state != null)
         {
             newIdForAdd--;
@@ -202,9 +208,9 @@ else
             StateMachine.States.Add(state);
 
             var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(50, 50))
-                {
-                    Title = state.Name
-                });
+                    {
+                        Title = state.Name
+                    });
 
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
@@ -215,18 +221,132 @@ else
     }
 
     Model? modelOnPointerUp = null;
-    async Task OnContextMenuAsync()
+    async Task OnContextMenuAsync(MouseEventArgs args)
     {
-        //for now
         if (modelOnPointerUp is NodeModel node)
         {
-            await EditStateAsync(node);
+            ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnNodeContextMenuItemClick">
+        <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
+    </RadzenMenu>);
         }
         else if (modelOnPointerUp is LinkModel link)
         {
-            await EditTransitionAsync(link);
+            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+            var targetState = StateMachine.States.First(x => x.Name == target.Title);
+
+            ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnLinkContextMenuItemClick">
+        <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Delete" Value="4"></RadzenMenuItem>
+        <RadzenMenuItem Text="Move Start To" Value="3">
+            @foreach (var state in StateMachine.States.Where(x => x.Id != targetState.Id).ToList())
+        {
+            <RadzenMenuItem Text="@(state.Name)" Value="21">
+                <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
+            </RadzenMenuItem>
         }
-        modelOnPointerUp = null;
+        </RadzenMenuItem>
+        <RadzenMenuItem Text="Move End To" Value="2">
+            @foreach (var state in StateMachine.States.Where(x => x.Id != sourceState.Id).ToList())
+        {
+            <RadzenMenuItem Text="@(state.Name)" Value="21">
+                <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
+            </RadzenMenuItem>
+        }
+        </RadzenMenuItem>
+    </RadzenMenu>
+    );
+        }
+    }
+
+    State? moveToState = null;
+    bool changeTarget = false;
+    async void OnLinkContextMenuItemClick(MenuItemEventArgs args)
+    {
+        var link = modelOnPointerUp as LinkModel;
+        switch (args.Value)
+        {
+            case 1:
+                ContextMenuService.Close();
+                await EditTransitionAsync(link!);
+                break;
+            case 2:
+                moveToState = null;
+                changeTarget = true;
+                break;
+            case 3:
+                moveToState = null;
+                changeTarget = false;
+                break;
+            case 21:
+                moveToState = StateMachine.States.First(x => x.Name == args.Text);
+                break;
+            case 30:
+            case 31:
+            case 32:
+            case 33:
+            case 34:
+            case 35:
+            case 36:
+                //move end of link to top of selected state
+                {
+                    //current situation
+                    var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
+                    var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                    var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    var sourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
+                    var targetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
+
+                    var newPortAllignment = (PortAlignment)((int)args.Value - 30);
+
+                    if (changeTarget)
+                    {
+                        transition.ToStateId = moveToState!.Id;
+                        AddLink(transition, sourcePort, newPortAllignment);
+                    }
+                    else
+                    {
+                        transition.FromStateId = moveToState!.Id;
+                        AddLink(transition, newPortAllignment, targetPort);
+                    }
+
+                    ContextMenuService.Close();
+                    Diagram.Links.Remove(link!);
+                    Diagram.Refresh();
+                }
+                break;
+            case 4:
+                ContextMenuService.Close();
+                Diagram.Links.Remove(link!);
+                break;
+        }
+    }
+
+    async void OnNodeContextMenuItemClick(MenuItemEventArgs args)
+    {
+        ContextMenuService.Close();
+        var node = modelOnPointerUp as NodeModel;
+        switch (args.Value)
+        {
+            case 1:
+                await EditStateAsync(node!);
+                break;
+            case 2:
+                Diagram.Nodes.Remove(node!);
+                break;
+        }
     }
 
     async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
@@ -340,7 +460,7 @@ else
             uiData.Y = (int)node.Position.Y;
             state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
         }
-        foreach( var link in Diagram.Links)
+        foreach (var link in Diagram.Links)
         {
             var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
             var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
