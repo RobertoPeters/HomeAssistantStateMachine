@@ -72,7 +72,7 @@ public class HAClientHandler : IAsyncDisposable
         var haEntityId = data ?? name;
 
         var existingVariable = VariableService.GetVariable(name);
-        if (existingVariable == null || (existingVariable.Data == data && existingVariable.HAClientId == HAClient.Id))
+        if (existingVariable != null && existingVariable.Data == data && existingVariable.HAClientId == HAClient.Id)
         {
             return existingVariable;
         }

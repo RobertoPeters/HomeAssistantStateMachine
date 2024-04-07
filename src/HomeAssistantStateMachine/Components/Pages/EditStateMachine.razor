@@ -2,6 +2,7 @@
 @inject StateMachineService StateMachineService
 @inject DialogService DialogService
 @inject ContextMenuService ContextMenuService
+@inject IJSRuntime JS
 @using Blazor.Diagrams.Core.Anchors
 @using Blazor.Diagrams.Core.Models
 @using Blazor.Diagrams.Core.Models.Base
@@ -32,6 +33,8 @@
     <RadzenButton Text="Reload" Click="@ReloadDiagramAsync" />
     <RadzenButton Text="Edit Properties" Click="@EditStateMachineAsync" />
     <RadzenButton Text="Script" Click="@ShowStateMachineAsync" />
+    <RadzenButton Text="Export" Click="@ExportAsync" />
+    <RadzenUpload Icon="upload" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
 
     <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
         <CascadingValue Value="Diagram" IsFixed="true">
@@ -76,11 +79,11 @@ else
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                    {
+                        {
                     Enabled = true,
-                    },
+                        },
                     Links =
-                    {
+                        {
                     DefaultRouter = new NormalRouter(),
                     DefaultPathGenerator = new SmoothPathGenerator(),
                     RequireTarget = false,
@@ -108,7 +111,7 @@ else
 
                         return linkModel;
                     }
-                    },
+                        },
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -124,35 +127,22 @@ else
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
-    {
-        var currentState = StateMachineHandler.CurrentState;
-        if (Diagram != null)
         {
-            if (currentState != null)
-            {
-                foreach (var node in Diagram.Nodes)
-                {
-                    if (node.Title == currentState!.Name)
-                    {
-                        Diagram.SelectModel(node, true);
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                Diagram.UnselectAll();
-            }
-        }
-        StateHasChanged();
-    });
+            var currentState = StateMachineHandler.CurrentState;
+            StateHasChanged();
+        });
     }
 
     async Task ReloadDiagramAsync()
     {
+        await ReloadDiagramAsync(null);
+    }
+
+    async Task ReloadDiagramAsync(StateMachine? useStateMachine)
+    {
         Diagram.Links.Clear();
         Diagram.Nodes.Clear();
-        StateMachine = await StateMachineService.GetStateMachineDataAsync(Id);
+        StateMachine = useStateMachine ?? await StateMachineService.GetStateMachineDataAsync(Id);
         foreach (var state in StateMachine.States)
         {
             state.StateMachine = null;
@@ -198,9 +188,9 @@ else
     async Task AddStateAsync(int x, int y)
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
-        {
-            dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-        });
+    {
+        dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+    });
         if (state != null)
         {
             newIdForAdd--;
@@ -265,7 +255,7 @@ else
         }
         </RadzenMenuItem>
     </RadzenMenu>
-    );
+        );
         }
         else
         {
@@ -277,6 +267,7 @@ else
         <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
         <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
         <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
+        <RadzenMenuItem Text="Export" Value="7"></RadzenMenuItem>
     </RadzenMenu>
     );
         }
@@ -304,6 +295,9 @@ else
                 break;
             case 6:
                 await ShowStateMachineAsync();
+                break;
+            case 7:
+                await ExportAsync();
                 break;
         }
         ContextMenuService.Close();
@@ -485,37 +479,6 @@ else
         StateMachineHandler.Stop();
     }
 
-    async Task SaveAsync()
-    {
-        var removedStates = StateMachine.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
-        foreach (var state in removedStates)
-        {
-            StateMachine.States.Remove(state);
-        }
-        foreach (var state in StateMachine.States)
-        {
-            var uiData = new NodeUIData();
-            var node = Diagram.Nodes.First(x => x.Title == state.Name);
-            uiData.X = (int)node.Position.X;
-            uiData.Y = (int)node.Position.Y;
-            state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
-        }
-        foreach (var link in Diagram.Links)
-        {
-            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
-            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-            var targetState = StateMachine.States.First(x => x.Name == target.Title);
-            var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-            var uiData = new LinkUIData();
-            uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
-            uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
-            transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
-        }
-        await StateMachineService.UpdateMachineStateAsync(StateMachine);
-        await ReloadDiagramAsync();
-    }
-
     async Task EditStateMachineAsync()
     {
         var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Edit State Machine", dialog =>
@@ -545,5 +508,83 @@ else
          {
              dialog.Script = StateMachineHandler.BuildEngineScript(copy);
          });
+    }
+
+    private void AddUIDataToStatesAndTransitions()
+    {
+        foreach (var state in StateMachine.States)
+        {
+            var uiData = new NodeUIData();
+            var node = Diagram.Nodes.First(x => x.Title == state.Name);
+            uiData.X = (int)node.Position.X;
+            uiData.Y = (int)node.Position.Y;
+            state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
+        foreach (var link in Diagram.Links)
+        {
+            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+            var targetState = StateMachine.States.First(x => x.Name == target.Title);
+            var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+            var uiData = new LinkUIData();
+            uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
+            uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
+            transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
+    }
+
+
+    async Task SaveAsync()
+    {
+        var removedStates = StateMachine.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
+        foreach (var state in removedStates)
+        {
+            StateMachine.States.Remove(state);
+        }
+        AddUIDataToStatesAndTransitions();
+        await StateMachineService.UpdateMachineStateAsync(StateMachine);
+        await ReloadDiagramAsync();
+    }
+
+    private Stream GetFileStream()
+    {
+        var fileStream = new MemoryStream();
+
+        AddUIDataToStatesAndTransitions();
+        System.Text.Json.JsonSerializer.Serialize(fileStream, StateMachine);
+        fileStream.Position = 0;
+
+        return fileStream;
+    }
+
+    async Task ExportAsync()
+    {
+        var fileStream = GetFileStream();
+        var fileName = "hasm_export.json";
+
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+    }
+
+    async Task OnImport(UploadChangeEventArgs args)
+    {
+        var file = args.Files.First();
+        var stream = file.OpenReadStream();
+        var stateMachine = await System.Text.Json.JsonSerializer.DeserializeAsync<StateMachine>(stream);
+        StateMachine.States.Clear();
+        StateMachine.Transitions.Clear();
+        foreach (var state in stateMachine!.States)
+        {
+            StateMachine.States.Add(state);
+        }
+        foreach (var transition in stateMachine!.Transitions)
+        {
+            StateMachine.Transitions.Add(transition);
+        }
+        StateMachine.PreScheduleAction = stateMachine.PreScheduleAction;
+        StateMachine.PreStartAction = stateMachine.PreStartAction;
+        await ReloadDiagramAsync(StateMachine);
     }
 }

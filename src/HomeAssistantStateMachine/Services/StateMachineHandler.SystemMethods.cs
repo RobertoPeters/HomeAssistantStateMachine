@@ -28,24 +28,54 @@ public partial class StateMachineHandler
             var haClientHandler = _haClientService.GetClientHandler(clientName);
             if (haClientHandler != null)
             {
+                name = $"__HA_{haClientHandler.HAClient.Id}__{name}";
                 return haClientHandler.CreateVariableAsync(name, data).Result != null;
             }
             return result;
         }
 
+        public object? getHAVariable(string? clientName, string name)
+        {
+            var haClientHandler = _haClientService.GetClientHandler(clientName);
+            if (haClientHandler != null)
+            {
+                name = $"__HA_{haClientHandler.HAClient.Id}__{name}";
+                return _variableService.GetVariableValue(name);
+            }
+            return null;
+        }
+
         public bool createVariable(string name)
         {
-            return _variableService.CreateVariableAsync(name, null, (int?)null, null, null).Result != null;
+            name = $"__SM_{_stateMachineHandler.StateMachine.Id}__{name}";
+            return _variableService.CreateVariableAsync(name, null, null, _stateMachineHandler.StateMachine.Id, null).Result != null;
         }
 
         public bool setVariable(string name, string? v)
         {
+            name = $"__SM_{_stateMachineHandler.StateMachine.Id}__{name}";
             return _variableService.UpdateVariableValueAsync(name, v).Result;
         }
 
-        public object? getVariableValue(string variable)
+        public object? getVariable(string name)
         {
-            return _variableService.GetVariableValue(variable);
+            name = $"__SM_{_stateMachineHandler.StateMachine.Id}__{name}";
+            return _variableService.GetVariableValue(name);
+        }
+
+        public bool createGlobalVariable(string name)
+        {
+            return _variableService.CreateVariableAsync(name, null, null, (int?)null, null).Result != null;
+        }
+
+        public bool setGlobalVariable(string name, string? v)
+        {
+            return _variableService.UpdateVariableValueAsync(name, v).Result;
+        }
+
+        public object? getGlobalVariable(string name)
+        {
+            return _variableService.GetVariableValue(name);
         }
 
         public bool createCountdownTimer(string name, int seconds)
@@ -70,8 +100,8 @@ public partial class StateMachineHandler
     }
 
     public const string SystemScript = """"
-        getValue = function(variable) {
-            return system.getVariableValue(variable);
+        getValue = function(name) {
+            return system.getVariableValue(name);
         }
 
         createTimer = function(name, seconds) {
@@ -84,19 +114,44 @@ public partial class StateMachineHandler
             return system.countdownTimerExpired(name);
         }
 
+        createGlobalVariable = function(name) {
+            //e.g. createGlobalVariable('test'); this will create a persistant variable accessible from any state machine
+            return system.createGlobalVariable(name);
+        }
+        
+        setGlobalVariable = function(name, newValue) {
+            //e.g. setGlobalVariable('test', 10); update the value of the given (global) variable
+            return system.setGlobalVariable(name, newValue);
+        }
+        
+        getGlobalVariable = function(name) {
+            //e.g. getGlobalVariable('test'); get the value of the given (global) variable
+            return system.getGlobalVariable(name);
+        }
+
         createVariable = function(name) {
-            //e.g. createVariable('test'); this will create a persistant variable
+            //e.g. createVariable('test'); this will create a persistant variable accessible from current state machine
             return system.createVariable(name);
         }
 
         setVariable = function(name, newValue) {
-            //e.g. setVariable('test', 10); update the value of the given variable
+            //e.g. setVariable('test', 10); update the value of the given (state machine) variable
             return system.setVariable(name, newValue);
+        }
+
+        getVariable = function(name) {
+            //e.g. getVariable('test'); get the value of the given (state machine) variable
+            return system.getVariable(name);
         }
         
         createHAVariable = function(clientname, name, entityId) {
             //e.g. createHAVariable(null, 'kitchenLight', 'light.my_light');
             return system.createHAVariable(clientname, name, entityId);
+        }
+
+        getHAVariable = function(clientname, name) {
+            //e.g. getHAVariable(clientname, 'test'); get the value of the given (HA) variable
+            return system.getHAVariable(clientname, name);
         }
         
         haClientCallService = function(clientname, name, service, data) {
