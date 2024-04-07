@@ -26,15 +26,15 @@
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
-    <RadzenButton Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
-    <RadzenButton Text="Save" Click="@SaveAsync" />
-    <RadzenButton Text="Stop" Click="@Stop" />
-    <RadzenButton Text="Restart" Click="@Restart" />
-    <RadzenButton Text="Reload" Click="@ReloadDiagramAsync" />
-    <RadzenButton Text="Edit Properties" Click="@EditStateMachineAsync" />
-    <RadzenButton Text="Script" Click="@ShowStateMachineAsync" />
-    <RadzenButton Text="Export" Click="@ExportAsync" />
-    <RadzenUpload Icon="upload" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
+    <RadzenButton Size="ButtonSize.Small" Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
+    <RadzenButton Size="ButtonSize.Small" Text="Save" Click="@SaveAsync" />
+    <RadzenButton Size="ButtonSize.Small" Text="Stop" Click="@Stop" />
+    <RadzenButton Size="ButtonSize.Small" Text="Restart" Click="@Restart" />
+    <RadzenButton Size="ButtonSize.Small" Text="Reload" Click="@ReloadDiagramAsync" />
+    <RadzenButton Size="ButtonSize.Small" Text="Edit Properties" Click="@EditStateMachineAsync" />
+    <RadzenButton Size="ButtonSize.Small" Text="Script" Click="@ShowStateMachineAsync" />
+    <RadzenButton Size="ButtonSize.Small" Text="Export" Click="@ExportAsync" />
+    <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
 
     <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
         <CascadingValue Value="Diagram" IsFixed="true">
@@ -182,6 +182,7 @@ else
     public void Dispose()
     {
         StateMachineHandler.StateChanged -= StateChanged;
+        Diagram.PointerUp -= DiagramPointerUpAsync;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
     }
 
