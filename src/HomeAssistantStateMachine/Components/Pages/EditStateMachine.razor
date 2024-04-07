@@ -20,12 +20,12 @@
 
 @if (StateMachine != null)
 {
-    <h1>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.CurrentState?.Name ?? "-"))</h1>
+    <h1>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState?.Name ?? "-"))</h1>
     @if (!string.IsNullOrWhiteSpace(StateMachineHandler?.ErrorMessage))
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
-    <RadzenButton Text="Add State" Click="@AddStateAsync" />
+    <RadzenButton Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
     <RadzenButton Text="Save" Click="@SaveAsync" />
     <RadzenButton Text="Stop" Click="@Stop" />
     <RadzenButton Text="Restart" Click="@Restart" />
@@ -195,19 +195,19 @@ else
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
     }
 
-    async Task AddStateAsync()
+    async Task AddStateAsync(int x, int y)
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
-    {
-        dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-    });
+        {
+            dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        });
         if (state != null)
         {
             newIdForAdd--;
             state.Id = newIdForAdd;
             StateMachine.States.Add(state);
 
-            var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(50, 50))
+            var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
                     {
                         Title = state.Name
                     });
@@ -267,6 +267,46 @@ else
     </RadzenMenu>
     );
         }
+        else
+        {
+            ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnContextMenuItemClick">
+        <RadzenMenuItem Text="Add state" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
+        <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
+        <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
+        <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
+        <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
+    </RadzenMenu>
+    );
+        }
+    }
+
+    async void OnContextMenuItemClick(MenuItemEventArgs args)
+    {
+        switch (args.Value)
+        {
+            case 1:
+                var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+                await AddStateAsync((int)p.X, (int)p.Y);
+                break;
+            case 2:
+                await SaveAsync();
+                break;
+            case 3:
+                Restart();
+                break;
+            case 4:
+                await ReloadDiagramAsync();
+                break;
+            case 5:
+                await EditStateMachineAsync();
+                break;
+            case 6:
+                await ShowStateMachineAsync();
+                break;
+        }
+        ContextMenuService.Close();
     }
 
     State? moveToState = null;
