@@ -47,9 +47,9 @@ public partial class StateMachineHandler : IDisposable
         }
     }
 
+    private readonly object _lockObject = new object();
     private Jint.Engine? _engine = null;
     private volatile bool _readyForTriggers = false;
-    private readonly SynchronizationContext _syncContext;
     private readonly VariableService _variableService;
     private readonly HAClientService _haClientService;
 
@@ -71,22 +71,21 @@ public partial class StateMachineHandler : IDisposable
 
     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
     {
+        _lockObject = new object();
         StateMachine = stateMachine;
         _variableService = variableService;
         _haClientService = haClientService;
-        _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
-
-    }
+     }
 
     public void Dispose()
     {
         _readyForTriggers = false;
-        _syncContext.Send((object? state) =>
+        lock (_lockObject)
         {
             RunningState = StateMachineRunningState.NotRunning;
             _engine?.Dispose();
             _engine = null;
-        }, null);
+        }
     }
 
     private State? GetStartState()
@@ -192,7 +191,7 @@ public partial class StateMachineHandler : IDisposable
     public void Start()
     {
         _readyForTriggers = false;
-        _syncContext.Send((_) =>
+        lock (_lockObject)
         {
             _currentState = null;
             if (ValidateModel())
@@ -220,27 +219,27 @@ public partial class StateMachineHandler : IDisposable
                 ErrorMessage = $"Statemachine is not valid";
                 RunningState = StateMachineRunningState.Error;
             }
-        }, null);
+        }
         _readyForTriggers = true;
     }
 
     public void Stop()
     {
         _readyForTriggers = false;
-        _syncContext.Send((_) =>
+        lock (_lockObject)
         {
             RunningState = StateMachineRunningState.NotRunning;
             _engine?.Dispose();
             _engine = null;
             ChangeToState(null);
-        }, null);
+        }
     }
 
     public void TriggerProcess()
     {
         if (!_readyForTriggers) return;
 
-        _syncContext.Send((_) =>
+        lock (_lockObject)
         {
 
             if (RunningState == StateMachineRunningState.Running && CurrentState != null && _engine != null)
@@ -269,17 +268,14 @@ public partial class StateMachineHandler : IDisposable
                     RunningState = StateMachineRunningState.Error;
                 }
             }
-        }, null);
+        }
     }
 
     public void UpdateStateMachine(StateMachine stateMachine)
     {
-        _syncContext.Send((_) =>
-        {
-            Stop();
-            StateMachine = stateMachine;
-            Start();
-        }, null);
+        Stop();
+        StateMachine = stateMachine;
+        Start();
     }
 
     private void ChangeToState(State? state)
