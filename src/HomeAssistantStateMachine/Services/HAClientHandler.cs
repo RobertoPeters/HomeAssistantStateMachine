@@ -52,16 +52,76 @@ public class HAClientHandler : IAsyncDisposable
                     variableInfos.Add(v);
                 }
             }
-            _wsApi = new HassWSApi();
-            _wsApi.ConnectionStateChanged += _wsApi_ConnectionStateChanged;
-            if (HAClient.Enabled && !string.IsNullOrWhiteSpace(HAClient.Token) && !string.IsNullOrWhiteSpace(HAClient.Host))
+            await CreateHassWSApiAsync();
+        }
+    }
+
+    private async Task CreateHassWSApiAsync()
+    {
+        _wsApi = new HassWSApi();
+        _wsApi.ConnectionStateChanged += _wsApi_ConnectionStateChanged;
+        if (HAClient.Enabled && !string.IsNullOrWhiteSpace(HAClient.Token) && !string.IsNullOrWhiteSpace(HAClient.Host))
+        {
+            await ConnectAsync();
+            foreach (var variable in _variables)
             {
-                await ConnectAsync();
-                foreach (var variable in _variables)
+                _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Key, EventHandlerEventStateChanged);
+            }
+            _started = true;
+        }
+    }
+
+    public async Task DisposeHassApiAsync()
+    {
+        if (_wsApi != null)
+        {
+            _wsApi.ConnectionStateChanged -= _wsApi_ConnectionStateChanged;
+            try
+            {
+                await _wsApi.CloseAsync();
+            }
+            catch
+            {
+                //nothing
+            }
+            _wsApi = null;
+        }
+    }
+
+    public async Task UpdateHAClientAsync(HAClient haCliennt, HasmDbContext? ctx = null)
+    {
+        _started = false;
+        await DisposeHassApiAsync();
+        HAClient = haCliennt;
+        await CreateHassWSApiAsync();
+    }
+
+    public async Task DeleteVariableAsync(string name, HasmDbContext? ctx = null)
+    {
+        var existingVariable = VariableService.GetVariable(name);
+        var haEntityId = existingVariable.Data ?? existingVariable.Name;
+        if (_variables.TryGetValue(haEntityId, out var variableInfos))
+        {
+            var varibleInfo = variableInfos.FirstOrDefault(v => v.Variable.Id == existingVariable.Id);
+            if (varibleInfo != null)
+            {
+                variableInfos.Remove(varibleInfo);
+                if (!variableInfos.Any())
                 {
-                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Key, EventHandlerEventStateChanged);
+                    _variables.TryRemove(haEntityId, out _);
+                    if (_wsApi != null)
+                    {
+                        try
+                        {
+                            _wsApi.StateChagedEventListener.UnsubscribeEntityStatusChanged(haEntityId, EventHandlerEventStateChanged);
+                        }
+                        catch
+                        {
+                            //nothing
+                        }
+                    }
                 }
-                _started = true;
+                await VariableService.DeleteVariableAsync(varibleInfo.Variable.Name, ctx);
             }
         }
     }
@@ -209,17 +269,9 @@ public class HAClientHandler : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_started && _wsApi != null)
+        if (_started)
         {
-            _wsApi.ConnectionStateChanged -= _wsApi_ConnectionStateChanged;
-            try
-            {
-                await _wsApi.CloseAsync();
-            }
-            catch
-            {
-                //nothing
-            }
+            await DisposeHassApiAsync();
         }
     }
 }

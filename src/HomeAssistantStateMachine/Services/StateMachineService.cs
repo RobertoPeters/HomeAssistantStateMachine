@@ -125,6 +125,29 @@ public class StateMachineService : ServiceDbBase
         });
     }
 
+    public async Task DeleteStateMachineHandler(int stateMachineId, HasmDbContext? ctx = null)
+    {
+        var handler = GetStateMachine(stateMachineId);
+        handler.Stop();
+        await ExecuteOnDbContextAsync(ctx, async (context) =>
+        {
+            return await ExecuteWithinTransactionAsync(context, async () =>
+            {
+                await _variableService.DeleteVariablesAsync(null, stateMachineId, null, context);
+                var allTransitions = await context.Transitions.Where(x => x.StateMachineId == stateMachineId).ToListAsync();
+                context.RemoveRange(allTransitions);
+                var allStates = await context.States.Where(x => x.StateMachineId == stateMachineId).ToListAsync();
+                context.RemoveRange(allStates);
+                var sm = await context.StateMachines.FirstAsync(x => x.Id == stateMachineId);
+                context.Remove(sm);
+                await context.SaveChangesAsync();
+
+                _handlers.TryRemove(stateMachineId, out var _);
+            });
+        });
+        handler.Dispose();
+    }
+
     public List<StateMachineHandler> GetStateMachines()
     {
         return _handlers.Values.ToList();

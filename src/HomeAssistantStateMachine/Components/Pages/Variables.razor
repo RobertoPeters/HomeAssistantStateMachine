@@ -3,6 +3,8 @@
 @using HomeAssistantStateMachine.Models
 @using System.Collections.Concurrent
 @inject VariableService VariableService
+@inject HAClientService HAClientService
+@inject StateMachineService StateMachineService
 @implements IDisposable
 
 <PageTitle>HASM - Variables</PageTitle>
@@ -31,6 +33,14 @@
                                   Title="Name" />
 
             <RadzenDataGridColumn TItem="VariableInfo"
+                                  Property="@nameof(VariableInfo.HAClientName)"
+                                  Title="HA Client" />
+
+            <RadzenDataGridColumn TItem="VariableInfo"
+                                  Property="@nameof(VariableInfo.StateMachineName)"
+                                  Title="State Machine" />
+
+           <RadzenDataGridColumn TItem="VariableInfo"
                                   Property="@nameof(VariableInfo.Data)"
                                   Title="Data" />
 
@@ -42,6 +52,16 @@
                                   Filterable="false"
                                   Property="@nameof(VariableInfo.Update)"
                                   Title="Update" FormatString="{0:HH:mm.sss}" />
+
+            <RadzenDataGridColumn TItem="VariableInfo"
+                                  Filterable="false"
+                                  Sortable="false"
+                                  Property="@nameof(VariableInfo.Id)"
+                                  Title="">
+                <Template Context="variable">
+                    <RadzenButton Disabled=@(variable.Timer != null) ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Text="Delete" Click="@(() => DeleteVariableAsync(variable))" />
+                </Template>
+            </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
 }
@@ -49,14 +69,34 @@
 @code {
     private class VariableInfo
     {
+        private readonly StateMachineService _stateMachineService;
+
+        public VariableInfo(StateMachineService stateMachineService)
+        {
+            _stateMachineService = stateMachineService;
+        }
+
         public Variable? Variable { get; set; } = null!;
         public VariableValue? VariableValue { get; set; }
         public VariableService.CountdownTimer? Timer { get; set; }
 
-        public string Name => Variable?.Name ?? Timer?.Name ?? "";
+        public int Id => Variable?.Id ?? Timer?.Id ?? 0;
+        public string Name => VariableName();
         public string? Data => Variable?.Data ?? "";
         public string? Value => VariableValue?.Value ?? Timer?.Value.ToString() ?? "";
         public DateTime? Update => (VariableValue?.Update ?? Timer?.Start)?.ToLocalTime();
+        public string? HAClientName => Variable?.HAClient?.Name ?? "";
+        public string? StateMachineName => Variable?.StateMachine?.Id == null ? "" : _stateMachineService.GetStateMachine(Variable.StateMachine.Id).StateMachine.Name;
+
+        private string VariableName()
+        {
+            var result = Variable?.Name ?? Timer?.Name ?? "";
+            if (Variable?.StateMachineId != null || Variable?.HAClientId != null)
+            {
+                result = Variable.Name.Split("__", 3, StringSplitOptions.None)[2];
+            }
+            return result;
+        }
     }
     private readonly ConcurrentDictionary<int, VariableInfo> variables = [];
 
@@ -68,7 +108,7 @@
         var allVariables = VariableService.GetVariables();
         foreach (var variable in allVariables)
         {
-            var v = new VariableInfo()
+            var v = new VariableInfo(StateMachineService)
                 {
                     Variable = variable.variable,
                     VariableValue = variable.variableValue
@@ -78,6 +118,7 @@
         UpdateCountdownTimers();
         VariableService.VariableValueChanged += VariableValueChanged;
         VariableService.CountdownTimerChanged += CountdownTimerChanged;
+        VariableService.VariableCollectionChanged += VariableCollectionChanged;
         gridData = variables.Values.ToList();
         base.OnInitialized();
     }
@@ -94,7 +135,7 @@
             }
             else
             {
-                var vi = new VariableInfo()
+                var vi = new VariableInfo(StateMachineService)
                     {
                         Timer = timer
                     };
@@ -138,6 +179,38 @@
         }
     }
 
+    private async Task DeleteVariableAsync(VariableInfo vi)
+    {
+        if (vi.Variable?.HAClientId != null)
+        {
+            await HAClientService.GetClients().First(x => x.HAClient.Id == vi.Variable?.HAClientId).DeleteVariableAsync(vi.Variable.Name);
+        }
+        else
+        {
+            await VariableService.DeleteVariableAsync(vi.Variable!.Name);
+        }
+    }
+
+    private void VariableCollectionChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(() =>
+        {
+            variables.Clear();
+            var allVariables = VariableService.GetVariables();
+            foreach (var variable in allVariables)
+            {
+                var v = new VariableInfo(StateMachineService)
+                    {
+                        Variable = variable.variable,
+                        VariableValue = variable.variableValue
+                    };
+                variables.TryAdd(variable.variable.Id, v);
+            }
+            UpdateCountdownTimers();
+            UpdateGridData();
+        });
+    }
+
     private void VariableValueChanged(object? sender, VariableValue e)
     {
         InvokeAsync(() =>
@@ -150,7 +223,7 @@
               else
               {
                   var newVariable = VariableService.GetVariables().Where(x => x.variable.Id == e.Variable.Id).First();
-                  var vi = new VariableInfo()
+                  var vi = new VariableInfo(StateMachineService)
                       {
                           Variable = newVariable.variable,
                           VariableValue = newVariable.variableValue
@@ -163,6 +236,7 @@
 
     public void Dispose()
     {
+        VariableService.VariableCollectionChanged -= VariableCollectionChanged;
         VariableService.CountdownTimerChanged -= CountdownTimerChanged;
         VariableService.VariableValueChanged -= VariableValueChanged;
     }

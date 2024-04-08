@@ -57,8 +57,8 @@ public class HAClientService : ServiceDbBase
                 && !_handlers.Values.ToList().Exists(x => x.HAClient.Name == "Test"))
             {
                 var handler = await CreateHAClientAsync("Test", true, testClientHost, testClientToken);
-                await handler!.CreateVariableAsync("test", "input_boolean.test");
-                await handler!.CreateVariableAsync("test2", "input_boolean.test2");
+                await handler!.CreateVariableAsync("__HAx__test", "input_boolean.test");
+                await handler!.CreateVariableAsync("__HAx__test2", "input_boolean.test2");
             }
             //END TEMP CODE
 
@@ -87,6 +87,39 @@ public class HAClientService : ServiceDbBase
             });
             return result;
         });
+    }
+
+    public async Task DeleteHAClientAsync(HAClientHandler client, HasmDbContext? ctx = null)
+    {
+        await ExecuteOnDbContextWithinTransactionAsync(ctx, async (context) =>
+        {
+            _handlers.TryRemove(client.HAClient.Name, out var _);
+            await client.DisposeAsync();
+            var haClient = await context.HAClients.FirstAsync(x => x.Id == client.HAClient.Id);
+            await _variableService.DeleteVariablesAsync(client.HAClient.Id, null, null, context);
+            context.Remove(haClient);
+            await context.SaveChangesAsync();
+        });
+    }
+
+    public async Task UpdateHAClientAsync(HAClientHandler client, string name, bool enabled, string host, string token, HasmDbContext? ctx = null)
+    {
+        HAClient? haClient = null;
+        if (await ExecuteOnDbContextWithinTransactionAsync(ctx, async (context) =>
+        {
+            haClient = await context.HAClients.FirstAsync(x => x.Id == client.HAClient.Id);
+            haClient.Name = name;
+            haClient.Enabled = enabled;
+            haClient.Host = host;
+            haClient.Token = token;
+            await context.SaveChangesAsync();
+        }))
+        {
+            var oldName = client.HAClient.Name;
+            _handlers.TryAdd(name, client);
+            await client.UpdateHAClientAsync(haClient, ctx);
+            _handlers.TryRemove(oldName, out var _);
+        }
     }
 
     public void ClientHandlerConnectionStateChanged(HAClientHandler clientHandler, ConnectionStates state)

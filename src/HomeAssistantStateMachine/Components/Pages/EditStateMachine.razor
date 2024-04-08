@@ -35,6 +35,7 @@
     <RadzenButton Size="ButtonSize.Small" Text="Script" Click="@ShowStateMachineAsync" />
     <RadzenButton Size="ButtonSize.Small" Text="Export" Click="@ExportAsync" />
     <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
+    <RadzenButton Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@OnDeleteAsync" />
 
     <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
         <CascadingValue Value="Diagram" IsFixed="true">
@@ -535,6 +536,11 @@ else
         }
     }
 
+    async Task OnDeleteAsync()
+    {
+        await StateMachineService.DeleteStateMachineHandler(StateMachine.Id);
+        NavigationManager.NavigateTo("/statemachines");
+    }
 
     async Task SaveAsync()
     {

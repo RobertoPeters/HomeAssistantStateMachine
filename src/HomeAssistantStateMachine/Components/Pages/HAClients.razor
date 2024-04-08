@@ -2,6 +2,7 @@
 @using HassClient.WS
 @using HomeAssistantStateMachine.Services
 @inject HAClientService HAClientService
+@inject DialogService DialogService
 @implements IDisposable
 
 <PageTitle>HASM - Home Assistant Clients</PageTitle>
@@ -10,13 +11,18 @@
 
 @if (clients != null)
 {
-    foreach(var client in clients.Values)
+    <RadzenButton Size="ButtonSize.Small" Text="Add HA Client" Click="@(() => AddOrEditHAClientAsync(null))" />
+
+    foreach (var client in clients.Values)
     {
-        <RadzenCard>
+        <RadzenCard onclick="@(() => AddOrEditHAClientAsync(client))">
             <div>@client.HAClient.Name</div>
             <div>@client.HAClient.Host</div>
             <div>@(client.HAClient.Enabled ? "Enabled" : "Disabled")</div>
             <div>@client.ConnectionState</div>
+            <div @onclick:stopPropagation="true">
+                <RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Text="Delete" Click="@(() => OnDeleteAsync(client))" />
+            </div>
         </RadzenCard>
     }
 }
@@ -44,5 +50,33 @@
     public void Dispose()
     {
         HAClientService.ConnectionChanged -= ClientConnectionChanged;
+    }
+
+    private async Task OnDeleteAsync(HAClientHandler haClient)
+    {
+        await HAClientService.DeleteHAClientAsync(haClient);
+        clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Id, x => x);
+        StateHasChanged();
+    }
+
+    private async Task AddOrEditHAClientAsync(HAClientHandler? haClient)
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditHAClientDialog, Models.HAClient>($"{(haClient == null ? "Add" : "Edit")} State Machine", dialog =>
+        {
+            dialog.HAClient = haClient?.HAClient;
+            dialog.ExistingHAClientNames = HAClientService.GetClients()!.Where(x => x.HAClient.Id != haClient?.HAClient.Id).Select(x => x.HAClient.Name).ToHashSet();
+        });
+        if (result != null)
+        {
+            if (haClient == null)
+            {
+                await HAClientService.CreateHAClientAsync(result.Name, result.Enabled, result.Host, result.Token);
+            }
+            else
+            {
+                await HAClientService.UpdateHAClientAsync(haClient, result.Name, result.Enabled, result.Host, result.Token);
+            }
+            StateHasChanged();
+        }
     }
 }

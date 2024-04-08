@@ -16,6 +16,7 @@ public partial class VariableService : ServiceDbBase
     private bool _started = false;
 
     public event EventHandler<VariableValue>? VariableValueChanged;
+    public event EventHandler<EventArgs>? VariableCollectionChanged;
 
     public VariableService(IDbContextFactory<HasmDbContext> dbFactory) : base(dbFactory)
     {
@@ -65,6 +66,73 @@ public partial class VariableService : ServiceDbBase
                 }
                 return true;
             });
+        }
+    }
+
+    public async Task DeleteVariableAsync(string name, HasmDbContext? ctx = null)
+    {
+        if (await ExecuteOnDbContextAsync(ctx, async (context) =>
+        {
+            return await ExecuteWithinTransactionAsync(context, async () =>
+            {
+                if (_variableNameToString.TryGetValue(name, out var id))
+                {
+                    var variable = await context.Variables.FirstAsync(x => x.Id == id);
+                    var variableValue = await context.VariableValues.FirstOrDefaultAsync(x => x.Id == id);
+                    if (variableValue != null)
+                    {
+                        context.Remove(variableValue);
+                    }
+                    context.Remove(variable);
+                    await context.SaveChangesAsync();
+
+                    _variables.TryRemove(id, out var _);
+                    if (variableValue != null)
+                    {
+                        _variableValues.TryRemove(id, out var _);
+                    }
+
+                    _variableNameToString.TryRemove(name, out var _);
+                }
+            });
+        }))
+        {
+            VariableCollectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public async Task DeleteVariablesAsync(int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
+    {
+        if (await ExecuteOnDbContextAsync(ctx, async (context) =>
+        {
+            return await ExecuteWithinTransactionAsync(context, async () =>
+            {
+                var variables = await context.Variables
+                    .Where(x => x.HAClientId == haClientId && x.StateMachineId == stateMachineId && x.StateId == stateId)
+                    .ToListAsync();
+                foreach (var variable in variables)
+                {
+                    var id = variable.Id;
+                    var variableValue = await context.VariableValues.FirstOrDefaultAsync(x => x.Id == id);
+                    if (variableValue != null)
+                    {
+                        context.Remove(variableValue);
+                    }
+                    context.Remove(variable);
+                    await context.SaveChangesAsync();
+
+                    _variables.TryRemove(id, out var _);
+                    if (variableValue != null)
+                    {
+                        _variableValues.TryRemove(id, out var _);
+                    }
+
+                    _variableNameToString.TryRemove(variable.Name, out var _);
+                }
+            });
+        }))
+        {
+            VariableCollectionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
