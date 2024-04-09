@@ -6,6 +6,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Remove="Settings\**" />
+      <Content Remove="Settings\**" />
+      <EmbeddedResource Remove="Settings\**" />
+      <None Remove="Settings\**" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Jint" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />

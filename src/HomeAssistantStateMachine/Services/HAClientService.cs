@@ -46,22 +46,6 @@ public class HAClientService : ServiceDbBase
             {
                 await handler.StartAsync();
             }
-
-            // TEMP CODE FOR DEVELEOPMENT
-            //testcode when database is recreated preventing to always add this manually
-            // as soon as we don't reacrteate the database anymore, we will remove this code
-            var testClientHost = _configuration.GetValue<string?>("TestHAClientHost", null);
-            var testClientToken = _configuration.GetValue<string>("TestHAClientToken");
-            if (!string.IsNullOrWhiteSpace(testClientHost)
-                && !string.IsNullOrWhiteSpace(testClientToken)
-                && !_handlers.Values.ToList().Exists(x => x.HAClient.Name == "Test"))
-            {
-                var handler = await CreateHAClientAsync("Test", true, testClientHost, testClientToken);
-                await handler!.CreateVariableAsync("__HAx__test", "input_boolean.test");
-                await handler!.CreateVariableAsync("__HAx__test2", "input_boolean.test2");
-            }
-            //END TEMP CODE
-
         }
     }
 
