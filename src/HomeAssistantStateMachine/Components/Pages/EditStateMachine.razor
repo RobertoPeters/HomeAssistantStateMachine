@@ -538,8 +538,11 @@ else
 
     async Task OnDeleteAsync()
     {
-        await StateMachineService.DeleteStateMachineHandler(StateMachine.Id);
-        NavigationManager.NavigateTo("/statemachines");
+        if (await DialogService.ShowNoYesCancelConfirmationDialogAsync("Delete State Machine", $"Are you sure you want to delete the State Machine '{StateMachine.Name}'?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
+        {
+            await StateMachineService.DeleteStateMachineHandler(StateMachine.Id);
+            NavigationManager.NavigateTo("/statemachines");
+        }
     }
 
     async Task SaveAsync()

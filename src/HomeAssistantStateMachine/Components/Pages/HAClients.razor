@@ -54,9 +54,12 @@
 
     private async Task OnDeleteAsync(HAClientHandler haClient)
     {
-        await HAClientService.DeleteHAClientAsync(haClient);
-        clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Id, x => x);
-        StateHasChanged();
+        if (await DialogService.ShowNoYesCancelConfirmationDialogAsync("Delete HA Client", $"Are you sure you want to delete the HA Client '{haClient.HAClient.Name}'?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
+        {
+            await HAClientService.DeleteHAClientAsync(haClient);
+            clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Id, x => x);
+            StateHasChanged();
+        }
     }
 
     private async Task AddOrEditHAClientAsync(HAClientHandler? haClient)

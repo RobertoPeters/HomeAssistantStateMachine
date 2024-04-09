@@ -2,6 +2,7 @@
 @using HomeAssistantStateMachine.Services
 @using HomeAssistantStateMachine.Models
 @using System.Collections.Concurrent
+@inject DialogService DialogService
 @inject VariableService VariableService
 @inject HAClientService HAClientService
 @inject StateMachineService StateMachineService
@@ -181,13 +182,16 @@
 
     private async Task DeleteVariableAsync(VariableInfo vi)
     {
-        if (vi.Variable?.HAClientId != null)
+        if (await DialogService.ShowNoYesCancelConfirmationDialogAsync("Delete Variable(s)", $"Are you sure you want variables?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
         {
-            await HAClientService.GetClients().First(x => x.HAClient.Id == vi.Variable?.HAClientId).DeleteVariableAsync(vi.Variable.Name);
-        }
-        else
-        {
-            await VariableService.DeleteVariableAsync(vi.Variable!.Name);
+            if (vi.Variable?.HAClientId != null)
+            {
+                await HAClientService.GetClients().First(x => x.HAClient.Id == vi.Variable?.HAClientId).DeleteVariableAsync(vi.Variable.Name);
+            }
+            else
+            {
+                await VariableService.DeleteVariableAsync(vi.Variable!.Name);
+            }
         }
     }
 
