@@ -53,6 +53,7 @@ public partial class StateMachineHandler : IDisposable
     private readonly VariableService _variableService;
     private readonly HAClientService _haClientService;
 
+    private State? _engineRequestToState = null;
     private State? _currentState = null;
     public State? CurrentState
     {
@@ -68,6 +69,7 @@ public partial class StateMachineHandler : IDisposable
     }
 
     public event EventHandler<State?>? StateChanged;
+    public event EventHandler<string>? Log;
 
     public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
     {
@@ -75,7 +77,38 @@ public partial class StateMachineHandler : IDisposable
         StateMachine = stateMachine;
         _variableService = variableService;
         _haClientService = haClientService;
-     }
+    }
+
+    public void SetEngineRequestToState(string? stateName)
+    {
+        _engineRequestToState = StateMachine.States.FirstOrDefault(x => x.Name == stateName);
+    }
+
+    public string? GetEngineState()
+    {
+        return CurrentState?.Name;
+    }
+
+    static System.Text.Json.JsonSerializerOptions logJsonOptions = new System.Text.Json.JsonSerializerOptions
+    {
+        WriteIndented = true,
+        IncludeFields = true
+    };
+    public void AddLog(object? logObject)
+    {
+        if (Log != null && logObject != null)
+        {
+            if (logObject is string txt)
+            {
+                Log.Invoke(this, txt);
+            }
+            else
+            {
+                var txt2 = System.Text.Json.JsonSerializer.Serialize(logObject, logJsonOptions);
+                Log.Invoke(this, txt2);
+            }
+        }
+    }
 
     public void Dispose()
     {
@@ -194,6 +227,7 @@ public partial class StateMachineHandler : IDisposable
         lock (_lockObject)
         {
             _currentState = null;
+            _engineRequestToState = null;
             if (ValidateModel())
             {
                 _engine = new Jint.Engine();
@@ -204,7 +238,7 @@ public partial class StateMachineHandler : IDisposable
                     _engine.Execute(BuildEngineScript(StateMachine));
                     RunningState = StateMachineRunningState.Running;
                     _engine.Invoke("preScheduleAction");
-                    ChangeToState(GetStartState());
+                    ChangeToState(_engineRequestToState ?? GetStartState());
                 }
                 catch (Exception e)
                 {
@@ -251,14 +285,23 @@ public partial class StateMachineHandler : IDisposable
                     var transitions = StateMachine.Transitions
                         .Where(t => t.FromStateId == CurrentState.Id)
                         .ToList();
-                    foreach (var transition in transitions)
+                    if (_engineRequestToState != null)
                     {
-                        activeTransition = transition;
-                        var condition = _engine.Evaluate($"transitionResult{transition.Id}()").ToObject();
-                        if ((bool)condition!)
+                        var state = _engineRequestToState;
+                        _engineRequestToState = null;
+                        ChangeToState(state);
+                    }
+                    else
+                    {
+                        foreach (var transition in transitions)
                         {
-                            ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
-                            break;
+                            activeTransition = transition;
+                            var condition = _engine.Evaluate($"transitionResult{transition.Id}()").ToObject();
+                            if ((bool)condition!)
+                            {
+                                ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
+                                break;
+                            }
                         }
                     }
                 }
@@ -286,6 +329,12 @@ public partial class StateMachineHandler : IDisposable
             try
             {
                 _engine.Invoke($"stateEntryAction{state.Id}");
+                if (_engineRequestToState != null && state != _engineRequestToState)
+                {
+                    var s = _engineRequestToState;
+                    _engineRequestToState = null;
+                    ChangeToState(s);
+                }
             }
             catch (Exception e)
             {

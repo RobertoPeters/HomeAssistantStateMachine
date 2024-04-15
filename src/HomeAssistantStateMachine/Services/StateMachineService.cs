@@ -171,7 +171,7 @@ public class StateMachineService : ServiceDbBase
             await ExecuteWithinTransactionAsync(context, async () =>
             {
                 StateMachine result = await context.StateMachines.FirstAsync(x => x.Id == stateMachine.Id);
-                result.PreStartAction = stateMachine.PreStartAction;
+                result.PreScheduleAction = stateMachine.PreScheduleAction;
                 result.PreStartAction = stateMachine.PreStartAction;
                 result.Name = stateMachine.Name;
                 result.Enabled = stateMachine.Enabled;

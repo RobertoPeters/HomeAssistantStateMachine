@@ -22,6 +22,20 @@ public partial class StateMachineHandler
             _haClientService = haClientService;
         }
 
+        public void log(object? data)
+        {
+            _stateMachineHandler.AddLog(data);
+        }
+        public void gotoState(string stateName)
+        {
+            _stateMachineHandler.SetEngineRequestToState(stateName);
+        }
+
+        public string getCurrentState()
+        {
+            return _stateMachineHandler.GetEngineState();
+        }
+
         public bool createHAVariable(string? clientName, string name, string? data)
         {
             var result = false;
@@ -100,6 +114,18 @@ public partial class StateMachineHandler
     }
 
     public const string SystemScript = """"
+        log = function(data) {
+            return system.log(data);
+        }
+
+        gotoState = function(state) {
+            return system.gotoState(state);
+        }
+
+        getCurrentState = function() {
+            return system.getCurrentState();
+        }
+                
         getValue = function(name) {
             return system.getVariableValue(name);
         }

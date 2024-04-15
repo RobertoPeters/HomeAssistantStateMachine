@@ -26,26 +26,40 @@
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
-    <RadzenButton Size="ButtonSize.Small" Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
-    <RadzenButton Size="ButtonSize.Small" Text="Save" Click="@SaveAsync" />
-    <RadzenButton Size="ButtonSize.Small" Text="Stop" Click="@Stop" />
-    <RadzenButton Size="ButtonSize.Small" Text="Restart" Click="@Restart" />
-    <RadzenButton Size="ButtonSize.Small" Text="Reload" Click="@ReloadDiagramAsync" />
-    <RadzenButton Size="ButtonSize.Small" Text="Edit Properties" Click="@EditStateMachineAsync" />
-    <RadzenButton Size="ButtonSize.Small" Text="Script" Click="@ShowStateMachineAsync" />
-    <RadzenButton Size="ButtonSize.Small" Text="Export" Click="@ExportAsync" />
-    <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
-    <RadzenButton Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@OnDeleteAsync" />
+    <RadzenSplitter>
+        <RadzenSplitterPane Size="50%" Min="30px" Max="100%">
+            <RadzenButton Size="ButtonSize.Small" Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
+            <RadzenButton Size="ButtonSize.Small" Text="Save" Click="@SaveAsync" />
+            <RadzenButton Size="ButtonSize.Small" Text="Stop" Click="@Stop" />
+            <RadzenButton Size="ButtonSize.Small" Text="Restart" Click="@Restart" />
+            <RadzenButton Size="ButtonSize.Small" Text="Reload" Click="@ReloadDiagramAsync" />
+            <RadzenButton Size="ButtonSize.Small" Text="Edit Properties" Click="@EditStateMachineAsync" />
+            <RadzenButton Size="ButtonSize.Small" Text="Script" Click="@ShowStateMachineAsync" />
+            <RadzenButton Size="ButtonSize.Small" Text="Export" Click="@ExportAsync" />
+            <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
+            <RadzenButton Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@OnDeleteAsync" />
 
-    <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
-        <CascadingValue Value="Diagram" IsFixed="true">
-            <DiagramCanvas>
-                <Widgets>
-                    <SelectionBoxWidget />
-                </Widgets>
-            </DiagramCanvas>
-        </CascadingValue>
-    </div>
+            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
+                <CascadingValue Value="Diagram" IsFixed="true">
+                    <DiagramCanvas>
+                        <Widgets>
+                            <SelectionBoxWidget />
+                        </Widgets>
+                    </DiagramCanvas>
+                </CascadingValue>
+            </div>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+            <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
+            <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
+                @foreach (var data in logLines)
+                {
+                    <RadzenLabel Text="@(data.Time.ToString("HH:mm.ss.fff"))" />
+                    <pre>@data.Message</pre>
+                }
+            </div>
+        </RadzenSplitterPane>
+    </RadzenSplitter>
 }
 else
 {
@@ -68,10 +82,17 @@ else
         public PortAlignment TargetPort { get; set; } = PortAlignment.Top;
     }
 
+    private class LogData
+    {
+        public string Message { get; set; } = string.Empty;
+        public DateTime Time { get; set; } = DateTime.Now;
+    }
+
     private BlazorDiagram Diagram { get; set; } = null!;
     private StateMachine StateMachine = null!;
     private StateMachineHandler StateMachineHandler = null!;
     private int newIdForAdd = -1;
+    private List<LogData> logLines = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,11 +101,11 @@ else
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                        {
+                                {
                     Enabled = true,
-                        },
+                                },
                     Links =
-                        {
+                                {
                     DefaultRouter = new NormalRouter(),
                     DefaultPathGenerator = new SmoothPathGenerator(),
                     RequireTarget = false,
@@ -112,25 +133,48 @@ else
 
                         return linkModel;
                     }
-                        },
+                                },
                 };
 
         Diagram = new BlazorDiagram(options);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
         StateMachineHandler.StateChanged += StateChanged;
+        StateMachineHandler.Log += LogEvent;
 
         await ReloadDiagramAsync();
 
         await base.OnInitializedAsync();
     }
 
+    void ClearLog()
+    {
+        InvokeAsync(() =>
+        {
+            logLines.Clear();
+            StateHasChanged();
+        });
+    }
+
+    void LogEvent(object? sender, string log)
+    {
+        InvokeAsync(() =>
+        {
+            logLines.Add(new LogData() { Message = log });
+            while (logLines.Count > 200)
+            {
+                logLines.RemoveAt(0);
+            }
+            StateHasChanged();
+        });
+    }
+
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
         {
-            var currentState = StateMachineHandler.CurrentState;
-            StateHasChanged();
+    var currentState = StateMachineHandler.CurrentState;
+    StateHasChanged();
         });
     }
 
@@ -182,6 +226,7 @@ else
 
     public void Dispose()
     {
+        StateMachineHandler.Log -= LogEvent;
         StateMachineHandler.StateChanged -= StateChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
