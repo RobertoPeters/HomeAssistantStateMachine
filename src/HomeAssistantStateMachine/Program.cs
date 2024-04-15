@@ -8,15 +8,15 @@ var settingsFolder = Path.Combine(builder.Environment.ContentRootPath, "Settings
 var settingsPath = Path.Combine(settingsFolder, "appsettings.json");
 var databasePath = Path.Combine(settingsFolder, "hasm.db3");
 
-Directory.CreateDirectory(settingsFolder);
+if (!Directory.Exists(settingsFolder))
+{
+    Directory.CreateDirectory(settingsFolder);
+}
 if (!File.Exists(settingsPath))
 {
     File.Copy(Path.Combine(builder.Environment.ContentRootPath, "appsettings.json"), settingsPath);
 }
-if (!File.Exists(databasePath))
-{
-    File.Copy(Path.Combine(builder.Environment.ContentRootPath, "hasm.db3"), databasePath);
-}
+
 builder.Configuration
     .SetBasePath(builder.Environment.ContentRootPath)
     .AddJsonFile(settingsPath, optional: false, reloadOnChange: true)

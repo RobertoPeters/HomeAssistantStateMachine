@@ -147,7 +147,7 @@ public partial class StateMachineHandler : IDisposable
             script.AppendLine($"function stateEntryAction{state.Id}() {{ ");
             if (state.EntryAction != null)
             {
-                var allLines = state.EntryAction.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+                var allLines = state.EntryAction.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var line in allLines)
                 {
                     script.AppendLine($"  {line}");
@@ -172,7 +172,7 @@ public partial class StateMachineHandler : IDisposable
         script.AppendLine($"function preScheduleAction() {{ ");
         if (stateMachine.PreScheduleAction != null)
         {
-            var allLines = stateMachine.PreScheduleAction.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+            var allLines = stateMachine.PreScheduleAction.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in allLines)
             {
                 script.AppendLine($"  {line}");

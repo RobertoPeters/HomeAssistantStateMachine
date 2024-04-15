@@ -1,0 +1,12 @@
+version: '3.0'
+services:
+  hasm:
+    build: 
+      dockerfile: ./Dockerfile
+    environment:
+      - TZ=Europe/Amsterdam
+    ports:
+      - "3020:80"
+    volumes:
+      - ./Docker:/app/Settings
+
