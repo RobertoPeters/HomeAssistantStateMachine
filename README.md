@@ -31,4 +31,11 @@ Entity Framework with SQlite is used for storage and ORM
 
 Jint is used for scripts in states and transitiions (javascript for user)
 
-The goal is to create a docker container and a HA add on for easy installation.
+# Installation
+Docker repository: robertpeters/homeassistantstatemachine:dev
+https://hub.docker.com/repository/docker/robertpeters/homeassistantstatemachine/general
+
+Internal port is 80 (http://)
+
+volume mapping is /app/Settings
+
