@@ -399,3 +399,4 @@ FodyWeavers.xsd
 /src/HomeAssistantStateMachine/Settings
 /src/HomeAssistantStateMachine/Settings
 /src/HomeAssistantStateMachine/DeployLinux
+/Docker
