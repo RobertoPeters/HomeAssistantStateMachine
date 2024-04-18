@@ -1,7 +1,8 @@
-# HomeAssistantStateMachine (HASM)
+# Home Assistant State Machine (HASM)
 State Machine for Home Assistant to create automation using state machines
 
-This project started at 26 March 2024 and more information and documentation will folow as soon as it is in alpha phase
+This project is almost going into alpha phase
+First I want to write some manual in the wiki for users to learn the application.
 
 Some info:
 ## Features
@@ -16,6 +17,8 @@ User can create service calls to HA
 A state has a entry script/code
 
 A condition has condition script/code
+
+...and many more...
 
 
 ## Technical information
