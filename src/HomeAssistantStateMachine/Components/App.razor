@@ -30,6 +30,17 @@
             anchorElement.remove();
             URL.revokeObjectURL(url);
         }
+        window.navigateToTarget = (url, target) => {
+            const anchorElement = document.createElement('a');
+            anchorElement.href = url;
+            if (target != null && target != '') {
+                anchorElement.target = target;
+            } else {
+                anchorElement.download = '';
+            }
+            anchorElement.click();
+            anchorElement.remove();
+        };
     </script>
 </body>
 

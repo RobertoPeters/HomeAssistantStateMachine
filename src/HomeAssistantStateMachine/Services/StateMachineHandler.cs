@@ -132,6 +132,50 @@ public partial class StateMachineHandler : IDisposable
         return false;
     }
 
+    public string? ExecuteScript(string script)
+    {
+        string? result = null;
+        if (_engine != null)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var jsValue = _engine.Evaluate(script);
+                    if (jsValue == null)
+                    {
+                        result = "null";
+                    }
+                    else
+                    {
+                        var obj = jsValue.ToObject();
+                        if ( obj == null)
+                        {
+                            result = "null";
+                        }
+                        else if (obj is string s)
+                        {
+                            result = s;
+                        }
+                        else if (obj.GetType().IsValueType)
+                        {
+                            result = obj.ToString();
+                        }
+                        else
+                        {
+                            result = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    result = $"Error: {e.Message}";
+                }
+            }
+        }
+        return result;
+    }
+
     public void SetEngineRequestToState(string? stateName)
     {
         _engineRequestToState = StateMachine.States.FirstOrDefault(x => x.Name == stateName);

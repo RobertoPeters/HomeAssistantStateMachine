@@ -5,7 +5,6 @@
     <RadzenStack Size="StackSize.s4">
         <div class="d-flex">
             <div>
-                <RadzenHeading Size="H1" Text="@Title" />
                 @Content
             </div>
         </div>
@@ -36,7 +35,7 @@
     [Parameter] public DialogButton Buttons { get; set; }
 
     protected override bool ShowClose => false;
-    protected override bool ShowTitle => false;
+    protected override bool ShowTitle => true;
     protected override bool IsPersistent => true;
 
     [Flags]

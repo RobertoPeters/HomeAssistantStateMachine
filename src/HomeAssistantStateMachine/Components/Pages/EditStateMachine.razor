@@ -26,7 +26,7 @@
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
-    <RadzenSplitter>
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
         <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
             <RadzenButton Size="ButtonSize.Small" Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
             <RadzenButton Size="ButtonSize.Small" Text="Save" Click="@SaveAsync" />
@@ -47,6 +47,12 @@
                         </Widgets>
                     </DiagramCanvas>
                 </CascadingValue>
+            </div>
+            <div>
+                <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
+            </div>
+            <div>
+                <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
             </div>
         </RadzenSplitterPane>
         <RadzenSplitterPane Min="50px">
@@ -93,6 +99,8 @@ else
     private StateMachineHandler StateMachineHandler = null!;
     private int newIdForAdd = -1;
     private List<LogData> logLines = [];
+    private int executeCommandPanelHeight = 50;
+    private string? executeCommand;
 
     protected override async Task OnInitializedAsync()
     {
@@ -101,11 +109,11 @@ else
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                                {
+                                            {
                     Enabled = true,
-                                },
+                                            },
                     Links =
-                                {
+                                            {
                     DefaultRouter = new NormalRouter(),
                     DefaultPathGenerator = new SmoothPathGenerator(),
                     RequireTarget = false,
@@ -133,7 +141,7 @@ else
 
                         return linkModel;
                     }
-                                },
+                                            },
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -145,6 +153,25 @@ else
         await ReloadDiagramAsync();
 
         await base.OnInitializedAsync();
+    }
+
+    void ExecuteInteractive()
+    {
+        if (!string.IsNullOrWhiteSpace(executeCommand))
+        {
+            var result = executeCommand;
+            result = result + "\r\n";
+            if (StateMachineHandler?.RunningState != StateMachineHandler.StateMachineRunningState.Running)
+            {
+                result = result + "error: state machine not running";
+            }
+            else
+            {
+                result = result + StateMachineHandler.ExecuteScript(executeCommand);
+            }
+            executeCommand = result;
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     void ClearLog()
@@ -159,23 +186,23 @@ else
     void LogEvent(object? sender, string log)
     {
         InvokeAsync(() =>
+    {
+        logLines.Add(new LogData() { Message = log });
+        while (logLines.Count > 200)
         {
-            logLines.Add(new LogData() { Message = log });
-            while (logLines.Count > 200)
-            {
-                logLines.RemoveAt(0);
-            }
-            StateHasChanged();
-        });
+            logLines.RemoveAt(0);
+        }
+        StateHasChanged();
+    });
     }
 
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
-        {
-    var currentState = StateMachineHandler.CurrentState;
-    StateHasChanged();
-        });
+    {
+        var currentState = StateMachineHandler.CurrentState;
+        StateHasChanged();
+    });
     }
 
     async Task ReloadDiagramAsync()
@@ -235,9 +262,9 @@ else
     async Task AddStateAsync(int x, int y)
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
-    {
-        dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-    });
+        {
+    dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        });
         if (state != null)
         {
             newIdForAdd--;
@@ -302,7 +329,7 @@ else
         }
         </RadzenMenuItem>
     </RadzenMenu>
-        );
+    );
         }
         else
         {
@@ -583,10 +610,10 @@ else
 
     async Task OnDeleteAsync()
     {
-        if (await DialogService.ShowNoYesCancelConfirmationDialogAsync("Delete State Machine", $"Are you sure you want to delete the State Machine '{StateMachine.Name}'?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
+        if (await DialogService.ShowNoYesConfirmationDialogAsync("Delete State Machine", $"Are you sure you want to delete the State Machine '{StateMachine.Name}'?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
         {
             await StateMachineService.DeleteStateMachineHandler(StateMachine.Id);
-            NavigationManager.NavigateTo("/statemachines");
+            NavigationManager.NavigateTo("/");
         }
     }
 

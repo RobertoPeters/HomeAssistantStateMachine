@@ -28,8 +28,7 @@
                     PagerHorizontalAlign="HorizontalAlign.Left"
                     ShowPagingSummary="true"
                     Data="@gridData"
-                    TItem="VariableInfo"
-                    ColumnWidth="300px">
+                    TItem="VariableInfo">
         <Columns>
             <RadzenDataGridColumn TItem="VariableInfo"
                                   Property="@nameof(VariableInfo.Name)"
@@ -184,7 +183,7 @@
 
     private async Task DeleteVariableAsync(VariableInfo vi)
     {
-        if (await DialogService.ShowNoYesCancelConfirmationDialogAsync("Delete Variable(s)", $"Are you sure you want variables?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
+        if (await DialogService.ShowNoYesConfirmationDialogAsync("Delete Variable(s)", $"Are you sure you want to delete the variable(s)?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
         {
             if (vi.Variable?.HAClientId != null)
             {
