@@ -27,7 +27,7 @@
         <p>@StateMachineHandler.ErrorMessage</p>
     }
     <RadzenSplitter>
-        <RadzenSplitterPane Size="50%" Min="30px" Max="100%">
+        <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
             <RadzenButton Size="ButtonSize.Small" Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
             <RadzenButton Size="ButtonSize.Small" Text="Save" Click="@SaveAsync" />
             <RadzenButton Size="ButtonSize.Small" Text="Stop" Click="@Stop" />
@@ -49,7 +49,7 @@
                 </CascadingValue>
             </div>
         </RadzenSplitterPane>
-        <RadzenSplitterPane>
+        <RadzenSplitterPane Min="50px">
             <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
             <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
                 @foreach (var data in logLines)
@@ -595,6 +595,11 @@ else
         var removedStates = StateMachine.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
         foreach (var state in removedStates)
         {
+            var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+            foreach (var transition in transitions)
+            {
+                StateMachine.Transitions.Remove(transition);
+            }
             StateMachine.States.Remove(state);
         }
         AddUIDataToStatesAndTransitions();

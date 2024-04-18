@@ -5,7 +5,7 @@
     <RadzenStack>
         <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
             <ChildContent>
-                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name"/>
+                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name" Placeholder="name"/>
             </ChildContent>
             <Helper>
                 <RadzenRequiredValidator Component="Name" Text="This field is required" />
@@ -14,7 +14,7 @@
         </RadzenFormField>
         <RadzenFormField Text="Host *" Variant="@Variant.Outlined">
             <ChildContent>
-                <RadzenTextBox @bind-Value="@Model!.Host" Name="Host" />
+                <RadzenTextBox @bind-Value="@Model!.Host" Name="Host" Placeholder="http://localhost:8123"/>
             </ChildContent>
             <Helper>
                 <RadzenRequiredValidator Component="Host" Text="This field is required" />

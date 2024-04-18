@@ -79,6 +79,7 @@
             {
                 await HAClientService.UpdateHAClientAsync(haClient, result.Name, result.Enabled, result.Host, result.Token);
             }
+            clients = HAClientService.GetClients().ToDictionary(x => x.HAClient.Id, x => x);
             StateHasChanged();
         }
     }

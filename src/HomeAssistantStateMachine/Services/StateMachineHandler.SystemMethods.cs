@@ -59,6 +59,21 @@ public partial class StateMachineHandler
             return null;
         }
 
+        public bool setHAStateChanged(string? clientName, string name, Func<JsValue, JsValue[], JsValue> callback)
+        {
+            var haClientHandler = _haClientService.GetClientHandler(clientName);
+            if (haClientHandler != null)
+            {
+                name = $"__HA_{haClientHandler.HAClient.Id}__{name}";
+                var variable = _variableService.GetVariable(name);
+                if (variable != null)
+                {
+                    return _stateMachineHandler.SetHAStateChanged(haClientHandler, variable, callback);
+                }
+            }
+            return false;
+        }
+
         public bool createVariable(string name)
         {
             name = $"__SM_{_stateMachineHandler.StateMachine.Id}__{name}";
@@ -179,7 +194,12 @@ public partial class StateMachineHandler
             //e.g. getHAVariable(clientname, 'test'); get the value of the given (HA) variable
             return system.getHAVariable(clientname, name);
         }
-        
+ 
+        setHAStateChanged = function(clientname, name, functionRef) {
+            //e.g. setHAStateChanged(null, 'kitchenLight', function(data) { log(data) });
+            return system.setHAStateChanged(clientname, name, functionRef);
+        }
+                
         haClientCallService = function(clientname, name, service, data) {
             //e.g. haClientCallService(null, 'light', 'turn_on', { entity_id = "light.my_light", brightness_pct = 20});
             return system.haClientCallService(clientname, name, service, data);

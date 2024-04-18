@@ -21,6 +21,8 @@
                     FilterMode="FilterMode.SimpleWithMenu"
                     AllowSorting="true"
                     PageSize="20"
+                    AllowColumnPicking="true"
+                    AllowColumnReorder="true"
                     AllowPaging="true"
                     AllowVirtualization="true"
                     PagerHorizontalAlign="HorizontalAlign.Left"
@@ -41,7 +43,7 @@
                                   Property="@nameof(VariableInfo.StateMachineName)"
                                   Title="State Machine" />
 
-           <RadzenDataGridColumn TItem="VariableInfo"
+            <RadzenDataGridColumn TItem="VariableInfo"
                                   Property="@nameof(VariableInfo.Data)"
                                   Title="Data" />
 

@@ -2,8 +2,8 @@
 using HassClient.WS;
 using HomeAssistantStateMachine.Data;
 using HomeAssistantStateMachine.Models;
-using Mono.TextTemplating;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace HomeAssistantStateMachine.Services;
 
@@ -22,6 +22,7 @@ public class HAClientHandler : IAsyncDisposable
     private HassWSApi? _wsApi;
     private bool _started = false;
     private readonly ConcurrentDictionary<string, List<VariableInfo>> _variables = [];
+    private readonly ConcurrentDictionary<string, Dictionary<int, Action<object>>> _variablesChangeCallBack = [];
 
     public HAClientHandler(HAClientService haClientService, HAClient haClient, VariableService variableService)
     {
@@ -99,30 +100,64 @@ public class HAClientHandler : IAsyncDisposable
     public async Task DeleteVariableAsync(string name, HasmDbContext? ctx = null)
     {
         var existingVariable = VariableService.GetVariable(name);
-        var haEntityId = existingVariable.Data ?? existingVariable.Name;
-        if (_variables.TryGetValue(haEntityId, out var variableInfos))
+        if (existingVariable != null)
         {
-            var varibleInfo = variableInfos.FirstOrDefault(v => v.Variable.Id == existingVariable.Id);
-            if (varibleInfo != null)
+            var haEntityId = existingVariable.Data ?? existingVariable.Name;
+            if (_variables.TryGetValue(haEntityId, out var variableInfos))
             {
-                variableInfos.Remove(varibleInfo);
-                if (!variableInfos.Any())
+                var varibleInfo = variableInfos.Find(v => v.Variable.Id == existingVariable.Id);
+                if (varibleInfo != null)
                 {
-                    _variables.TryRemove(haEntityId, out _);
-                    if (_wsApi != null)
+                    variableInfos.Remove(varibleInfo);
+                    if (!variableInfos.Any())
                     {
-                        try
+                        _variables.TryRemove(haEntityId, out _);
+                        if (_wsApi != null)
                         {
-                            _wsApi.StateChagedEventListener.UnsubscribeEntityStatusChanged(haEntityId, EventHandlerEventStateChanged);
-                        }
-                        catch
-                        {
-                            //nothing
+                            try
+                            {
+                                _wsApi.StateChagedEventListener.UnsubscribeEntityStatusChanged(haEntityId, EventHandlerEventStateChanged);
+                            }
+                            catch
+                            {
+                                //nothing
+                            }
                         }
                     }
+                    await VariableService.DeleteVariableAsync(varibleInfo.Variable.Name, ctx);
                 }
-                await VariableService.DeleteVariableAsync(varibleInfo.Variable.Name, ctx);
             }
+        }
+    }
+
+    public bool SetStateChangedCallback(int registrarId, Variable variable, Action<object> callback)
+    {
+        var result = false;
+        if (variable != null)
+        {
+            var haEntityId = variable.Data ?? variable.Name;
+            if (!_variablesChangeCallBack.TryGetValue(haEntityId, out var callbacks))
+            {
+                callbacks = [];
+                _variablesChangeCallBack.TryAdd(haEntityId, callbacks);
+            }
+            if (callbacks.TryGetValue(registrarId, out _))
+            {
+                callbacks.Remove(registrarId);
+            }
+            callbacks.TryAdd(registrarId, callback);
+            return true;
+        }
+        return result;
+    }
+
+    public void RemoveRegistrarFromStateChangedCallback(int registrarId)
+    {
+        foreach (var item in from item in _variablesChangeCallBack.Values.ToList()
+                             where item.ContainsKey(registrarId)
+                             select item)
+        {
+            item.Remove(registrarId);
         }
     }
 
@@ -166,12 +201,15 @@ public class HAClientHandler : IAsyncDisposable
             else if (vv == null && ConnectionState == ConnectionStates.Connected)
             {
                 _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(haEntityId, EventHandlerEventStateChanged);
-                var states = await _wsApi!.GetStatesAsync();
-                var state = states.FirstOrDefault(s => s.EntityId == result.Data);
-                if (state != null)
+                Task.Factory.StartNew(async () =>
                 {
-                    await UpdateVariableValue(state.EntityId, state.State);
-                }
+                    var states = await _wsApi!.GetStatesAsync();
+                    var state = states.FirstOrDefault(s => s.EntityId == haEntityId);
+                    if (state != null)
+                    {
+                        await UpdateVariableValue(state.EntityId, state.State);
+                    }
+                });
             }
         }
         return result;
@@ -242,6 +280,20 @@ public class HAClientHandler : IAsyncDisposable
     private async void EventHandlerEventStateChanged(object? sender, StateChangedEvent stateChangedArgs)
     {
         await UpdateVariableValue(stateChangedArgs.EntityId, stateChangedArgs.NewState.State);
+        if (_variablesChangeCallBack.TryGetValue(stateChangedArgs.EntityId, out var callbacks))
+        {
+            foreach (var callback in callbacks)
+            {
+                try
+                {
+                    callback.Value(stateChangedArgs);
+                }
+                catch
+                {
+                    //ignore
+                }
+            }
+        }
     }
 
     private async Task UpdateVariableValue(string eventId, string state)

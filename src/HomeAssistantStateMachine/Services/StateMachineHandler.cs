@@ -12,6 +12,34 @@ public partial class StateMachineHandler : IDisposable
         Error
     }
 
+    private sealed class HAStateChangedCallBackInfo
+    {
+        public HAStateChangedCallBackInfo(int variableId, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
+        {
+            VariableId = variableId;
+            Callback = callback;
+        }
+        public Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> Callback { get; private set; }
+        public int VariableId { get; private set; }
+        public bool Triggered { get; private set; }
+        private object? _data;
+        public object? Data
+        {
+            get { return _data; }
+            set
+            {
+                _data = value;
+                Triggered = true;
+            }
+        }
+
+        public void ExecuteCallback(Jint.Engine engine)
+        {
+            Triggered = false;
+            Callback.Invoke(Jint.Native.JsValue.Undefined, [Jint.Native.JsValue.FromObject(engine, Data)]);
+        }
+    }
+
     public StateMachine StateMachine { get; private set; }
     public string? ErrorMessage { get; private set; }
 
@@ -49,6 +77,7 @@ public partial class StateMachineHandler : IDisposable
 
     private readonly object _lockObject = new object();
     private Jint.Engine? _engine = null;
+    private readonly List<HAStateChangedCallBackInfo> _haStateChangedCallBackInfos = [];
     private volatile bool _readyForTriggers = false;
     private readonly VariableService _variableService;
     private readonly HAClientService _haClientService;
@@ -77,6 +106,30 @@ public partial class StateMachineHandler : IDisposable
         StateMachine = stateMachine;
         _variableService = variableService;
         _haClientService = haClientService;
+    }
+
+    public bool SetHAStateChanged(HAClientHandler clientHandler, Variable variable, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
+    {
+        //call from engine, so no lock required (already locked)
+        var existing = _haStateChangedCallBackInfos.Find(x => x.VariableId == variable.Id);
+        if (existing != null)
+        {
+            _haStateChangedCallBackInfos.Remove(existing);
+        }
+        var cbInfo = new HAStateChangedCallBackInfo(variable.Id, callback);
+        if (clientHandler.SetStateChangedCallback(StateMachine.Id, variable, (data) =>
+            {
+                cbInfo.Data = data;
+                Task.Factory.StartNew(() =>
+                {
+                    TriggerProcess();
+                });
+            }))
+        {
+            _haStateChangedCallBackInfos.Add(cbInfo);
+            return true;
+        }
+        return false;
     }
 
     public void SetEngineRequestToState(string? stateName)
@@ -116,9 +169,16 @@ public partial class StateMachineHandler : IDisposable
         lock (_lockObject)
         {
             RunningState = StateMachineRunningState.NotRunning;
-            _engine?.Dispose();
-            _engine = null;
+            DisposeEngine();
         }
+    }
+
+    private void DisposeEngine()
+    {
+        _haStateChangedCallBackInfos.Clear();
+        _haClientService.GetClients().ForEach(x => x.RemoveRegistrarFromStateChangedCallback(StateMachine.Id));
+        _engine?.Dispose();
+        _engine = null;
     }
 
     private State? GetStartState()
@@ -242,8 +302,7 @@ public partial class StateMachineHandler : IDisposable
                 }
                 catch (Exception e)
                 {
-                    _engine.Dispose();
-                    _engine = null;
+                    DisposeEngine();
                     ErrorMessage = $"Error initializing statemachine: {e.Message}";
                     RunningState = StateMachineRunningState.Error;
                 }
@@ -263,8 +322,7 @@ public partial class StateMachineHandler : IDisposable
         lock (_lockObject)
         {
             RunningState = StateMachineRunningState.NotRunning;
-            _engine?.Dispose();
-            _engine = null;
+            DisposeEngine();
             ChangeToState(null);
         }
     }
@@ -281,6 +339,13 @@ public partial class StateMachineHandler : IDisposable
                 Transition? activeTransition = null;
                 try
                 {
+                    foreach (var cbInfo in _haStateChangedCallBackInfos)
+                    {
+                        if (cbInfo.Triggered)
+                        {
+                            cbInfo.ExecuteCallback(_engine);
+                        }
+                    }
                     _engine.Invoke("preScheduleAction");
                     var transitions = StateMachine.Transitions
                         .Where(t => t.FromStateId == CurrentState.Id)
