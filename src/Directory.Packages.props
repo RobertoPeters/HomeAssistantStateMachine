@@ -14,7 +14,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageVersion>
-    <PackageVersion Include="Radzen.Blazor" Version="4.29.7" />
+    <PackageVersion Include="Radzen.Blazor" Version="4.29.8" />
     <PackageVersion Include="Z.Blazor.Diagrams" Version="3.0.2" />
   </ItemGroup>
 </Project>

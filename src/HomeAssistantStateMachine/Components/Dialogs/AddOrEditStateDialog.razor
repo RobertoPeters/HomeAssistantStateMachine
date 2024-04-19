@@ -12,7 +12,7 @@
                 <RadzenCustomValidator Component="Name" Validator="@(() => !ExistingStateNames.Contains(Model!.Name))" Text="Name should be unique" />
             </Helper>
         </RadzenFormField>
-        <RadzenFormField Text="Enabled" Variant="@Variant.Outlined">
+        <RadzenFormField Text="Type" Variant="@Variant.Outlined">
             <RadzenRadioButtonList @bind-Value="@TypeOfState" TValue="int" class="rz-m-4 rz-mt-8">
                 <Items>
                     <RadzenRadioButtonListItem Text="Normal" Value="0" />

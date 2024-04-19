@@ -390,6 +390,7 @@ public partial class StateMachineHandler : IDisposable
                             cbInfo.ExecuteCallback(_engine);
                         }
                     }
+
                     _engine.Invoke("preScheduleAction");
                     var transitions = StateMachine.Transitions
                         .Where(t => t.FromStateId == CurrentState.Id)
@@ -411,6 +412,14 @@ public partial class StateMachineHandler : IDisposable
                                 ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
                                 break;
                             }
+                        }
+                    }
+
+                    foreach (var cbInfo in _haStateChangedCallBackInfos)
+                    {
+                        if (cbInfo.Triggered)
+                        {
+                            cbInfo.ExecuteCallback(_engine);
                         }
                     }
                 }
