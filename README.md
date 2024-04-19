@@ -3,25 +3,7 @@ State Machine for Home Assistant to create automation using state machines
 
 ![image](https://github.com/RobertoPeters/HomeAssistantStateMachine/assets/5654611/d25de45b-157d-4359-9b14-4b92b403b10d)
 
-
-This project is almost going into alpha phase
-First I want to write some manual in the wiki for users to learn the application.
-
-Some info:
-## Features
-User can add HA clients (to connect to HA)
-
-User can add variables which reflects entities in HA (e.g. button1 -> input_boolean.button1)
-
-User can create state machines like in Visio
-
-User can create service calls to HA
-
-A state has a entry script/code
-
-A condition has condition script/code
-
-...and many more...
+For the features and user manual see the Wiki https://github.com/RobertoPeters/HomeAssistantStateMachine/wiki
 
 
 ## Technical information
@@ -36,12 +18,3 @@ Z.Blazor.Diagrams for state machine modulation
 Entity Framework with SQlite is used for storage and ORM
 
 Jint is used for scripts in states and transitiions (javascript for user)
-
-# Installation
-Docker repository: robertpeters/homeassistantstatemachine:dev
-https://hub.docker.com/repository/docker/robertpeters/homeassistantstatemachine/general
-
-Internal port is 80 (http://)
-
-volume mapping is /app/Settings
-
