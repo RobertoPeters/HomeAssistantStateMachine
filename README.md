@@ -1,6 +1,9 @@
 # Home Assistant State Machine (HASM)
 State Machine for Home Assistant to create automation using state machines
 
+![image](https://github.com/RobertoPeters/HomeAssistantStateMachine/assets/5654611/d25de45b-157d-4359-9b14-4b92b403b10d)
+
+
 This project is almost going into alpha phase
 First I want to write some manual in the wiki for users to learn the application.
 
