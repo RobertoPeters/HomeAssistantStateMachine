@@ -49,7 +49,15 @@
                 </CascadingValue>
             </div>
             <div>
-                <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
+                <div style="float:left;">
+                    <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
+                </div>
+                <div style="float:right;">
+                    <RadzenButton Size="ButtonSize.Small" Text="+" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 1.25))" />
+                    <RadzenButton Size="ButtonSize.Small" Text="-" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 0.75))" />
+                    <RadzenButton Size="ButtonSize.Small" Text="Reset" Click="@(() => Diagram.SetZoom(1.0))" />
+                    <RadzenButton Size="ButtonSize.Small" Text="Fit" Click="@(() => Diagram.ZoomToFit() )" />
+                </div>
             </div>
             <div>
                 <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
@@ -108,12 +116,12 @@ else
         var options = new BlazorDiagramOptions
                 {
                     AllowMultiSelection = true,
-                    Zoom = 
-                    {
+                    Zoom =
+                            {
                         Enabled = true
-                    },
-                    Links = 
-                    {
+                            },
+                    Links =
+                            {
                         DefaultRouter = new NormalRouter(),
                         DefaultPathGenerator = new SmoothPathGenerator(),
                         RequireTarget = true,
@@ -141,7 +149,7 @@ else
 
                             return linkModel;
                         }
-                    }
+                            }
                 };
 
         Diagram = new BlazorDiagram(options);
