@@ -108,40 +108,40 @@ else
         var options = new BlazorDiagramOptions
                 {
                     AllowMultiSelection = true,
-                    Zoom =
-                                            {
-                    Enabled = true,
-                                            },
-                    Links =
-                                            {
-                    DefaultRouter = new NormalRouter(),
-                    DefaultPathGenerator = new SmoothPathGenerator(),
-                    RequireTarget = false,
-                    Factory = (diagram, source, targetAnchor) =>
+                    Zoom = 
                     {
-                        Anchor? source2;
-                        if (!(source is NodeModel model3))
+                        Enabled = true
+                    },
+                    Links = 
+                    {
+                        DefaultRouter = new NormalRouter(),
+                        DefaultPathGenerator = new SmoothPathGenerator(),
+                        RequireTarget = true,
+                        Factory = (diagram, source, targetAnchor) =>
                         {
-                            if (!(source is PortModel port2))
+                            Anchor? source2;
+                            if (!(source is NodeModel model3))
                             {
-                                throw new NotImplementedException();
+                                if (!(source is PortModel port2))
+                                {
+                                    throw new NotImplementedException();
+                                }
+
+                                source2 = new SinglePortAnchor(port2);
+                            }
+                            else
+                            {
+                                source2 = new ShapeIntersectionAnchor(model3);
                             }
 
-                            source2 = new SinglePortAnchor(port2);
-                        }
-                        else
-                        {
-                            source2 = new ShapeIntersectionAnchor(model3);
-                        }
+                            var linkModel = new LinkModel(source2, targetAnchor);
+                            linkModel.TargetMarker = LinkMarker.Arrow;
+                            //linkModel.Segmentable = true;
+                            linkModel.AddLabel("true");
 
-                        var linkModel = new LinkModel(source2, targetAnchor);
-                        linkModel.TargetMarker = LinkMarker.Arrow;
-                        //linkModel.Segmentable = true;
-                        linkModel.AddLabel("true");
-
-                        return linkModel;
+                            return linkModel;
+                        }
                     }
-                                            },
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -178,8 +178,8 @@ else
     {
         InvokeAsync(() =>
         {
-            logLines.Clear();
-            StateHasChanged();
+    logLines.Clear();
+    StateHasChanged();
         });
     }
 
@@ -436,8 +436,16 @@ else
                 }
                 break;
             case 4:
-                ContextMenuService.Close();
-                Diagram.Links.Remove(link!);
+                {
+                    ContextMenuService.Close();
+                    var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
+                    var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                    var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    StateMachine.Transitions.Remove(transition);
+                    Diagram.Links.Remove(link!);
+                }
                 break;
         }
     }
@@ -463,8 +471,13 @@ else
         if (args.Button == 0)
         {
             //check if link is added
-            foreach (var link in Diagram.Links)
+            foreach (var link in Diagram.Links.ToList())
             {
+                if (link.Target.Model == null)
+                {
+                    Diagram.Links.Remove(link);
+                    continue;
+                }
                 var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                 var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
                 var sourceState = StateMachine.States.First(x => x.Name == source3.Title);

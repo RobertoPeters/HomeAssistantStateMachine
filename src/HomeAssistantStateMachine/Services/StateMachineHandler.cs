@@ -328,36 +328,43 @@ public partial class StateMachineHandler : IDisposable
     public void Start()
     {
         _readyForTriggers = false;
-        lock (_lockObject)
+        if (StateMachine.Enabled)
         {
-            _currentState = null;
-            _engineRequestToState = null;
-            if (ValidateModel())
+            lock (_lockObject)
             {
-                _engine = new Jint.Engine();
-                _engine.SetValue("system", NewSystemMethods);
+                _currentState = null;
+                _engineRequestToState = null;
+                if (ValidateModel())
+                {
+                    _engine = new Jint.Engine();
+                    _engine.SetValue("system", NewSystemMethods);
 
-                try
-                {
-                    _engine.Execute(BuildEngineScript(StateMachine));
-                    RunningState = StateMachineRunningState.Running;
-                    _engine.Invoke("preScheduleAction");
-                    ChangeToState(_engineRequestToState ?? GetStartState());
+                    try
+                    {
+                        _engine.Execute(BuildEngineScript(StateMachine));
+                        RunningState = StateMachineRunningState.Running;
+                        _engine.Invoke("preScheduleAction");
+                        ChangeToState(_engineRequestToState ?? GetStartState());
+                    }
+                    catch (Exception e)
+                    {
+                        DisposeEngine();
+                        ErrorMessage = $"Error initializing statemachine: {e.Message}";
+                        RunningState = StateMachineRunningState.Error;
+                    }
                 }
-                catch (Exception e)
+                else
                 {
-                    DisposeEngine();
-                    ErrorMessage = $"Error initializing statemachine: {e.Message}";
+                    ErrorMessage = $"Statemachine is not valid";
                     RunningState = StateMachineRunningState.Error;
                 }
             }
-            else
-            {
-                ErrorMessage = $"Statemachine is not valid";
-                RunningState = StateMachineRunningState.Error;
-            }
+            _readyForTriggers = true;
         }
-        _readyForTriggers = true;
+        else
+        {
+            RunningState = StateMachineRunningState.NotRunning;
+        }
     }
 
     public void Stop()
