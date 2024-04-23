@@ -100,9 +100,9 @@ public class HAClientService : ServiceDbBase
         }))
         {
             var oldName = client.HAClient.Name;
-            _handlers.TryAdd(name, client);
-            await client.UpdateHAClientAsync(haClient, ctx);
             _handlers.TryRemove(oldName, out var _);
+            await client.UpdateHAClientAsync(haClient, ctx);
+            _handlers.TryAdd(name, client);
         }
     }
 
@@ -115,6 +115,12 @@ public class HAClientService : ServiceDbBase
     {
         return _handlers.Values.ToList();
     }
+
+    public HAClientHandler? GetClient(int id)
+    {
+        return _handlers.Values.FirstOrDefault(x => x.HAClient.Id == id);
+    }
+
 
     public HAClientHandler? GetClientHandler(string? name)
     {

@@ -72,10 +72,12 @@
     private class VariableInfo
     {
         private readonly StateMachineService _stateMachineService;
+        private readonly HAClientService _haClientService;
 
-        public VariableInfo(StateMachineService stateMachineService)
+        public VariableInfo(StateMachineService stateMachineService, HAClientService haClientService)
         {
             _stateMachineService = stateMachineService;
+            _haClientService = haClientService;
         }
 
         public Variable? Variable { get; set; } = null!;
@@ -87,7 +89,7 @@
         public string? Data => Variable?.Data ?? "";
         public string? Value => VariableValue?.Value ?? Timer?.Value.ToString() ?? "";
         public DateTime? Update => (VariableValue?.Update ?? Timer?.Start)?.ToLocalTime();
-        public string? HAClientName => Variable?.HAClient?.Name ?? "";
+        public string? HAClientName => Variable?.HAClientId == null ? "" : _haClientService.GetClient(Variable.HAClientId.Value)?.HAClient.Name ?? "";
         public string? StateMachineName => Variable?.StateMachine?.Id == null ? "" : _stateMachineService.GetStateMachine(Variable.StateMachine.Id).StateMachine.Name;
 
         private string VariableName()
@@ -110,7 +112,7 @@
         var allVariables = VariableService.GetVariables();
         foreach (var variable in allVariables)
         {
-            var v = new VariableInfo(StateMachineService)
+            var v = new VariableInfo(StateMachineService, HAClientService)
                 {
                     Variable = variable.variable,
                     VariableValue = variable.variableValue
@@ -137,7 +139,7 @@
             }
             else
             {
-                var vi = new VariableInfo(StateMachineService)
+                var vi = new VariableInfo(StateMachineService, HAClientService)
                     {
                         Timer = timer
                     };
@@ -204,7 +206,7 @@
             var allVariables = VariableService.GetVariables();
             foreach (var variable in allVariables)
             {
-                var v = new VariableInfo(StateMachineService)
+                var v = new VariableInfo(StateMachineService, HAClientService)
                     {
                         Variable = variable.variable,
                         VariableValue = variable.variableValue
@@ -228,7 +230,7 @@
               else
               {
                   var newVariable = VariableService.GetVariables().Where(x => x.variable.Id == e.Variable.Id).First();
-                  var vi = new VariableInfo(StateMachineService)
+                  var vi = new VariableInfo(StateMachineService, HAClientService)
                       {
                           Variable = newVariable.variable,
                           VariableValue = newVariable.variableValue
