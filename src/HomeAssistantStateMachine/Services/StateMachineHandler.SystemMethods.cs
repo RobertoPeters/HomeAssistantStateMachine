@@ -201,7 +201,7 @@ public partial class StateMachineHandler
         }
                 
         haClientCallService = function(clientname, name, service, data) {
-            //e.g. haClientCallService(null, 'light', 'turn_on', { entity_id = "light.my_light", brightness_pct = 20});
+            //e.g. haClientCallService(null, 'light', 'turn_on', { "entity_id": "light.my_light", "brightness_pct": 20});
             return system.haClientCallService(clientname, name, service, data);
         }
         
