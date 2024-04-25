@@ -21,6 +21,7 @@ public class HAClientHandler : IAsyncDisposable
 
     private HassWSApi? _wsApi;
     private bool _started = false;
+    private Timer? _reconnectTimer = null;
     private readonly ConcurrentDictionary<string, List<VariableInfo>> _variables = [];
     private readonly ConcurrentDictionary<string, Dictionary<int, Action<object>>> _variablesChangeCallBack = [];
 
@@ -74,6 +75,8 @@ public class HAClientHandler : IAsyncDisposable
 
     public async Task DisposeHassApiAsync()
     {
+        _reconnectTimer?.Dispose();
+        _reconnectTimer = null;
         if (_wsApi != null)
         {
             _wsApi.ConnectionStateChanged -= _wsApi_ConnectionStateChanged;
@@ -259,6 +262,27 @@ public class HAClientHandler : IAsyncDisposable
             {
                 await UpdateVariableValue(state.EntityId, state.State);
             }
+        }
+        else if (e == ConnectionStates.Disconnected)
+        {
+            //ok, we need to try again in a few seconds
+            _reconnectTimer?.Dispose();
+            _reconnectTimer = new Timer(async (state) =>
+            {
+                if (_wsApi != null)
+                {
+                    try
+                    {
+                        var connectionParameters = ConnectionParameters.CreateFromInstanceBaseUrl(HAClient.Host, HAClient.Token);
+                        await _wsApi.ConnectAsync(connectionParameters);
+                    }
+                    catch
+                    {
+                        //ignore
+                    }
+                }
+            }, null, 5000, Timeout.Infinite);
+            
         }
         HAClientService.ClientHandlerConnectionStateChanged(this, e);
     }
