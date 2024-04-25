@@ -153,6 +153,7 @@ else
                 };
 
         Diagram = new BlazorDiagram(options);
+        Diagram.UnregisterBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
         StateMachineHandler.StateChanged += StateChanged;
