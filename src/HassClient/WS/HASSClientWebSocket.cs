@@ -660,7 +660,7 @@ namespace HassClient.WS
             }
 
             Trace.TraceWarning($"Error response received for command [{commandMessage}] => {resultMessage.Error}");
-            Debugger.Break();
+            //Debugger.Break();
         }
 
         /// <summary>

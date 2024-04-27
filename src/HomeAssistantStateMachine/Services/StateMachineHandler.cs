@@ -137,41 +137,48 @@ public partial class StateMachineHandler : IDisposable
         string? result = null;
         if (_engine != null)
         {
-            lock (_lockObject)
+            var autoResetEvent = new AutoResetEvent(false);
+            Task.Run(() =>
             {
-                try
+                lock (_lockObject)
                 {
-                    var jsValue = _engine.Evaluate(script);
-                    if (jsValue == null)
+                    try
                     {
-                        result = "null";
-                    }
-                    else
-                    {
-                        var obj = jsValue.ToObject();
-                        if ( obj == null)
+                        var jsValue = _engine.Evaluate(script);
+                        if (jsValue == null)
                         {
                             result = "null";
                         }
-                        else if (obj is string s)
-                        {
-                            result = s;
-                        }
-                        else if (obj.GetType().IsValueType)
-                        {
-                            result = obj.ToString();
-                        }
                         else
                         {
-                            result = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
+                            var obj = jsValue.ToObject();
+                            if (obj == null)
+                            {
+                                result = "null";
+                            }
+                            else if (obj is string s)
+                            {
+                                result = s;
+                            }
+                            else if (obj.GetType().IsValueType)
+                            {
+                                result = obj.ToString();
+                            }
+                            else
+                            {
+                                result = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
+                            }
                         }
                     }
+                    catch (Exception e)
+                    {
+                        result = $"Error: {e.Message}";
+                    }
                 }
-                catch (Exception e)
-                {
-                    result = $"Error: {e.Message}";
-                }
-            }
+                autoResetEvent.Set();
+            });
+            autoResetEvent.WaitOne();
+            autoResetEvent.Dispose();
         }
         return result;
     }

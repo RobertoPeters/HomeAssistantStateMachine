@@ -225,7 +225,7 @@ public class HAClientHandler : IAsyncDisposable
         {
             try
             {
-                var callResult = await _wsApi!.CallServiceAsync(name, service, data);
+                var callResult = await _wsApi!.CallServiceAsync(name, service, data, new CancellationTokenSource(1000).Token);
                 result = callResult != null;
             }
             catch
@@ -242,7 +242,7 @@ public class HAClientHandler : IAsyncDisposable
         {
             try
             {
-                result = await _wsApi!.CallServiceForEntitiesAsync(name, service, entityIds);
+                result = await _wsApi!.CallServiceForEntitiesAsync(name, service, new CancellationTokenSource(1000).Token, entityIds);
             }
             catch
             {//ignore
