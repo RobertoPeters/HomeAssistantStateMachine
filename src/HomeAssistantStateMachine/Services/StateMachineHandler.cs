@@ -455,6 +455,7 @@ public partial class StateMachineHandler : IDisposable
 
     private void ChangeToState(State? state)
     {
+        AddLog($"Changing state to {state?.Name ?? "null"}");
         CurrentState = state;
         if (RunningState == StateMachineRunningState.Running && _engine != null && state != null)
         {
