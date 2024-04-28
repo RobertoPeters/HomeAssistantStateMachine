@@ -131,10 +131,33 @@ public class MqttClientHandler : IDisposable
                 if (!await _mqttClient.TryPingAsync())
                 {
                     //try connect
-                    //todo: but for now simple (check Tls, Username, port etc)
-                    var mqttClientOptions = new MqttClientOptionsBuilder()
-                            .WithTcpServer(MqttClient.Host)
-                            .Build();
+                    var parts = MqttClient.Host.Split(':', 2);
+                    var mqttClientOptionsPreBuild = new MqttClientOptionsBuilder();
+
+                    if (parts.Length == 1)
+                    {
+                        mqttClientOptionsPreBuild = mqttClientOptionsPreBuild.WithTcpServer(MqttClient.Host);
+                    }
+                    else
+                    {
+                        mqttClientOptionsPreBuild = mqttClientOptionsPreBuild.WithTcpServer(parts[0], int.Parse(parts[1]));
+                    }
+
+                    if (MqttClient.Tls)
+                    {
+                        var tlsOptions = new MqttClientTlsOptions()
+                        {
+                             UseTls = true
+                        };
+                        mqttClientOptionsPreBuild = mqttClientOptionsPreBuild.WithTlsOptions(tlsOptions);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(MqttClient.Username))
+                    {
+                        mqttClientOptionsPreBuild = mqttClientOptionsPreBuild.WithCredentials(MqttClient.Username, MqttClient.Password);
+                    }
+
+                    var mqttClientOptions = mqttClientOptionsPreBuild.Build();
                     using (var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(1)))
                     {
                         await _mqttClient.ConnectAsync(mqttClientOptions, timeoutToken.Token);

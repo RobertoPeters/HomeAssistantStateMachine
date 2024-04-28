@@ -20,14 +20,6 @@
                 <RadzenRequiredValidator Component="Host" Text="This field is required" />
             </Helper>
         </RadzenFormField>
-        <RadzenFormField Text="WebSocket" Variant="@Variant.Outlined">
-            <RadzenRadioButtonList @bind-Value="@Model!.WebSocket" TValue="bool" class="rz-m-4 rz-mt-8">
-                <Items>
-                    <RadzenRadioButtonListItem Text="Yes" Value="true" />
-                    <RadzenRadioButtonListItem Text="No" Value="false" />
-                </Items>
-            </RadzenRadioButtonList>
-        </RadzenFormField>
         <RadzenFormField Text="Tls" Variant="@Variant.Outlined">
             <RadzenRadioButtonList @bind-Value="@Model!.Tls" TValue="bool" class="rz-m-4 rz-mt-8">
                 <Items>
