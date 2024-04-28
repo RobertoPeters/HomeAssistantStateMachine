@@ -64,6 +64,29 @@
             </div>
         </RadzenSplitterPane>
         <RadzenSplitterPane Min="50px">
+            <RadzenPanel CollapseTitle="Debug" AllowCollapse="true">
+                <RadzenLabel Text="Mock variables" /> <RadzenCheckBox @bind-Value="_mockVariables" TValue="bool" Change="@((args) => OnChangeMockingVariablesActive())" />
+                @if (_mockVariables)
+                {
+                    <RadzenStack Orientation="Orientation.Vertical">
+                        @foreach (var mv in StateMachineHandler!.GetMockingVariables())
+                        {
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="@AlignItems.Center">
+                                <RadzenLabel Text="@mv.Name" />
+                                @if (mv!.ValueSelection?.Any() == true)
+                                {
+                                    <RadzenDropDown TValue="Jint.Native.JsValue" Data="@mv.ValueSelection" Value="@mv.Value" Change="@((arg) => StateMachineHandler.UpdateMockingVariableValue(mv.SystemName, arg))" />
+                                }
+                                else
+                                {
+                                    <RadzenTextBox Value="@mv.Value?.ToString()" Change="@((arg) => StateMachineHandler.UpdateMockingVariableValue(mv.SystemName, arg))" />
+                                }
+                            </RadzenStack>
+                        }
+                        <RadzenButton Text="Refresh" Click="@StateHasChanged" />
+                    </RadzenStack>
+                }
+            </RadzenPanel>
             <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
             <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
                 @foreach (var data in logLines)
@@ -109,19 +132,21 @@ else
     private List<LogData> logLines = [];
     private int executeCommandPanelHeight = 50;
     private string? executeCommand;
+    private bool _mockVariables;
 
     protected override async Task OnInitializedAsync()
     {
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
+        _mockVariables = StateMachineHandler.GetMockingVariablesActive();
         var options = new BlazorDiagramOptions
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                            {
+                                        {
                         Enabled = true
-                            },
+                                        },
                     Links =
-                            {
+                                        {
                         DefaultRouter = new NormalRouter(),
                         DefaultPathGenerator = new SmoothPathGenerator(),
                         RequireTarget = true,
@@ -149,7 +174,7 @@ else
 
                             return linkModel;
                         }
-                            }
+                                        }
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -165,6 +190,11 @@ else
         await ReloadDiagramAsync();
 
         await base.OnInitializedAsync();
+    }
+
+    private void OnChangeMockingVariablesActive()
+    {
+        StateMachineHandler.SetMockingVariablesActive(_mockVariables);
     }
 
     public ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
@@ -213,32 +243,32 @@ else
     void ClearLog()
     {
         InvokeAsync(() =>
-        {
-    logLines.Clear();
-    StateHasChanged();
-        });
+    {
+        logLines.Clear();
+        StateHasChanged();
+    });
     }
 
     void LogEvent(object? sender, string log)
     {
         InvokeAsync(() =>
-    {
-        logLines.Add(new LogData() { Message = log });
-        while (logLines.Count > 200)
         {
-            logLines.RemoveAt(0);
-        }
-        StateHasChanged();
-    });
+    logLines.Add(new LogData() { Message = log });
+    while (logLines.Count > 200)
+    {
+        logLines.RemoveAt(0);
+    }
+    StateHasChanged();
+        });
     }
 
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
-    {
-        var currentState = StateMachineHandler.CurrentState;
-        StateHasChanged();
-    });
+        {
+    var currentState = StateMachineHandler.CurrentState;
+    StateHasChanged();
+        });
     }
 
     async Task ReloadDiagramAsync()
@@ -259,7 +289,7 @@ else
                     {
                         Title = state.Name
                     });
- 
+
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
             node.AddPort(PortAlignment.Left);
@@ -298,9 +328,9 @@ else
     async Task AddStateAsync(int x, int y)
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
-        {
-    dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-        });
+    {
+        dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+    });
         if (state != null)
         {
             newIdForAdd--;
@@ -365,7 +395,7 @@ else
         }
         </RadzenMenuItem>
     </RadzenMenu>
-    );
+        );
         }
         else
         {

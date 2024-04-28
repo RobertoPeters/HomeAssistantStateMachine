@@ -81,6 +81,7 @@ public partial class StateMachineHandler : IDisposable
     private volatile bool _readyForTriggers = false;
     private readonly VariableService _variableService;
     private readonly HAClientService _haClientService;
+    private readonly SystemMethods _systemMethods;
 
     private State? _engineRequestToState = null;
     private State? _currentState = null;
@@ -106,6 +107,7 @@ public partial class StateMachineHandler : IDisposable
         StateMachine = stateMachine;
         _variableService = variableService;
         _haClientService = haClientService;
+        _systemMethods = NewSystemMethods;
     }
 
     public bool SetHAStateChanged(HAClientHandler clientHandler, Variable variable, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
@@ -282,7 +284,7 @@ public partial class StateMachineHandler : IDisposable
     {
         var script = new StringBuilder();
 
-        script.AppendLine(SystemScript);
+         script.AppendLine(SystemScript);
 
         foreach (var state in stateMachine.States)
         {
@@ -343,8 +345,12 @@ public partial class StateMachineHandler : IDisposable
                 _engineRequestToState = null;
                 if (ValidateModel())
                 {
+                    if (!_systemMethods.GetMockingVariablesActive())
+                    {
+                        _systemMethods.ClearMockingVariables();
+                    }
                     _engine = new Jint.Engine();
-                    _engine.SetValue("system", NewSystemMethods);
+                    _engine.SetValue("system", _systemMethods);
 
                     try
                     {
