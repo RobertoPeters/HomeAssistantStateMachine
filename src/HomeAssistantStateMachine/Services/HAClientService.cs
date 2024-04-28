@@ -11,16 +11,14 @@ namespace HomeAssistantStateMachine.Services;
 
 public class HAClientService : ServiceDbBase
 {
-    private readonly IConfiguration _configuration;
     private readonly VariableService _variableService;
     private readonly ConcurrentDictionary<string, HAClientHandler> _handlers = [];
     private bool _started = false;
 
     public event EventHandler<ConnectionStates>? ConnectionChanged;
 
-    public HAClientService(IDbContextFactory<HasmDbContext> dbFactory, IConfiguration configuration, VariableService variableService) : base(dbFactory)
+    public HAClientService(IDbContextFactory<HasmDbContext> dbFactory, VariableService variableService) : base(dbFactory)
     {
-        _configuration = configuration;
         _variableService = variableService;
     }
 

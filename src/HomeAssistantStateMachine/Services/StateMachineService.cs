@@ -10,14 +10,16 @@ public class StateMachineService : ServiceDbBase
 {
     private ConcurrentDictionary<int, StateMachineHandler> _handlers = [];
     private readonly HAClientService _haClientService;
+    private readonly MqttClientService _mqttClientService;
     private readonly VariableService _variableService;
 
     private bool _started = false;
 
-    public StateMachineService(IDbContextFactory<HasmDbContext> dbFactory, HAClientService haClientService, VariableService variableService) : base(dbFactory)
+    public StateMachineService(IDbContextFactory<HasmDbContext> dbFactory, HAClientService haClientService, VariableService variableService, MqttClientService mqttClientService) : base(dbFactory)
     {
         _haClientService = haClientService;
         _variableService = variableService;
+        _mqttClientService = mqttClientService;
         variableService.VariableValueChanged += VariableService_VariableValueChanged;
         variableService.CountdownTimerChanged += VariableService_CountdownTimerChanged;
     }
@@ -56,7 +58,7 @@ public class StateMachineService : ServiceDbBase
                     .ToListAsync();
                 foreach (var sm in sms)
                 {
-                    _handlers.TryAdd(sm.Id, new StateMachineHandler(sm, _variableService, _haClientService));
+                    _handlers.TryAdd(sm.Id, new StateMachineHandler(sm, _variableService, _haClientService, _mqttClientService));
                 }
                 return true;
             });
@@ -115,7 +117,7 @@ public class StateMachineService : ServiceDbBase
             {
                 await context.AddAsync(stateMachine);
                 await context.SaveChangesAsync();
-                result = new StateMachineHandler(stateMachine, _variableService, _haClientService);
+                result = new StateMachineHandler(stateMachine, _variableService, _haClientService, _mqttClientService);
                 _handlers.TryAdd(stateMachine.Id, result);
             }))
             {

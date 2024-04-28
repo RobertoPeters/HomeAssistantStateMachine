@@ -23,6 +23,7 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="MQTTnet" />
         <PackageReference Include="Radzen.Blazor" />
         <PackageReference Include="Z.Blazor.Diagrams" />
     </ItemGroup>

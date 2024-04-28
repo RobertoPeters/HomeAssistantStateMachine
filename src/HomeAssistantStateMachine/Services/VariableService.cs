@@ -49,6 +49,7 @@ public partial class VariableService : ServiceDbBase
             {
                 var variables = await context.Variables
                     .Include(v => v.HAClient)
+                    .Include(v => v.MqttClient)
                     .Include(v => v.StateMachine)
                     .Include(v => v.State)
                     .ToListAsync();
@@ -136,19 +137,19 @@ public partial class VariableService : ServiceDbBase
         }
     }
 
-    public async Task<Variable?> CreateVariableAsync(string name, string? data, HAClient? haClient, StateMachine? stateMachine, State? state, HasmDbContext? ctx = null)
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, HAClient? haClient, MqttClient? mqttClient, StateMachine? stateMachine, State? state, HasmDbContext? ctx = null)
     {
-        return await CreateVariableAsync(name, data, haClient?.Id, stateMachine?.Id, state?.Id, ctx);
+        return await CreateVariableAsync(name, data, haClient?.Id, mqttClient?.Id, stateMachine?.Id, state?.Id, ctx);
     }
 
-    public async Task<Variable?> CreateVariableAsync(string name, string? data, int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, int? haClientId, int? mqttClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
     {
         return await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
             Variable? result = _variables.Values.FirstOrDefault(x => x.Name == name);
             if (result != null)
             {
-                if (result.HAClientId != haClientId || result.StateMachineId != stateMachineId || result.StateId != stateId || result.Data != data)
+                if (result.HAClientId != haClientId || result.MqttClientId != mqttClientId || result.StateMachineId != stateMachineId || result.StateId != stateId || result.Data != data)
                 {
                     return null;
                 }
@@ -163,6 +164,7 @@ public partial class VariableService : ServiceDbBase
                         Name = name,
                         Data = data,
                         HAClientId = haClientId,
+                        MqttClientId = mqttClientId,
                         StateMachineId = stateMachineId,
                         StateId = stateId
                     };
@@ -258,12 +260,12 @@ public partial class VariableService : ServiceDbBase
         return result;
     }
 
-    public List<(Variable variable, VariableValue? variableValue)> GetScopedVariables(HAClient? haClient, StateMachine? stateMachine, State? state)
+    public List<(Variable variable, VariableValue? variableValue)> GetScopedVariables(MqttClient? mqttClient, HAClient? haClient, StateMachine? stateMachine, State? state)
     {
         List<(Variable variable, VariableValue? variableValue)> result = [];
 
         var allVariables = _variables.Values
-            .Where(x => haClient?.Id == x.HAClient?.Id && stateMachine?.Id == x.StateMachine?.Id && state?.Id == x.State?.Id)
+            .Where(x => mqttClient?.Id == x.MqttClient?.Id && haClient?.Id == x.HAClient?.Id && stateMachine?.Id == x.StateMachine?.Id && state?.Id == x.State?.Id)
             .ToList();
 
         foreach (var variable in allVariables)

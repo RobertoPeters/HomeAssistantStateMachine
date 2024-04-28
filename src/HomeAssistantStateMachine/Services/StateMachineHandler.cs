@@ -12,9 +12,9 @@ public partial class StateMachineHandler : IDisposable
         Error
     }
 
-    private sealed class HAStateChangedCallBackInfo
+    private sealed class StateChangedCallBackInfo
     {
-        public HAStateChangedCallBackInfo(int variableId, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
+        public StateChangedCallBackInfo(int variableId, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
         {
             VariableId = variableId;
             Callback = callback;
@@ -77,10 +77,11 @@ public partial class StateMachineHandler : IDisposable
 
     private readonly object _lockObject = new object();
     private Jint.Engine? _engine = null;
-    private readonly List<HAStateChangedCallBackInfo> _haStateChangedCallBackInfos = [];
+    private readonly List<StateChangedCallBackInfo> _stateChangedCallBackInfos = [];
     private volatile bool _readyForTriggers = false;
     private readonly VariableService _variableService;
     private readonly HAClientService _haClientService;
+    private readonly MqttClientService _mqttClientService;
     private readonly SystemMethods _systemMethods;
 
     private State? _engineRequestToState = null;
@@ -101,35 +102,54 @@ public partial class StateMachineHandler : IDisposable
     public event EventHandler<State?>? StateChanged;
     public event EventHandler<string>? Log;
 
-    public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService)
+    public StateMachineHandler(StateMachine stateMachine, VariableService variableService, HAClientService haClientService, MqttClientService mqttClientService)
     {
         _lockObject = new object();
         StateMachine = stateMachine;
         _variableService = variableService;
         _haClientService = haClientService;
+         _mqttClientService = mqttClientService;
         _systemMethods = NewSystemMethods;
     }
 
-    public bool SetHAStateChanged(HAClientHandler clientHandler, Variable variable, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
+    public bool SetStateChanged(HAClientHandler? haClientHandler, MqttClientHandler? mqttClientHandler, Variable variable, Func<Jint.Native.JsValue, Jint.Native.JsValue[], Jint.Native.JsValue> callback)
     {
         //call from engine, so no lock required (already locked)
-        var existing = _haStateChangedCallBackInfos.Find(x => x.VariableId == variable.Id);
+        var existing = _stateChangedCallBackInfos.Find(x => x.VariableId == variable.Id);
         if (existing != null)
         {
-            _haStateChangedCallBackInfos.Remove(existing);
+            _stateChangedCallBackInfos.Remove(existing);
         }
-        var cbInfo = new HAStateChangedCallBackInfo(variable.Id, callback);
-        if (clientHandler.SetStateChangedCallback(StateMachine.Id, variable, (data) =>
-            {
-                cbInfo.Data = data;
-                Task.Factory.StartNew(() =>
-                {
-                    TriggerProcess();
-                });
-            }))
+        var cbInfo = new StateChangedCallBackInfo(variable.Id, callback);
+        if (haClientHandler != null)
         {
-            _haStateChangedCallBackInfos.Add(cbInfo);
-            return true;
+            if (haClientHandler.SetStateChangedCallback(StateMachine.Id, variable, (data) =>
+                {
+                    cbInfo.Data = data;
+                    Task.Factory.StartNew(() =>
+                    {
+                        TriggerProcess();
+                    });
+                }))
+            {
+                _stateChangedCallBackInfos.Add(cbInfo);
+                return true;
+            }
+        }
+        else if (mqttClientHandler != null)
+        {
+            if (mqttClientHandler.SetStateChangedCallback(StateMachine.Id, variable, (data) =>
+                {
+                    cbInfo.Data = data;
+                    Task.Factory.StartNew(() =>
+                    {
+                        TriggerProcess();
+                    });
+                }))
+            {
+                _stateChangedCallBackInfos.Add(cbInfo);
+                return true;
+            }
         }
         return false;
     }
@@ -228,8 +248,9 @@ public partial class StateMachineHandler : IDisposable
 
     private void DisposeEngine()
     {
-        _haStateChangedCallBackInfos.Clear();
+        _stateChangedCallBackInfos.Clear();
         _haClientService.GetClients().ForEach(x => x.RemoveRegistrarFromStateChangedCallback(StateMachine.Id));
+        _mqttClientService.GetClients().ForEach(x => x.RemoveRegistrarFromStateChangedCallback(StateMachine.Id));
         _engine?.Dispose();
         _engine = null;
     }
@@ -403,7 +424,7 @@ public partial class StateMachineHandler : IDisposable
                 Transition? activeTransition = null;
                 try
                 {
-                    foreach (var cbInfo in _haStateChangedCallBackInfos)
+                    foreach (var cbInfo in _stateChangedCallBackInfos)
                     {
                         if (cbInfo.Triggered)
                         {
@@ -435,7 +456,7 @@ public partial class StateMachineHandler : IDisposable
                         }
                     }
 
-                    foreach (var cbInfo in _haStateChangedCallBackInfos)
+                    foreach (var cbInfo in _stateChangedCallBackInfos)
                     {
                         if (cbInfo.Triggered)
                         {

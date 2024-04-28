@@ -8,7 +8,7 @@ namespace HomeAssistantStateMachine.Services;
 
 public partial class StateMachineHandler
 {
-    private SystemMethods NewSystemMethods => new SystemMethods(_variableService, this, _haClientService);
+    private SystemMethods NewSystemMethods => new SystemMethods(_variableService, this, _haClientService, _mqttClientService);
 
     public class MockingVariableInfo
     {
@@ -46,17 +46,22 @@ public partial class StateMachineHandler
         private readonly VariableService _variableService;
         private readonly StateMachineHandler _stateMachineHandler;
         private readonly HAClientService _haClientService;
+        private readonly MqttClientService _mqttClientService;
 
         private volatile bool _mockingVariablesActive = false;
         private readonly ConcurrentDictionary<string, MockingVariableInfo> _mockingVariables = [];
 
-        public SystemMethods(VariableService variableService, StateMachineHandler stateMachineHandler, HAClientService haClientService)
+        public SystemMethods(VariableService variableService, StateMachineHandler stateMachineHandler, HAClientService haClientService, MqttClientService mqttClientService)
         {
             _variableService = variableService;
             _stateMachineHandler = stateMachineHandler;
             _haClientService = haClientService;
+            _mqttClientService = mqttClientService;
         }
 
+        //=======================================================================================================
+        // mocking functions
+        //=======================================================================================================
         public List<MockingVariableInfo> GetMockingVariables()
         {
             return _mockingVariables.Values.ToList();
@@ -111,6 +116,70 @@ public partial class StateMachineHandler
             return _stateMachineHandler.GetEngineState();
         }
 
+        //=======================================================================================================
+        // MQTT functions
+        //=======================================================================================================
+        public bool createMqttVariable(string? clientName, string name, string? data)
+        {
+            return createMqttVariableWithMockingValues(clientName, name, data, null);
+        }
+
+        public bool createMqttVariableWithMockingValues(string? clientName, string name, string? data, JsValue[]? mockingOptions)
+        {
+            var result = false;
+            var mqttClientHandler = _mqttClientService.GetClientHandler(clientName);
+            if (mqttClientHandler != null)
+            {
+                var internalName = $"__MQ_{mqttClientHandler.MqttClient.Id}__{name}";
+                if (!_mockingVariables.TryGetValue(internalName, out var mv))
+                {
+                    _mockingVariables.TryAdd(internalName, new MockingVariableInfo { SystemName = internalName, Name = name, ValueSelection = mockingOptions });
+                }
+                return mqttClientHandler.CreateVariableAsync(internalName, data).Result != null;
+            }
+            return result;
+        }
+
+        public object? getMqttVariable(string? clientName, string name)
+        {
+            var mqttClientHandler = _mqttClientService.GetClientHandler(clientName);
+            if (mqttClientHandler != null)
+            {
+                name = $"__MQ_{mqttClientHandler.MqttClient.Id}__{name}";
+                if (_mockingVariablesActive)
+                {
+                    _mockingVariables.TryGetValue(name, out var mv);
+                    return mv?.Value;
+                }
+                return _variableService.GetVariableValue(name);
+            }
+            return null;
+        }
+
+        public bool mqttClientPublish(string? clientName, string topic, string? data)
+        {
+            return _mqttClientService.PublishAsync(clientName, topic, data).Result;
+        }
+
+        public bool setMqttStateChanged(string? clientName, string name, Func<JsValue, JsValue[], JsValue> callback)
+        {
+            var mqttClientHandler = _mqttClientService.GetClientHandler(clientName);
+            if (mqttClientHandler != null)
+            {
+                name = $"__MQ_{mqttClientHandler.MqttClient.Id}__{name}";
+                var variable = _variableService.GetVariable(name);
+                if (variable != null)
+                {
+                    return _stateMachineHandler.SetStateChanged(null, mqttClientHandler, variable, callback);
+                }
+            }
+            return false;
+        }
+
+
+        //=======================================================================================================
+        // Home Asststant (HA) functions
+        //=======================================================================================================
         public bool createHAVariable(string? clientName, string name, string? data)
         {
             return createHAVariableWithMockingValues(clientName, name, data, null);
@@ -157,12 +226,25 @@ public partial class StateMachineHandler
                 var variable = _variableService.GetVariable(name);
                 if (variable != null)
                 {
-                    return _stateMachineHandler.SetHAStateChanged(haClientHandler, variable, callback);
+                    return _stateMachineHandler.SetStateChanged(haClientHandler, null, variable, callback);
                 }
             }
             return false;
         }
 
+        public bool haClientCallService(string? clientName, string name, string service, object? data)
+        {
+            return _haClientService.CallServiceAsync(clientName, name, service, data).Result;
+        }
+
+        public bool haClientCallServiceForEntities(string? clientName, string name, string service, params string[] entityIds)
+        {
+            return _haClientService.CallServiceForEntitiesAsync(clientName, name, service, entityIds).Result;
+        }
+
+        //=======================================================================================================
+        // generic variable functions
+        //=======================================================================================================
         public bool createVariable(string name)
         {
             return createVariableWithMockingValues(name, null);
@@ -175,7 +257,7 @@ public partial class StateMachineHandler
             {
                 _mockingVariables.TryAdd(internalName, new MockingVariableInfo { SystemName = internalName, Name = name, ValueSelection = mockingOptions });
             }
-            return _variableService.CreateVariableAsync(internalName, null, null, _stateMachineHandler.StateMachine.Id, null).Result != null;
+            return _variableService.CreateVariableAsync(internalName, null, null, null, _stateMachineHandler.StateMachine.Id, null).Result != null;
         }
 
         public bool setVariable(string name, string? v)
@@ -213,7 +295,7 @@ public partial class StateMachineHandler
             {
                 _mockingVariables.TryAdd(name, new MockingVariableInfo { SystemName = name, Name = name, ValueSelection = mockingOptions });
             }
-            return _variableService.CreateVariableAsync(name, null, null, (int?)null, null).Result != null;
+            return _variableService.CreateVariableAsync(name, null, null, null, (int?)null, null).Result != null;
         }
 
         public bool setGlobalVariable(string name, string? v)
@@ -238,6 +320,10 @@ public partial class StateMachineHandler
             return _variableService.GetVariableValue(name);
         }
 
+        //=======================================================================================================
+        // counter/timer functions
+        //=======================================================================================================
+
         public bool createCountdownTimer(string name, int seconds)
         {
             return _variableService.CreateCountdownTimer(_stateMachineHandler.StateMachine.Id, name, seconds);
@@ -248,16 +334,7 @@ public partial class StateMachineHandler
             return _variableService.GetCountdownTimerExpired(_stateMachineHandler.StateMachine.Id, name);
         }
 
-        public bool haClientCallService(string? clientName, string name, string service, object? data = null)
-        {
-            return _haClientService.CallServiceAsync(clientName, name, service, data).Result;
-        }
-
-        public bool haClientCallServiceForEntities(string? clientName, string name, string service, params string[] entityIds)
-        {
-            return _haClientService.CallServiceForEntitiesAsync(clientName, name, service, entityIds).Result;
-        }
-    }
+     }
 
     public const string SystemScript = """"
         log = function(data) {
@@ -359,6 +436,33 @@ public partial class StateMachineHandler
             //e.g. haClientCallServiceForEntities(null, 'light', 'toggle', ["light.my_light1", "light.my_light2"]);
             return system.haClientCallServiceForEntities(clientname, name, service, entityIds);
         }
+
+
+        createMqttVariableWithMockingValues = function(clientname, name, topic, valueOptions) {
+            //e.g. createMqttVariableWithMockingValues(null, 'kitchenLight', 'mqttnet/samples/topic/2', ['on', 'off']);
+            return system.createMqttVariableWithMockingValues(clientname, name, topic, valueOptions);
+        }
+        
+        createMqttVariable = function(clientname, name, topic) {
+            //e.g. createMqttVariable(null, 'kitchenLight', 'mqttnet/samples/topic/2');
+            return system.createMqttVariable(clientname, name, topic);
+        }
+        
+        getMqttVariable = function(clientname, name) {
+            //e.g. getMqttVariable(clientname, 'test'); get the value of the given (MQTT topic) variable
+            return system.getMqttVariable(clientname, name);
+        }
+        
+        setMqttStateChanged = function(clientname, name, functionRef) {
+            //e.g. setMqttStateChanged(null, 'kitchenLight', function(data) { log(data) });
+            return system.setMqttStateChanged(clientname, name, functionRef);
+        }
+                
+        mqttClientPublish = function(clientname, topic, payload) {
+            //e.g. mqttClientPublish(null, 'mqttnet/samples/topic/2', 'on');
+            return system.mqttClientPublish(clientname, topic, payload);
+        }
+        
 
         """";
 }

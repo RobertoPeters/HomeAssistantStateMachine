@@ -6,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 var settingsFolder = Path.Combine(builder.Environment.ContentRootPath, "Settings");
 var settingsPath = Path.Combine(settingsFolder, "appsettings.json");
-var databasePath = Path.Combine(settingsFolder, "hasm.db3");
 
 if (!Directory.Exists(settingsFolder))
 {
@@ -30,6 +29,7 @@ builder.Services.AddDbContextFactory<HasmDbContext>(options =>
 
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.VariableService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.HAClientService>();
+builder.Services.AddSingleton<HomeAssistantStateMachine.Services.MqttClientService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.StateMachineService>();
 builder.Services.AddScoped<ContextMenuService>();
 builder.Services.AddScoped<NotificationService>();
@@ -62,6 +62,8 @@ Task.Run(async () =>
     await variableService.StartAsync();
     var haClientService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.HAClientService>();
     await haClientService.StartAsync();
+    var mqttClientService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.MqttClientService>();
+    await mqttClientService.StartAsync();
     var stateMachineService = app.Services.GetRequiredService<HomeAssistantStateMachine.Services.StateMachineService>();
     await stateMachineService.StartAsync();
 }).Wait();

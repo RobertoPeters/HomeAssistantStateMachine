@@ -14,6 +14,9 @@ public class Variable
     public int? HAClientId { get; set; }
     public HAClient? HAClient { get; set; }
 
+    public int? MqttClientId { get; set; }
+    public MqttClient? MqttClient { get; set; }
+
     public int? StateMachineId { get; set; }
     public StateMachine? StateMachine { get; set; }
 

@@ -5,6 +5,7 @@
 @inject DialogService DialogService
 @inject VariableService VariableService
 @inject HAClientService HAClientService
+@inject MqttClientService MqttClientService
 @inject StateMachineService StateMachineService
 @implements IDisposable
 
@@ -39,6 +40,10 @@
                                   Title="HA Client" />
 
             <RadzenDataGridColumn TItem="VariableInfo"
+                                  Property="@nameof(VariableInfo.MqttClientName)"
+                                  Title="Mqtt Client" />
+
+           <RadzenDataGridColumn TItem="VariableInfo"
                                   Property="@nameof(VariableInfo.StateMachineName)"
                                   Title="State Machine" />
 
@@ -73,11 +78,13 @@
     {
         private readonly StateMachineService _stateMachineService;
         private readonly HAClientService _haClientService;
+        private readonly MqttClientService _mqttClientService;
 
-        public VariableInfo(StateMachineService stateMachineService, HAClientService haClientService)
+        public VariableInfo(StateMachineService stateMachineService, HAClientService haClientService, MqttClientService mqttClientService)
         {
             _stateMachineService = stateMachineService;
             _haClientService = haClientService;
+            _mqttClientService = mqttClientService;
         }
 
         public Variable? Variable { get; set; } = null!;
@@ -90,12 +97,13 @@
         public string? Value => VariableValue?.Value ?? Timer?.Value.ToString() ?? "";
         public DateTime? Update => (VariableValue?.Update ?? Timer?.Start)?.ToLocalTime();
         public string? HAClientName => Variable?.HAClientId == null ? "" : _haClientService.GetClient(Variable.HAClientId.Value)?.HAClient.Name ?? "";
+        public string? MqttClientName => Variable?.MqttClientId == null ? "" : _mqttClientService.GetClient(Variable.MqttClientId.Value)?.MqttClient.Name ?? "";
         public string? StateMachineName => Variable?.StateMachine?.Id == null ? "" : _stateMachineService.GetStateMachine(Variable.StateMachine.Id).StateMachine.Name;
 
         private string VariableName()
         {
             var result = Variable?.Name ?? Timer?.Name ?? "";
-            if (Variable?.StateMachineId != null || Variable?.HAClientId != null)
+            if (Variable?.StateMachineId != null || Variable?.HAClientId != null || Variable?.MqttClientId != null)
             {
                 result = Variable.Name.Split("__", 3, StringSplitOptions.None)[2];
             }
@@ -112,7 +120,7 @@
         var allVariables = VariableService.GetVariables();
         foreach (var variable in allVariables)
         {
-            var v = new VariableInfo(StateMachineService, HAClientService)
+            var v = new VariableInfo(StateMachineService, HAClientService, MqttClientService)
                 {
                     Variable = variable.variable,
                     VariableValue = variable.variableValue
@@ -139,7 +147,7 @@
             }
             else
             {
-                var vi = new VariableInfo(StateMachineService, HAClientService)
+                var vi = new VariableInfo(StateMachineService, HAClientService, MqttClientService)
                     {
                         Timer = timer
                     };
@@ -191,6 +199,10 @@
             {
                 await HAClientService.GetClients().First(x => x.HAClient.Id == vi.Variable?.HAClientId).DeleteVariableAsync(vi.Variable.Name);
             }
+            else if (vi.Variable?.MqttClientId != null)
+            {
+                await MqttClientService.GetClients().First(x => x.MqttClient.Id == vi.Variable?.MqttClientId).DeleteVariableAsync(vi.Variable.Name);
+            }
             else
             {
                 await VariableService.DeleteVariableAsync(vi.Variable!.Name);
@@ -206,7 +218,7 @@
             var allVariables = VariableService.GetVariables();
             foreach (var variable in allVariables)
             {
-                var v = new VariableInfo(StateMachineService, HAClientService)
+                var v = new VariableInfo(StateMachineService, HAClientService, MqttClientService)
                     {
                         Variable = variable.variable,
                         VariableValue = variable.variableValue
@@ -230,7 +242,7 @@
               else
               {
                   var newVariable = VariableService.GetVariables().Where(x => x.variable.Id == e.Variable.Id).First();
-                  var vi = new VariableInfo(StateMachineService, HAClientService)
+                  var vi = new VariableInfo(StateMachineService, HAClientService, MqttClientService)
                       {
                           Variable = newVariable.variable,
                           VariableValue = newVariable.variableValue

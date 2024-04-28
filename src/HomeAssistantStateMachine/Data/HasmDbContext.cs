@@ -98,6 +98,7 @@ public class HasmDbContext: DbContext
     }
 
     public DbSet<Models.HAClient> HAClients { get; set; } = null!;
+    public DbSet<Models.MqttClient> MqttClients { get; set; } = null!;
     public DbSet<Models.State> States { get; set; } = null!;
     public DbSet<Models.Transition> Transitions { get; set; } = null!;
     public DbSet<Models.StateMachine> StateMachines { get; set; } = null!;
