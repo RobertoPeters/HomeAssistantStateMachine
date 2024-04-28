@@ -48,7 +48,7 @@ public partial class StateMachineHandler
         private readonly HAClientService _haClientService;
 
         private volatile bool _mockingVariablesActive = false;
-        private ConcurrentDictionary<string, MockingVariableInfo> _mockingVariables = [];
+        private readonly ConcurrentDictionary<string, MockingVariableInfo> _mockingVariables = [];
 
         public SystemMethods(VariableService variableService, StateMachineHandler stateMachineHandler, HAClientService haClientService)
         {
