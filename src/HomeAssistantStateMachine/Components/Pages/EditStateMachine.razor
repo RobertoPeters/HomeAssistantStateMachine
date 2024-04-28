@@ -153,7 +153,10 @@ else
                 };
 
         Diagram = new BlazorDiagram(options);
-        Diagram.UnregisterBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
+        var keyboardBehavior = Diagram.GetBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
+        keyboardBehavior!.RemoveShortcut("g", ctrl: true, shift: false, alt: true);
+        keyboardBehavior.RemoveShortcut("Delete", ctrl: false, shift: false, alt: false);
+        keyboardBehavior.SetShortcut("Delete", ctrl: false, shift: false, alt: false, DeleteSelection);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
         StateMachineHandler.StateChanged += StateChanged;
@@ -163,6 +166,30 @@ else
 
         await base.OnInitializedAsync();
     }
+
+    public ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        var selectedModels = diagram.GetSelectedModels().ToList();
+        foreach (var sm in selectedModels)
+        {
+            LinkModel? link = sm as LinkModel;
+            if (link != null)
+            {
+                RemoveLink(link);
+            }
+        }
+        foreach (var sm in selectedModels)
+        {
+            NodeModel? node = sm as NodeModel;
+            if (node != null)
+            {
+                RemoveNode(node);
+            }
+        }
+        Diagram.Refresh();
+        return ValueTask.CompletedTask;
+    }
+
 
     void ExecuteInteractive()
     {
@@ -447,13 +474,7 @@ else
             case 4:
                 {
                     ContextMenuService.Close();
-                    var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
-                    var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                    var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
-                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-                    StateMachine.Transitions.Remove(transition);
-                    Diagram.Links.Remove(link!);
+                    RemoveLink(link!);
                 }
                 break;
         }
@@ -469,9 +490,33 @@ else
                 await EditStateAsync(node!);
                 break;
             case 2:
-                Diagram.Nodes.Remove(node!);
+                RemoveNode(node!);
                 break;
         }
+    }
+
+    void RemoveLink(LinkModel link)
+    {
+        var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
+        var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+        var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+        var targetState = StateMachine.States.First(x => x.Name == target.Title);
+        var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+        StateMachine.Transitions.Remove(transition);
+        Diagram.Links.Remove(link!);
+    }
+
+    void RemoveNode(NodeModel node)
+    {
+        //should remove transitions as well
+        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+        foreach (var transition in transitions)
+        {
+            StateMachine.Transitions.Remove(transition);
+        }
+        StateMachine.States.Remove(state);
+        Diagram.Nodes.Remove(node!);
     }
 
     async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
