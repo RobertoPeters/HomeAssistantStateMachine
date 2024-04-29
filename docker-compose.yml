@@ -10,3 +10,13 @@ services:
     volumes:
       - ./Docker:/app/Settings
 
+  ha:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: ha
+    volumes:
+      - ./Docker/ha:/config
+    ports:
+      - "8123:8123"
+    restart: unless-stopped
+    privileged: true
+    

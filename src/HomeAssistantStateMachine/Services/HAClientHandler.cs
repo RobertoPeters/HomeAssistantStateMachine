@@ -67,7 +67,14 @@ public class HAClientHandler : IAsyncDisposable
             await ConnectAsync();
             foreach (var variable in _variables)
             {
-                _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Key, EventHandlerEventStateChanged);
+                try
+                {
+                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Key, EventHandlerEventStateChanged);
+                }
+                catch
+                {
+                    //none
+                }
             }
             _started = true;
         }
