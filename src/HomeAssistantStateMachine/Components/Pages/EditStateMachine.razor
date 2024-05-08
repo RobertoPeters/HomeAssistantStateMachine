@@ -88,6 +88,7 @@
                 }
             </RadzenPanel>
             <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
+            <RadzenButton Size="ButtonSize.Small" Text="@(_pauseLog ? "Continue" : "Pause")" Click="@PauseLog" />
             <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
                 @foreach (var data in logLines)
                 {
@@ -133,6 +134,7 @@ else
     private int executeCommandPanelHeight = 50;
     private string? executeCommand;
     private bool _mockVariables;
+    private bool _pauseLog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -142,11 +144,11 @@ else
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                                        {
+                                                {
                         Enabled = true
-                                        },
+                                                },
                     Links =
-                                        {
+                                                {
                         DefaultRouter = new NormalRouter(),
                         DefaultPathGenerator = new SmoothPathGenerator(),
                         RequireTarget = true,
@@ -174,7 +176,7 @@ else
 
                             return linkModel;
                         }
-                                        }
+                                                }
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -249,26 +251,33 @@ else
     });
     }
 
+    void PauseLog()
+    {
+        _pauseLog = !_pauseLog;
+    }
+
     void LogEvent(object? sender, string log)
     {
+        if (_pauseLog) return;
+
         InvokeAsync(() =>
-        {
-    logLines.Add(new LogData() { Message = log });
-    while (logLines.Count > 200)
     {
-        logLines.RemoveAt(0);
-    }
-    StateHasChanged();
-        });
+        logLines.Add(new LogData() { Message = log });
+        while (logLines.Count > 200)
+        {
+            logLines.RemoveAt(0);
+        }
+        StateHasChanged();
+    });
     }
 
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
-        {
-    var currentState = StateMachineHandler.CurrentState;
-    StateHasChanged();
-        });
+    {
+        var currentState = StateMachineHandler.CurrentState;
+        StateHasChanged();
+    });
     }
 
     async Task ReloadDiagramAsync()
