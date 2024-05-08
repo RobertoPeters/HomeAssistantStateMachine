@@ -4,10 +4,10 @@
 <RadzenTemplateForm @ref="Form" Data="@Model" TItem="Transition">
     <RadzenStack>
         <RadzenFormField Text="Description" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" />
+            <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" spellcheck="false" />
         </RadzenFormField>
         <RadzenFormField Text="Condition" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Rows="10" />
+            <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Rows="10" spellcheck="false" />
         </RadzenFormField>
         <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     </RadzenStack>

@@ -5,7 +5,7 @@
     <RadzenStack>
         <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
             <ChildContent>
-                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name"/>
+                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name" spellcheck="false" />
             </ChildContent>
             <Helper>
                 <RadzenRequiredValidator Component="Name" Text="This field is required" />
@@ -20,10 +20,10 @@
             </RadzenRadioButtonList>
         </RadzenFormField>
         <RadzenFormField Text="Pre Start Action" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.PreStartAction" Name="PreStartAction" Rows="10" />
+            <RadzenTextArea @bind-Value="@Model!.PreStartAction" Name="PreStartAction" Rows="10" spellcheck="false" />
         </RadzenFormField>
         <RadzenFormField Text="Pre Schedule Action" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.PreScheduleAction" Name="PreScheduleAction" Rows="10" />
+            <RadzenTextArea @bind-Value="@Model!.PreScheduleAction" Name="PreScheduleAction" Rows="10" spellcheck="false" />
         </RadzenFormField>
         <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     </RadzenStack>
