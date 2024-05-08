@@ -13,6 +13,13 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Remove="DeployLinux\**" />
+        <Content Remove="DeployLinux\**" />
+        <EmbeddedResource Remove="DeployLinux\**" />
+        <None Remove="DeployLinux\**" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Jint" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
           <PrivateAssets>all</PrivateAssets>

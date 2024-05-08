@@ -102,14 +102,14 @@ public partial class VariableService : ServiceDbBase
         }
     }
 
-    public async Task DeleteVariablesAsync(int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
+    public async Task DeleteVariablesAsync(int? mqttClientId, int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
     {
         if (await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
             return await ExecuteWithinTransactionAsync(context, async () =>
             {
                 var variables = await context.Variables
-                    .Where(x => x.HAClientId == haClientId && x.StateMachineId == stateMachineId && x.StateId == stateId)
+                    .Where(x => x.MqttClientId == mqttClientId && x.HAClientId == haClientId && x.StateMachineId == stateMachineId && x.StateId == stateId)
                     .ToListAsync();
                 foreach (var variable in variables)
                 {

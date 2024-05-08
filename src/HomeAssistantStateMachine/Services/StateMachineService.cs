@@ -135,7 +135,7 @@ public class StateMachineService : ServiceDbBase
         {
             return await ExecuteWithinTransactionAsync(context, async () =>
             {
-                await _variableService.DeleteVariablesAsync(null, stateMachineId, null, context);
+                await _variableService.DeleteVariablesAsync(null, null, stateMachineId, null, context);
                 var allTransitions = await context.Transitions.Where(x => x.StateMachineId == stateMachineId).ToListAsync();
                 context.RemoveRange(allTransitions);
                 var allStates = await context.States.Where(x => x.StateMachineId == stateMachineId).ToListAsync();
