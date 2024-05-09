@@ -135,6 +135,7 @@ else
     private string? executeCommand;
     private bool _mockVariables;
     private bool _pauseLog;
+    private bool _draggingElement;
 
     protected override async Task OnInitializedAsync()
     {
@@ -173,7 +174,7 @@ else
                             linkModel.TargetMarker = LinkMarker.Arrow;
                             //linkModel.Segmentable = true;
                             linkModel.AddLabel("true");
-
+                            _draggingElement = true;
                             return linkModel;
                         }
                                                 }
@@ -186,6 +187,7 @@ else
         keyboardBehavior.SetShortcut("Delete", ctrl: false, shift: false, alt: false, DeleteSelection);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
+        Diagram.PointerMove += DiagramPointerMove;
         StateMachineHandler.StateChanged += StateChanged;
         StateMachineHandler.Log += LogEvent;
 
@@ -558,8 +560,43 @@ else
         Diagram.Nodes.Remove(node!);
     }
 
+    void DiagramPointerMove(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (_draggingElement)
+        {
+            var relMouse = Diagram.GetRelativePoint(args.ClientX, args.ClientY); //pointer position on canvas element (top left = 0,0)
+            var currentPan = Diagram.Pan;
+            var moveX = 0;
+            var moveY = 0;
+            var stepSize = 20;
+            var margin = 20;
+            if (relMouse.X < margin)
+            {
+                moveX = stepSize;
+            }
+            else if (relMouse.X > Diagram.Container!.Width - margin)
+            {
+                moveX = -stepSize;
+            }
+            if (relMouse.Y < margin)
+            {
+                moveY = stepSize;
+            }
+            else if (relMouse.Y > Diagram.Container!.Height - margin)
+            {
+                moveY = -stepSize;
+            }
+
+            if (moveX != 0 || moveY != 0)
+            {
+                Diagram.SetPan(currentPan.X + moveX, currentPan.Y + moveY);
+            }
+        }
+    }
+
     async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
     {
+        _draggingElement = false;
         modelOnPointerUp = null;
         if (args.Button == 0)
         {
