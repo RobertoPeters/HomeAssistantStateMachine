@@ -699,7 +699,6 @@ else
             StateMachine.PreScheduleAction = result.PreScheduleAction;
             StateMachine.PreStartAction = result.PreStartAction;
             await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
-            await ReloadDiagramAsync();
         }
     }
 
