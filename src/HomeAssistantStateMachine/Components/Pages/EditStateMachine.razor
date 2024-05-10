@@ -19,6 +19,12 @@
 
 <PageTitle>HASM - Edit State Machine</PageTitle>
 
+<style>
+    .rz-panel-titlebar {
+        flex-direction: row-reverse;
+        justify-content: left;
+    }
+</style>
 @if (StateMachine != null)
 {
     <span>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState?.Name ?? "-"))</span>
@@ -28,7 +34,7 @@
     }
     <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
         <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
-            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true" >
+            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
                 <CascadingValue Value="Diagram" IsFixed="true">
                     <DiagramCanvas>
                         <Widgets>
@@ -54,7 +60,7 @@
             </div>
         </RadzenSplitterPane>
         <RadzenSplitterPane Min="50px">
-            <RadzenPanel CollapseTitle="Debug" AllowCollapse="true">
+            <RadzenPanel Text="Debug" AllowCollapse="true">
                 <RadzenLabel Text="Mock variables" /> <RadzenCheckBox @bind-Value="_mockVariables" TValue="bool" Change="@((args) => OnChangeMockingVariablesActive())" />
                 @if (_mockVariables)
                 {
@@ -77,15 +83,22 @@
                     </RadzenStack>
                 }
             </RadzenPanel>
-            <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
-            <RadzenButton Size="ButtonSize.Small" Text="@(_pauseLog ? "Continue" : "Pause")" Click="@PauseLog" />
-            <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
-                @foreach (var data in logLines)
-                {
-                    <RadzenLabel Text="@(data.Time.ToString("HH:mm.ss.fff"))" />
-                    <pre>@data.Message</pre>
-                }
-            </div>
+            <RadzenPanel Text="Log" AllowCollapse="true" Collapsed="false">
+                <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
+                <RadzenButton Size="ButtonSize.Small" Text="@(_pauseLog ? "Continue" : "Pause")" Click="@PauseLog" />
+                <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
+                    @foreach (var data in logLines)
+                    {
+                        <RadzenLabel Text="@(data.Time.ToString("HH:mm.ss.fff"))" />
+                        <pre>@data.Message</pre>
+                    }
+                </div>
+            </RadzenPanel>
+            <RadzenPanel Text="Pre Start Script" AllowCollapse="true" Collapsed="true">
+                <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
+                    <pre>@StateMachine.PreStartAction</pre>
+                </div>
+            </RadzenPanel>
         </RadzenSplitterPane>
     </RadzenSplitter>
 }
@@ -126,20 +139,22 @@ else
     private bool _mockVariables;
     private bool _pauseLog;
     private bool _draggingElement;
+    private EventCallback ShowStateMachineScriptEventCallback;
 
     protected override async Task OnInitializedAsync()
     {
+        ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         _mockVariables = StateMachineHandler.GetMockingVariablesActive();
         var options = new BlazorDiagramOptions
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                                                {
+                                                    {
                         Enabled = true
-                                                },
+                                                    },
                     Links =
-                                                {
+                                                    {
                         DefaultRouter = new NormalRouter(),
                         DefaultPathGenerator = new SmoothPathGenerator(),
                         RequireTarget = true,
@@ -167,7 +182,7 @@ else
                             _draggingElement = true;
                             return linkModel;
                         }
-                                                }
+                                                    }
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -237,10 +252,10 @@ else
     void ClearLog()
     {
         InvokeAsync(() =>
-    {
-        logLines.Clear();
-        StateHasChanged();
-    });
+        {
+    logLines.Clear();
+    StateHasChanged();
+        });
     }
 
     void PauseLog()
@@ -253,23 +268,23 @@ else
         if (_pauseLog) return;
 
         InvokeAsync(() =>
-    {
-        logLines.Add(new LogData() { Message = log });
-        while (logLines.Count > 200)
         {
-            logLines.RemoveAt(0);
-        }
-        StateHasChanged();
-    });
+    logLines.Add(new LogData() { Message = log });
+    while (logLines.Count > 200)
+    {
+        logLines.RemoveAt(0);
+    }
+    StateHasChanged();
+        });
     }
 
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
-    {
-        var currentState = StateMachineHandler.CurrentState;
-        StateHasChanged();
-    });
+        {
+    var currentState = StateMachineHandler.CurrentState;
+    StateHasChanged();
+        });
     }
 
     async Task ReloadDiagramAsync()
@@ -329,9 +344,9 @@ else
     async Task AddStateAsync(int x, int y)
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
-    {
-        dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-    });
+        {
+    dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        });
         if (state != null)
         {
             newIdForAdd--;
@@ -396,7 +411,7 @@ else
         }
         </RadzenMenuItem>
     </RadzenMenu>
-        );
+    );
         }
         else
         {
@@ -631,6 +646,7 @@ else
         var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
         {
             dialog.Transition = transition;
+            dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
         });
         if (result != null)
         {
@@ -650,6 +666,7 @@ else
         {
             dialog.State = state;
             dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
+            dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
         });
         if (result != null)
         {

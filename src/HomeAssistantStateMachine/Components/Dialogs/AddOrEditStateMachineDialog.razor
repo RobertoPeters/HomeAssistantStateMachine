@@ -12,7 +12,7 @@
             </Helper>
         </RadzenFormField>
         <RadzenFormField Text="Enabled" Variant="@Variant.Outlined">
-            <RadzenRadioButtonList @bind-Value="@Model!.Enabled" TValue="bool" class="rz-m-4 rz-mt-8" >
+            <RadzenRadioButtonList @bind-Value="@Model!.Enabled" TValue="bool" class="rz-m-4 rz-mt-8">
                 <Items>
                     <RadzenRadioButtonListItem Text="Yes" Value="true" />
                     <RadzenRadioButtonListItem Text="No" Value="false" />
@@ -25,8 +25,9 @@
         <RadzenFormField Text="Pre Schedule Action" Variant="@Variant.Outlined">
             <RadzenTextArea @bind-Value="@Model!.PreScheduleAction" Name="PreScheduleAction" Rows="10" spellcheck="false" />
         </RadzenFormField>
-        <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    <RadzenButton ButtonType="ButtonType.Button" Text="System script" Click="@OnSystemScriptAsync" />
 </RadzenTemplateForm>
 
 
@@ -60,6 +61,14 @@
         {
             Close(Model);
         };
+    }
+
+    async Task OnSystemScriptAsync()
+    {
+        await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("System Script", dialog =>
+        {
+           dialog.Script = Services.StateMachineHandler.SystemScript;
+        });
     }
 
 }

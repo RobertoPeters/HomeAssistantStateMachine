@@ -28,8 +28,9 @@
         <RadzenFormField Text="Entry Action" Variant="@Variant.Outlined">
             <RadzenTextArea @bind-Value="@Model!.EntryAction" Name="EntryAction" Rows="10" spellcheck="false" />
         </RadzenFormField>
-        <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    <RadzenButton ButtonType="ButtonType.Button" Text="Script" Click="@(() => ShowStateMachineScript.InvokeAsync())" />
 </RadzenTemplateForm>
 
 
@@ -44,6 +45,9 @@
 
     [Parameter]
     public HashSet<string> ExistingStateNames { get; set; } = [];
+
+    [Parameter]
+    public EventCallback ShowStateMachineScript { get; set; }
 
     private State? Model;
     private RadzenTemplateForm<State>? Form;

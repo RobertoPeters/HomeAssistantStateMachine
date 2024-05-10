@@ -9,8 +9,9 @@
         <RadzenFormField Text="Condition" Variant="@Variant.Outlined">
             <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Rows="10" spellcheck="false" />
         </RadzenFormField>
-        <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    <RadzenButton ButtonType="ButtonType.Button" Text="Script" Click="@(() => ShowStateMachineScript.InvokeAsync())" />
 </RadzenTemplateForm>
 
 
@@ -22,6 +23,9 @@
 
     [Parameter]
     public Transition? Transition { get; set; }
+
+    [Parameter]
+    public EventCallback ShowStateMachineScript { get; set; }
 
     private Transition? Model;
     private RadzenTemplateForm<Transition>? Form;
