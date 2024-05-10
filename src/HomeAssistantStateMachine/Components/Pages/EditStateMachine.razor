@@ -21,25 +21,14 @@
 
 @if (StateMachine != null)
 {
-    <h1>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState?.Name ?? "-"))</h1>
+    <span>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState?.Name ?? "-"))</span>
     @if (!string.IsNullOrWhiteSpace(StateMachineHandler?.ErrorMessage))
     {
         <p>@StateMachineHandler.ErrorMessage</p>
     }
     <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
         <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
-            <RadzenButton Size="ButtonSize.Small" Text="Add State" Click="@(() => AddStateAsync(50, 50))" />
-            <RadzenButton Size="ButtonSize.Small" Text="Save" Click="@SaveAsync" />
-            <RadzenButton Size="ButtonSize.Small" Text="Stop" Click="@Stop" />
-            <RadzenButton Size="ButtonSize.Small" Text="Restart" Click="@Restart" />
-            <RadzenButton Size="ButtonSize.Small" Text="Reload" Click="@ReloadDiagramAsync" />
-            <RadzenButton Size="ButtonSize.Small" Text="Edit Properties" Click="@EditStateMachineAsync" />
-            <RadzenButton Size="ButtonSize.Small" Text="Script" Click="@ShowStateMachineAsync" />
-            <RadzenButton Size="ButtonSize.Small" Text="Export" Click="@ExportAsync" />
-            <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
-            <RadzenButton Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@OnDeleteAsync" />
-
-            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
+            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true" >
                 <CascadingValue Value="Diagram" IsFixed="true">
                     <DiagramCanvas>
                         <Widgets>
@@ -61,6 +50,7 @@
             </div>
             <div>
                 <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
+                <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
             </div>
         </RadzenSplitterPane>
         <RadzenSplitterPane Min="50px">
@@ -101,7 +91,7 @@
 }
 else
 {
-    <h1>Edit State Machine</h1>
+    <h2>Edit State Machine</h2>
 }
 
 @code {
@@ -748,15 +738,6 @@ else
             uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
             uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
             transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
-        }
-    }
-
-    async Task OnDeleteAsync()
-    {
-        if (await DialogService.ShowNoYesConfirmationDialogAsync("Delete State Machine", $"Are you sure you want to delete the State Machine '{StateMachine.Name}'?") == Dialogs.ConfirmationDialog.DialogButton.Yes)
-        {
-            await StateMachineService.DeleteStateMachineHandler(StateMachine.Id);
-            NavigationManager.NavigateTo("/");
         }
     }
 
