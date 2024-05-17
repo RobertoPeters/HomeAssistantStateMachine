@@ -225,6 +225,7 @@ public class StateMachineService : ServiceDbBase
 
                 foreach (var transition in stateMachine.Transitions)
                 {
+                    transition.Id = 0;
                     transition.StateMachineId = stateMachine.Id;
                     transition.StateMachine = null;
                     transition.FromStateId = newIds[transition.FromStateId!.Value].Id;

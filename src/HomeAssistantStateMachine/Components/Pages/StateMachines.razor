@@ -72,6 +72,7 @@
                                   Title="">
                 <Template Context="statemachine">
                     <div @onclick:stopPropagation="true">
+                        <RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.ExtraSmall" Text="Copy" Click="@(() => CopyStateMachineAsync(statemachine))" />
                         <RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Text="Delete" Click="@(() => DeleteStateMachineAsync(statemachine))" />
                     </div>
                 </Template>
@@ -129,18 +130,24 @@
         var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Add State Machine", dialog => { });
         if (result != null)
         {
-            var statemachine = await StateMachineService.CreateMachineStateAsync(result);
-            if (statemachine != null)
-            {
-                var v = new StateMachineInfo()
-                    {
-                        StateMachineHandler = statemachine
-                    };
-                statemachines.TryAdd(statemachine.StateMachine.Id, v);
-                statemachine.StateChanged += StateMachineStateChanged;
-                grid!.Data = statemachines.Values.ToList();
-            }
+            await CreateStateMachineAsync(result);
         }
+    }
+
+    private async Task<StateMachineHandler?> CreateStateMachineAsync(StateMachine statemachine)
+    {
+        var stateMachineHandler = await StateMachineService.CreateMachineStateAsync(statemachine);
+        if (stateMachineHandler != null)
+        {
+            var v = new StateMachineInfo()
+                {
+                    StateMachineHandler = stateMachineHandler
+                };
+            statemachines.TryAdd(stateMachineHandler.StateMachine.Id, v);
+            stateMachineHandler.StateChanged += StateMachineStateChanged;
+            grid!.Data = statemachines.Values.ToList();
+        }
+        return stateMachineHandler;
     }
 
     void OnRowClick(DataGridRowMouseEventArgs<StateMachineInfo> item)
@@ -156,6 +163,42 @@
             statemachines.TryRemove(mi.Id, out var _);
             await StateMachineService.DeleteStateMachineHandler(mi.Id);
             grid!.Data = statemachines.Values.ToList();
+        }
+    }
+
+    private async Task CopyStateMachineAsync(StateMachineInfo mi)
+    {
+        var newStateMachine = new StateMachine();
+        newStateMachine.PreStartAction = mi.StateMachineHandler.StateMachine.PreStartAction;
+        newStateMachine.PreScheduleAction = mi.StateMachineHandler.StateMachine.PreScheduleAction;
+        newStateMachine.Enabled = false;
+        var index = 1;
+        newStateMachine.Name = $"{mi.Name}({index})";
+        while (statemachines.Values.Any(x => x.Name == newStateMachine.Name))
+        {
+            index++;
+            newStateMachine.Name = $"{mi.Name}({index})";
+        }
+        var handler = await CreateStateMachineAsync(newStateMachine);
+        if (handler != null)
+        {
+            newStateMachine = await StateMachineService.GetStateMachineDataAsync(handler.StateMachine.Id);
+            var srcStatemachine = await StateMachineService.GetStateMachineDataAsync(mi.Id);
+            foreach (var state in srcStatemachine.States)
+            {
+                state.StateMachineId = newStateMachine.Id;
+                state.StateMachine = null;
+                newStateMachine.States.Add(state);
+            }
+            foreach (var transition in srcStatemachine.Transitions)
+            {
+                transition.StateMachineId = newStateMachine.Id;
+                transition.StateMachine = null;
+                transition.FromState = null;
+                transition.ToState = null;
+                newStateMachine.Transitions.Add(transition);
+            }
+            await StateMachineService.UpdateMachineStateAsync(newStateMachine);
         }
     }
 }
