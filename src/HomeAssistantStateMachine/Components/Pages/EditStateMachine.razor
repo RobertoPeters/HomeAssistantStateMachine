@@ -2,6 +2,7 @@
 @inject StateMachineService StateMachineService
 @inject DialogService DialogService
 @inject ContextMenuService ContextMenuService
+@inject ClipboardService ClipboardService
 @inject IJSRuntime JS
 @using Blazor.Diagrams.Core.Anchors
 @using Blazor.Diagrams.Core.Models
@@ -150,11 +151,11 @@ else
                 {
                     AllowMultiSelection = true,
                     Zoom =
-                                                    {
+                                                        {
                         Enabled = true
-                                                    },
+                                                        },
                     Links =
-                                                    {
+                                                        {
                         DefaultRouter = new NormalRouter(),
                         DefaultPathGenerator = new SmoothPathGenerator(),
                         RequireTarget = true,
@@ -182,7 +183,7 @@ else
                             _draggingElement = true;
                             return linkModel;
                         }
-                                                    }
+                                                        }
                 };
 
         Diagram = new BlazorDiagram(options);
@@ -252,10 +253,10 @@ else
     void ClearLog()
     {
         InvokeAsync(() =>
-        {
-    logLines.Clear();
-    StateHasChanged();
-        });
+    {
+        logLines.Clear();
+        StateHasChanged();
+    });
     }
 
     void PauseLog()
@@ -268,23 +269,23 @@ else
         if (_pauseLog) return;
 
         InvokeAsync(() =>
-        {
-    logLines.Add(new LogData() { Message = log });
-    while (logLines.Count > 200)
     {
-        logLines.RemoveAt(0);
-    }
-    StateHasChanged();
-        });
+        logLines.Add(new LogData() { Message = log });
+        while (logLines.Count > 200)
+        {
+            logLines.RemoveAt(0);
+        }
+        StateHasChanged();
+    });
     }
 
     void StateChanged(object? sender, State? state)
     {
         InvokeAsync(() =>
-        {
-    var currentState = StateMachineHandler.CurrentState;
-    StateHasChanged();
-        });
+    {
+        var currentState = StateMachineHandler.CurrentState;
+        StateHasChanged();
+    });
     }
 
     async Task ReloadDiagramAsync()
@@ -345,25 +346,31 @@ else
     {
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
         {
-    dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+            dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
         });
         if (state != null)
         {
-            newIdForAdd--;
-            state.Id = newIdForAdd;
-            StateMachine.States.Add(state);
-
-            var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
-                    {
-                        Title = state.Name
-                    });
-
-            node.AddPort(PortAlignment.Bottom);
-            node.AddPort(PortAlignment.Top);
-            node.AddPort(PortAlignment.Left);
-            node.AddPort(PortAlignment.Right);
+            AddNewState(state, x, y);
             Diagram.Refresh();
         }
+    }
+
+    State AddNewState(State state, int x, int y)
+    {
+        newIdForAdd--;
+        state.Id = newIdForAdd;
+        StateMachine.States.Add(state);
+
+        var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
+                {
+                    Title = state.Name
+                });
+
+        node.AddPort(PortAlignment.Bottom);
+        node.AddPort(PortAlignment.Top);
+        node.AddPort(PortAlignment.Left);
+        node.AddPort(PortAlignment.Right);
+        return state;
     }
 
     Model? modelOnPointerUp = null;
@@ -374,6 +381,7 @@ else
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnNodeContextMenuItemClick">
         <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Copy" Value="3" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
         <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
     </RadzenMenu>);
         }
@@ -411,17 +419,23 @@ else
         }
         </RadzenMenuItem>
     </RadzenMenu>
-    );
+        );
         }
         else
         {
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnContextMenuItemClick">
+        <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
         <RadzenMenuItem Text="Add state" Value="1"></RadzenMenuItem>
         <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
+        <RadzenMenuItem Text="Copy" Value="8">
+            <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
+            <RadzenMenuItem Text="All states and transitions" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())" Value="10"></RadzenMenuItem>
+            <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
+        </RadzenMenuItem>
+        <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
         <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
         <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
-        <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
         <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
         <RadzenMenuItem Text="Export" Value="7"></RadzenMenuItem>
     </RadzenMenu>
@@ -455,8 +469,146 @@ else
             case 7:
                 await ExportAsync();
                 break;
+            case 8:
+                return;
+            case 9:
+                CopySelectionToClipboard();
+                break;
+            case 12:
+                PasteFromClipboard(args);
+                break;
+            case 10:
+                CopyAllStatesAndTransitionsToClipboard();
+                break;
+            case 11:
+                CopyStateMachineToClipboard();
+                break;
         }
         ContextMenuService.Close();
+    }
+
+    void CopyStateMachineToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToStatesAndTransitions();
+        content.StateMachine = StateMachine;
+
+        ClipboardService.Copy(content);
+    }
+
+    void CopyAllStatesAndTransitionsToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToStatesAndTransitions();
+        var selectedModels = Diagram.GetSelectedModels().ToList();
+        content.States.AddRange(StateMachine.States.ToList());
+        content.Transitions.AddRange(StateMachine.Transitions.ToList());
+
+        ClipboardService.Copy(content);
+    }
+
+    void CopySelectionToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToStatesAndTransitions();
+        var selectedModels = Diagram.GetSelectedModels().ToList();
+        foreach (var sm in selectedModels)
+        {
+            NodeModel? node = sm as NodeModel;
+            if (node != null)
+            {
+                var state = StateMachine.States.First(x => x.Name == node.Title);
+                content.States.Add(state);
+            }
+        }
+        foreach (var sm in selectedModels)
+        {
+            LinkModel? link = sm as LinkModel;
+            if (link != null)
+            {
+                var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceState = content.States.FirstOrDefault(x => x.Name == source.Title);
+                var targetState = content.States.FirstOrDefault(x => x.Name == target.Title);
+                if (sourceState != null && targetState != null)
+                {
+                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    content.Transitions.Add(transition);
+                }
+            }
+        }
+
+        ClipboardService.Copy(content);
+    }
+
+    void PasteFromClipboard(MenuItemEventArgs args)
+    {
+        var content = ClipboardService.Paste();
+        if (content == null)
+        {
+            return;
+        }
+
+        List<Transition> transitions = content.Transitions;
+        List<State> states = content.States;
+
+        if (content.StateMachine != null)
+        {
+            StateMachine.PreStartAction = content.StateMachine.PreStartAction;
+            StateMachine.PreScheduleAction = content.StateMachine.PreScheduleAction;
+            StateMachine.Enabled = content.StateMachine.Enabled;
+            transitions = content.StateMachine.Transitions.ToList();
+            states = content.StateMachine.States.ToList();
+        }
+
+        int? minX = null;
+        int? minY = null;
+
+        foreach (var state in states)
+        {
+            if (!string.IsNullOrWhiteSpace(state.UIData))
+            {
+                var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
+                if (uiData != null && (minX == null || uiData.X < minX))
+                {
+                    minX = uiData.X;
+                }
+                if (uiData != null && (minY == null || uiData.Y < minY))
+                {
+                    minY = uiData.Y;
+                }
+            }
+        }
+        minX ??= 0;
+        minY ??= 0;
+
+        var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+        var existingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        foreach (var state in states)
+        {
+            if (existingStateNames.Contains(state.Name))
+            {
+                var index = 1;
+                var orgName = state.Name;
+                state.Name = $"{orgName}({index})";
+                while (existingStateNames.Contains(state.Name))
+                {
+                    index++;
+                    state.Name = $"{orgName}({index})";
+                }
+            }
+            existingStateNames.Add(state.Name);
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
+            AddNewState(state, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            Diagram.SelectModel(Diagram.Nodes.Where(x => x.Title == state.Name).First(), false);
+        }
+
+        //todo
+
+        Diagram.Refresh();
     }
 
     State? moveToState = null;
@@ -537,6 +689,9 @@ else
                 break;
             case 2:
                 RemoveNode(node!);
+                break;
+            case 3:
+                CopySelectionToClipboard();
                 break;
         }
     }
@@ -683,6 +838,8 @@ else
 
     async void DiagramPointerDoubleClickAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
     {
+        if (args.Button != 0) return;
+
         if (model is NodeModel node)
         {
             await EditStateAsync(node);

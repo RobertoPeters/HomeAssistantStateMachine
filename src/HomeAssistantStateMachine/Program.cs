@@ -27,6 +27,7 @@ builder.Services.AddDbContextFactory<HasmDbContext>(options =>
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
 
+builder.Services.AddSingleton<HomeAssistantStateMachine.Services.ClipboardService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.VariableService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.HAClientService>();
 builder.Services.AddSingleton<HomeAssistantStateMachine.Services.MqttClientService>();
