@@ -141,6 +141,7 @@ else
     private bool _pauseLog;
     private bool _draggingElement;
     private EventCallback ShowStateMachineScriptEventCallback;
+    private UndoRedo<string> _undoRedo = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -192,14 +193,16 @@ else
         keyboardBehavior.RemoveShortcut("Delete", ctrl: false, shift: false, alt: false);
         keyboardBehavior.SetShortcut("Delete", ctrl: false, shift: false, alt: false, DeleteSelection);
         keyboardBehavior.SetShortcut("a", ctrl: true, shift: false, alt: false, SelectAll);
+        keyboardBehavior.SetShortcut("z", ctrl: true, shift: false, alt: false, UndoAsync);
+        keyboardBehavior.SetShortcut("y", ctrl: true, shift: false, alt: false, RedoAsync);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
         Diagram.PointerMove += DiagramPointerMove;
+        Diagram.PointerDown += DiagramPointerDown;
         StateMachineHandler.StateChanged += StateChanged;
         StateMachineHandler.Log += LogEvent;
 
         await ReloadDiagramAsync();
-
         await base.OnInitializedAsync();
     }
 
@@ -213,7 +216,7 @@ else
         foreach (var node in diagram.Nodes)
         {
             diagram.SelectModel(node, false);
-         }
+        }
         foreach (var link in diagram.Links)
         {
             diagram.SelectModel(link, false);
@@ -223,6 +226,7 @@ else
 
     private ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
     {
+        AddUndo();
         var selectedModels = diagram.GetSelectedModels().ToList();
         foreach (var sm in selectedModels)
         {
@@ -448,6 +452,8 @@ else
             <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
         </RadzenMenuItem>
         <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
         <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())"></RadzenMenuItem>
         <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
         <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
@@ -463,6 +469,7 @@ else
         switch (args.Value)
         {
             case 1:
+                AddUndo();
                 var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
                 await AddStateAsync((int)p.X, (int)p.Y);
                 break;
@@ -473,6 +480,7 @@ else
                 Restart();
                 break;
             case 4:
+                AddUndo();
                 await ReloadDiagramAsync();
                 break;
             case 5:
@@ -500,6 +508,12 @@ else
                 break;
             case 13:
                 await SelectAll(Diagram);
+                break;
+            case 14:
+                await UndoAsync(Diagram);
+                break;
+            case 15:
+                await RedoAsync(Diagram);
                 break;
         }
         ContextMenuService.Close();
@@ -570,6 +584,7 @@ else
             return;
         }
 
+        AddUndo();
         List<Transition> transitions = content.Transitions;
         List<State> states = content.States;
 
@@ -645,7 +660,7 @@ else
             StateMachine.Transitions.Add(transition);
             AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
         }
- 
+
         Diagram.Refresh();
     }
 
@@ -680,6 +695,7 @@ else
             case 36:
                 //move end of link to top of selected state
                 {
+                    AddUndo();
                     //current situation
                     var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
                     var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
@@ -710,6 +726,7 @@ else
             case 4:
                 {
                     ContextMenuService.Close();
+                    AddUndo();
                     RemoveLink(link!);
                 }
                 break;
@@ -726,6 +743,7 @@ else
                 await EditStateAsync(node!);
                 break;
             case 2:
+                AddUndo();
                 RemoveNode(node!);
                 break;
             case 3:
@@ -792,6 +810,14 @@ else
         }
     }
 
+    void DiagramPointerDown(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (args.Button == 0)
+        {
+            AddUndo();
+        }
+    }
+
     async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
     {
         _draggingElement = false;
@@ -843,6 +869,7 @@ else
         });
         if (result != null)
         {
+            AddUndo();
             transition.Condition = result.Condition;
             transition.Description = result.Description;
 
@@ -863,6 +890,7 @@ else
         });
         if (result != null)
         {
+            AddUndo();
             state.Name = result.Name;
             state.Description = result.Description;
             state.EntryAction = result.EntryAction;
@@ -906,6 +934,7 @@ else
         });
         if (result != null)
         {
+            AddUndo();
             StateMachine.Enabled = result.Enabled;
             StateMachine.Name = result.Name;
             StateMachine.PreScheduleAction = result.PreScheduleAction;
@@ -992,9 +1021,18 @@ else
 
     async Task OnImport(UploadChangeEventArgs args)
     {
+        AddUndo();
         var file = args.Files.First();
         var stream = file.OpenReadStream();
         var stateMachine = await System.Text.Json.JsonSerializer.DeserializeAsync<StateMachine>(stream);
+        if (stateMachine != null)
+        {
+            await OnImport(stateMachine);
+        }
+    }
+
+    async Task OnImport(StateMachine stateMachine)
+    {
         StateMachine.States.Clear();
         StateMachine.Transitions.Clear();
         foreach (var state in stateMachine!.States)
@@ -1009,4 +1047,49 @@ else
         StateMachine.PreStartAction = stateMachine.PreStartAction;
         await ReloadDiagramAsync(StateMachine);
     }
+
+    private void AddUndo()
+    {
+        AddUIDataToStatesAndTransitions();
+        var data = System.Text.Json.JsonSerializer.Serialize(StateMachine);
+        if (data != null)
+        {
+            _undoRedo.Add(data);
+        }
+    }
+
+    private async ValueTask UndoAsync(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        if (CanUndo())
+        {
+            var data = _undoRedo.Undo();
+            if (data != null)
+            {
+                var stateMachine = System.Text.Json.JsonSerializer.Deserialize<StateMachine>(data);
+                if (stateMachine != null)
+                {
+                    await OnImport(stateMachine);
+                }
+            }
+        }
+    }
+
+    private async ValueTask RedoAsync(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        if (CanRedo())
+        {
+            var data = _undoRedo.Redo();
+            if (data != null)
+            {
+                var stateMachine = System.Text.Json.JsonSerializer.Deserialize<StateMachine>(data);
+                if (stateMachine != null)
+                {
+                    await OnImport(stateMachine);
+                }
+            }
+        }
+    }
+
+    private bool CanUndo() => _undoRedo.CanUndo();
+    private bool CanRedo() => _undoRedo.CanRedo();
 }
