@@ -3,6 +3,7 @@
 @inject DialogService DialogService
 @inject ContextMenuService ContextMenuService
 @inject ClipboardService ClipboardService
+@inject NavigationManager Navigation
 @inject IJSRuntime JS
 @using Blazor.Diagrams.Core.Anchors
 @using Blazor.Diagrams.Core.Models
@@ -19,6 +20,9 @@
 @implements IDisposable
 
 <PageTitle>HASM - Edit State Machine</PageTitle>
+
+<NavigationLock ConfirmExternalNavigation="true"
+                OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
 <style>
     .rz-panel-titlebar {
@@ -142,6 +146,7 @@ else
     private bool _draggingElement;
     private EventCallback ShowStateMachineScriptEventCallback;
     private UndoRedo<string> _undoRedo = new();
+    private bool _unsavedChanges = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -204,6 +209,19 @@ else
 
         await ReloadDiagramAsync();
         await base.OnInitializedAsync();
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (_unsavedChanges)
+        {
+            var isConfirmed = await JS.InvokeAsync<bool>("confirm", "Changes are not saved. Are you sure you want to leave the page without saving changes?");
+
+            if (!isConfirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
     }
 
     private void OnChangeMockingVariablesActive()
@@ -309,6 +327,7 @@ else
     async Task ReloadDiagramAsync()
     {
         await ReloadDiagramAsync(null);
+        _unsavedChanges = false;
     }
 
     async Task ReloadDiagramAsync(StateMachine? useStateMachine)
@@ -1050,6 +1069,7 @@ else
 
     private void AddUndo()
     {
+        _unsavedChanges = true;
         AddUIDataToStatesAndTransitions();
         var data = System.Text.Json.JsonSerializer.Serialize(StateMachine);
         if (data != null)
