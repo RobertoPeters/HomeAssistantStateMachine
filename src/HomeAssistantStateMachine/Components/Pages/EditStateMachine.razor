@@ -191,6 +191,7 @@ else
         keyboardBehavior!.RemoveShortcut("g", ctrl: true, shift: false, alt: true);
         keyboardBehavior.RemoveShortcut("Delete", ctrl: false, shift: false, alt: false);
         keyboardBehavior.SetShortcut("Delete", ctrl: false, shift: false, alt: false, DeleteSelection);
+        keyboardBehavior.SetShortcut("a", ctrl: true, shift: false, alt: false, SelectAll);
         Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
         Diagram.PointerUp += DiagramPointerUpAsync;
         Diagram.PointerMove += DiagramPointerMove;
@@ -207,7 +208,20 @@ else
         StateMachineHandler.SetMockingVariablesActive(_mockVariables);
     }
 
-    public ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
+    private ValueTask SelectAll(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        foreach (var node in diagram.Nodes)
+        {
+            diagram.SelectModel(node, false);
+         }
+        foreach (var link in diagram.Links)
+        {
+            diagram.SelectModel(link, false);
+        }
+        return ValueTask.CompletedTask;
+    }
+
+    private ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
     {
         var selectedModels = diagram.GetSelectedModels().ToList();
         foreach (var sm in selectedModels)
@@ -434,6 +448,7 @@ else
             <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
         </RadzenMenuItem>
         <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())"></RadzenMenuItem>
         <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
         <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
         <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
@@ -474,14 +489,17 @@ else
             case 9:
                 CopySelectionToClipboard();
                 break;
-            case 12:
-                PasteFromClipboard(args);
-                break;
             case 10:
                 CopyAllStatesAndTransitionsToClipboard();
                 break;
             case 11:
                 CopyStateMachineToClipboard();
+                break;
+            case 12:
+                PasteFromClipboard(args);
+                break;
+            case 13:
+                await SelectAll(Diagram);
                 break;
         }
         ContextMenuService.Close();
@@ -585,10 +603,12 @@ else
         minX ??= 0;
         minY ??= 0;
 
+        Dictionary<int, int> oldStateIdToNewId = [];
         var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
         var existingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
         foreach (var state in states)
         {
+            var oldId = state.Id;
             if (existingStateNames.Contains(state.Name))
             {
                 var index = 1;
@@ -602,12 +622,30 @@ else
             }
             existingStateNames.Add(state.Name);
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
-            AddNewState(state, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            var newState = AddNewState(state, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            oldStateIdToNewId.Add(oldId, newState.Id);
             Diagram.SelectModel(Diagram.Nodes.Where(x => x.Title == state.Name).First(), false);
         }
 
-        //todo
+        foreach(var transition in transitions)
+        {
+            if (transition.FromStateId== null || transition.ToStateId == null) continue;
 
+            LinkUIData? uiData = null;
+            if (!string.IsNullOrWhiteSpace(transition.UIData))
+            {
+                uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
+            }
+            transition.StateMachineId = StateMachine.Id;
+            transition.FromStateId = oldStateIdToNewId[transition.FromStateId.Value];
+            transition.ToStateId = oldStateIdToNewId[transition.ToStateId.Value];
+            transition.FromState = null;
+            transition.ToState = null;
+            transition.StateMachine = null;
+            StateMachine.Transitions.Add(transition);
+            AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
+        }
+ 
         Diagram.Refresh();
     }
 
