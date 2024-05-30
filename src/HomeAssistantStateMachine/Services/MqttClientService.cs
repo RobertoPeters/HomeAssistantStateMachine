@@ -71,7 +71,7 @@ public class MqttClientService : ServiceDbBase
             _handlers.TryRemove(client.MqttClient.Name, out var _);
             client.Dispose();
             var mqttClient = await context.MqttClients.FirstAsync(x => x.Id == client.MqttClient.Id);
-            await _variableService.DeleteVariablesAsync(client.MqttClient.Id, null, null, null, context);
+            await _variableService.DeleteMqttVariablesAsync(client.MqttClient.Id, ctx: context);
             context.Remove(mqttClient);
             await context.SaveChangesAsync();
         });

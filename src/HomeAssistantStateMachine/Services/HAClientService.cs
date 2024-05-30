@@ -78,7 +78,7 @@ public class HAClientService : ServiceDbBase
             _handlers.TryRemove(client.HAClient.Name, out var _);
             await client.DisposeAsync();
             var haClient = await context.HAClients.FirstAsync(x => x.Id == client.HAClient.Id);
-            await _variableService.DeleteVariablesAsync(null, client.HAClient.Id, null, null, context);
+            await _variableService.DeleteHaVariablesAsync(client.HAClient.Id, ctx: context);
             context.Remove(haClient);
             await context.SaveChangesAsync();
         });

@@ -102,7 +102,19 @@ public partial class VariableService : ServiceDbBase
         }
     }
 
-    public async Task DeleteVariablesAsync(int? mqttClientId, int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
+    public async Task DeleteMqttVariablesAsync(int mqttClientId, HasmDbContext? ctx = null)
+    {
+        await DeleteVariablesAsync(mqttClientId, null, null, null, ctx: ctx);
+    }
+    public async Task DeleteHaVariablesAsync(int haClientId, HasmDbContext? ctx = null)
+    {
+        await DeleteVariablesAsync(null, haClientId, null, null, ctx: ctx);
+    }
+    public async Task DeleteStateMachineVariablesAsync(int stateMachineId, HasmDbContext? ctx = null)
+    {
+        await DeleteVariablesAsync(null, null, stateMachineId, null, ctx: ctx);
+    }
+    private async Task DeleteVariablesAsync(int? mqttClientId, int? haClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
     {
         if (await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
@@ -137,12 +149,31 @@ public partial class VariableService : ServiceDbBase
         }
     }
 
-    public async Task<Variable?> CreateVariableAsync(string name, string? data, HAClient? haClient, MqttClient? mqttClient, StateMachine? stateMachine, State? state, HasmDbContext? ctx = null)
+    public async Task<Variable?> CreateHaVariableAsync(string name, string? data, int haClientId, HasmDbContext? ctx = null)
     {
-        return await CreateVariableAsync(name, data, haClient?.Id, mqttClient?.Id, stateMachine?.Id, state?.Id, ctx);
+        return await CreateVariableAsync(name, data, haClientId, null, null, null, ctx: ctx);
     }
-
-    public async Task<Variable?> CreateVariableAsync(string name, string? data, int? haClientId, int? mqttClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
+    public async Task<Variable?> CreateMqttVariableAsync(string name, string? data, int mqttClientId, HasmDbContext? ctx = null)
+    {
+        return await CreateVariableAsync(name, data, null, mqttClientId, null, null, ctx: ctx);
+    }
+    public async Task<Variable?> CreateStateMachineVariableAsync(string name, string? data, int stateMachineId, HasmDbContext? ctx = null)
+    {
+        return await CreateVariableAsync(name, data, null, null, stateMachineId, null, ctx: ctx);
+    }
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, HasmDbContext? ctx = null)
+    {
+        return await CreateVariableAsync(name, data, null, null, null, null, ctx: ctx);
+    }
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, HAClient haClient, HasmDbContext? ctx = null)
+    {
+        return await CreateHaVariableAsync(name, data, haClient.Id, ctx: ctx);
+    }
+    public async Task<Variable?> CreateVariableAsync(string name, string? data, MqttClient mqttClient, HasmDbContext? ctx = null)
+    {
+        return await CreateMqttVariableAsync(name, data, mqttClient.Id, ctx: ctx);
+    }
+    private async Task<Variable?> CreateVariableAsync(string name, string? data, int? haClientId, int? mqttClientId, int? stateMachineId, int? stateId, HasmDbContext? ctx = null)
     {
         return await ExecuteOnDbContextAsync(ctx, async (context) =>
         {
@@ -260,7 +291,15 @@ public partial class VariableService : ServiceDbBase
         return result;
     }
 
-    public List<(Variable variable, VariableValue? variableValue)> GetScopedVariables(MqttClient? mqttClient, HAClient? haClient, StateMachine? stateMachine, State? state)
+    public List<(Variable variable, VariableValue? variableValue)> GetScopedVariables(MqttClient mqttClient)
+    {
+        return GetScopedVariables(mqttClient, null, null, null);
+    }
+    public List<(Variable variable, VariableValue? variableValue)> GetScopedVariables(HAClient haClient)
+    {
+        return GetScopedVariables(null, haClient, null, null);
+    }
+    private List<(Variable variable, VariableValue? variableValue)> GetScopedVariables(MqttClient? mqttClient, HAClient? haClient, StateMachine? stateMachine, State? state)
     {
         List<(Variable variable, VariableValue? variableValue)> result = [];
 

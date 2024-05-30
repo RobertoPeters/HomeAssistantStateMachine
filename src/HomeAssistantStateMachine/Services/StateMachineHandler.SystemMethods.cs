@@ -257,7 +257,7 @@ public partial class StateMachineHandler
             {
                 _mockingVariables.TryAdd(internalName, new MockingVariableInfo { SystemName = internalName, Name = name, ValueSelection = mockingOptions });
             }
-            return _variableService.CreateVariableAsync(internalName, null, null, null, _stateMachineHandler.StateMachine.Id, null).Result != null;
+            return _variableService.CreateStateMachineVariableAsync(internalName, null, _stateMachineHandler.StateMachine.Id).Result != null;
         }
 
         public bool setVariable(string name, string? v)
@@ -295,7 +295,7 @@ public partial class StateMachineHandler
             {
                 _mockingVariables.TryAdd(name, new MockingVariableInfo { SystemName = name, Name = name, ValueSelection = mockingOptions });
             }
-            return _variableService.CreateVariableAsync(name, null, null, null, (int?)null, null).Result != null;
+            return _variableService.CreateVariableAsync(name, null).Result != null;
         }
 
         public bool setGlobalVariable(string name, string? v)

@@ -37,7 +37,7 @@ public class MqttClientHandler : IDisposable
     {
         if (!_started)
         {
-            var variables = VariableService.GetScopedVariables(MqttClient, null, null, null);
+            var variables = VariableService.GetScopedVariables(MqttClient);
             foreach (var variable in variables)
             {
                 if (!string.IsNullOrWhiteSpace(variable.variable.Data))
@@ -324,7 +324,7 @@ public class MqttClientHandler : IDisposable
 
         //todo: check data has changed!
 
-        result = await VariableService.CreateVariableAsync(name, data, null, MqttClient, null, null, ctx);
+        result = await VariableService.CreateVariableAsync(name, data, MqttClient, ctx: ctx);
         if (result != null && !string.IsNullOrWhiteSpace(result.Data))
         {
             VariableValue? vv = null;

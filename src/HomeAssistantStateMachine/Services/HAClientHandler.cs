@@ -36,7 +36,7 @@ public class HAClientHandler : IAsyncDisposable
     {
         if (!_started)
         {
-            var variables = VariableService.GetScopedVariables(null, HAClient, null, null);
+            var variables = VariableService.GetScopedVariables(HAClient);
             foreach (var variable in variables)
             {
                 if (!string.IsNullOrWhiteSpace(variable.variable.Data))
@@ -184,7 +184,7 @@ public class HAClientHandler : IAsyncDisposable
 
         //todo: check data has changed!
 
-        result = await VariableService.CreateVariableAsync(name, data, HAClient, null, null, null, ctx);
+        result = await VariableService.CreateVariableAsync(name, data, HAClient, ctx: ctx);
         if (result != null && !string.IsNullOrWhiteSpace(result.Data))
         {
             VariableValue? vv = null;
