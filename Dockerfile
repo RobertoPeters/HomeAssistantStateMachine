@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine
 WORKDIR /app
 EXPOSE 80
 ENV ASPNETCORE_URLS="http://+:80"
