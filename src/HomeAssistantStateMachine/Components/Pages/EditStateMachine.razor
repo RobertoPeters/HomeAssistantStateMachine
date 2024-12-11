@@ -22,12 +22,12 @@
 <PageTitle>HASM - Edit State Machine</PageTitle>
 
 <NavigationLock ConfirmExternalNavigation="true"
-                OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
 <style>
     .rz-panel-titlebar {
-        flex-direction: row-reverse;
-        justify-content: left;
+    flex-direction: row-reverse;
+    justify-content: left;
     }
 </style>
 @if (StateMachine != null)
@@ -988,15 +988,18 @@ else
         }
         foreach (var link in Diagram.Links)
         {
-            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
-            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-            var targetState = StateMachine.States.First(x => x.Name == target.Title);
-            var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-            var uiData = new LinkUIData();
-            uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
-            uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
-            transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+            if (link.Target is Blazor.Diagrams.Core.Anchors.SinglePortAnchor)
+            {
+                var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+                var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                var uiData = new LinkUIData();
+                uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
+                uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
+                transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+            }
         }
     }
 
