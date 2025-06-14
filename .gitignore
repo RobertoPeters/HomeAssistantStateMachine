@@ -396,7 +396,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
-/src/HomeAssistantStateMachine/Settings
+/src/Hasm/Settings
 /src/HomeAssistantStateMachine/Settings
 /src/HomeAssistantStateMachine/DeployLinux
+/src/Hasm/DeployLinux
 /Docker

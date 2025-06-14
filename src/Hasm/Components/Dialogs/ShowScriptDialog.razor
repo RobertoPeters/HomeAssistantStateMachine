@@ -1,0 +1,26 @@
+﻿@using Hasm.Models
+@inherits DialogBase
+
+@if (Script != null)
+{
+    <div class="p-2">
+        <pre>@Script</pre>
+    </div>
+}
+else
+{
+    <div class="p-2">
+        <p>No script to show</p>
+    </div>
+}
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    [Parameter]
+    public string? Script { get; set; }
+
+}

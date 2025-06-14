@@ -1,0 +1,58 @@
+﻿@using Radzen
+@inherits ResultDialogBase<ConfirmationDialog.DialogButton>
+
+<div>
+    <RadzenStack Size="StackSize.s4">
+        <div class="d-flex">
+            <div>
+                @Content
+            </div>
+        </div>
+    </RadzenStack>
+
+    @if (DialogButton.Ok == (Buttons & DialogButton.Ok))
+    {
+        <RadzenButton Click="@(() => base.Close(DialogButton.Ok))" Text="OK" />
+    }
+    @if (DialogButton.Yes == (Buttons & DialogButton.Yes))
+    {
+        <RadzenButton Click="@(() => base.Close(DialogButton.Yes))" Text="Yes" />
+    }
+    @if (DialogButton.No == (Buttons & DialogButton.No))
+    {
+        <RadzenButton Click="@(() => base.Close(DialogButton.No))" Text="No" />
+    }
+    @if (DialogButton.Cancel == (Buttons & DialogButton.Cancel))
+    {
+        <RadzenButton Click="@(() => base.Close(DialogButton.Cancel))" Text="Cancel" />
+    }
+</div>
+
+
+
+@code {
+    [Parameter] public string? Content { get; set; }
+    [Parameter] public DialogButton Buttons { get; set; }
+
+    protected override bool ShowClose => false;
+    protected override bool ShowTitle => true;
+    protected override bool IsPersistent => true;
+
+    [Flags]
+    public enum DialogButton
+    {
+        // Raw values
+        None = 0,
+        Cancel = 1,
+        Ok = 2,
+        Yes = 4,
+        No = 8,
+
+
+        // Combined values
+        NoYes = No | Yes,
+        NoYesCancel = No | Yes | Cancel,
+        OkCancel = Ok | Cancel,
+        YesCancel = Yes | Cancel,
+    }
+}
