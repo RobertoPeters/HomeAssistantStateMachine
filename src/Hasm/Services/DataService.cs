@@ -4,7 +4,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class DataService(Repository.DataRepository _dataRepository, IServiceScopeFactory _serviceScopeFactory)
+public class DataService(Repository.DataRepository _dataRepository, MessageBusService _messageBusService)
 {
     private readonly ConcurrentDictionary<int, Client> _clients = [];
     private readonly ConcurrentDictionary<int, Variable> _variables = [];
@@ -66,9 +66,7 @@ public class DataService(Repository.DataRepository _dataRepository, IServiceScop
             await _dataRepository.UpdateClientAsync(client);
         }
         _clients.AddOrUpdate(client.Id, client, (_, _) => client);
-        using var scope = _serviceScopeFactory.CreateScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await bus.SendAsync(client);
+        await _messageBusService.SendAsync(client);
     }
 
     public async Task DeleteClientAsync(Client client)
@@ -93,9 +91,7 @@ public class DataService(Repository.DataRepository _dataRepository, IServiceScop
             _variables.TryRemove(variable.Id, out _);
         }
         _clients.TryRemove(-client.Id, out _);
-        using var scope = _serviceScopeFactory.CreateScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await bus.SendAsync(client);
+        await _messageBusService.SendAsync(client);
     }
 
     public async Task AddOrUpdateStateMachineAsync(StateMachine stateMachine)
@@ -109,9 +105,7 @@ public class DataService(Repository.DataRepository _dataRepository, IServiceScop
             await _dataRepository.UpdateStateMachineAsync(stateMachine);
         }
         _stateMachines.AddOrUpdate(stateMachine.Id, stateMachine, (_, _) => stateMachine);
-        using var scope = _serviceScopeFactory.CreateScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await bus.SendAsync(stateMachine);
+         await _messageBusService.SendAsync(stateMachine);
     }
 
     public async Task DeleteStateMachineAsync(StateMachine stateMachine)
@@ -136,9 +130,7 @@ public class DataService(Repository.DataRepository _dataRepository, IServiceScop
             _variables.TryRemove(variable.Id, out _);
         }
         _stateMachines.TryRemove(-stateMachine.Id, out _);
-        using var scope = _serviceScopeFactory.CreateScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await bus.SendAsync(stateMachine);
+        await _messageBusService.SendAsync(stateMachine);
     }
 
 }

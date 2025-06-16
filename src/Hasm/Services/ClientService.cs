@@ -4,7 +4,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class ClientService(DataService _dataService, IServiceScopeFactory _serviceScopeFactory)
+public class ClientService(DataService _dataService, MessageBusService _messageBusService)
 {
     private readonly ConcurrentDictionary<int, IClientHandler> _handlers = [];
 
@@ -25,6 +25,22 @@ public class ClientService(DataService _dataService, IServiceScopeFactory _servi
     public List<T> GetClients<T>() where T : IClientHandler
     {
         return _handlers.Values.OfType<T>().ToList();
+    }
+
+    public async Task Handle(Variable variable)
+    {
+        if (!_handlers.TryGetValue(variable.ClientId, out var clientHandler))
+        {
+            return;
+        }
+        if (variable.Id < 0)
+        {
+            await clientHandler.DeleteVariableAsync(variable);
+        }
+        else
+        {
+            await clientHandler.AddOrUpdateVariableAsync(variable);
+        }
     }
 
     public async Task Handle(Client client)
@@ -49,9 +65,7 @@ public class ClientService(DataService _dataService, IServiceScopeFactory _servi
 
         if (clientHandler != null)
         {
-            using var scope = _serviceScopeFactory.CreateScope();
-            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-            await bus.SendAsync(clientHandler!);
+            await _messageBusService.SendAsync(clientHandler!);
         }
     }
 
@@ -71,7 +85,7 @@ public class ClientService(DataService _dataService, IServiceScopeFactory _servi
         switch (client.ClientType)
         {
             case Models.ClientType.HomeAssistant:
-                clientHandler = new HAClientHandler(client, _serviceScopeFactory);
+                clientHandler = new HAClientHandler(client, _messageBusService);
                 if (!_handlers.TryAdd(client.Id, clientHandler))
                 {
                     clientHandler = null;
@@ -91,5 +105,10 @@ public class ClientServiceMessageHandler
     public async Task Handle(Client client, ClientService clientService)
     {
         await clientService.Handle(client);
+    }
+
+    public async Task Handle(Variable variable, ClientService clientService)
+    {
+        await clientService.Handle(variable);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace Hasm.Services;
 
-public class StateMachineHandler(StateMachine _stateMachine, IServiceScopeFactory _serviceScopeFactory) : IDisposable
+public class StateMachineHandler(StateMachine _stateMachine, MessageBusService _messageBusService) : IDisposable
 {
     public enum StateMachineRunningState
     {

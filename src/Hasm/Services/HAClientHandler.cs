@@ -6,7 +6,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class HAClientHandler(Client _client, IServiceScopeFactory _serviceScopeFactory) : IClientHandler
+public class HAClientHandler(Client _client, MessageBusService _messageBusService) : IClientHandler
 {
     public class ClientProperties
     {
@@ -31,12 +31,12 @@ public class HAClientHandler(Client _client, IServiceScopeFactory _serviceScopeF
     public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
     public Client Client => _client;
 
-    public Task AddVariableAsync(Variable variable)
+    public Task AddOrUpdateVariableAsync(Variable variable)
     {
         throw new NotImplementedException();
     }
 
-    public Task DeleteVariableAsync(string name)
+    public Task DeleteVariableAsync(Variable variable)
     {
         throw new NotImplementedException();
     }
@@ -75,11 +75,6 @@ public class HAClientHandler(Client _client, IServiceScopeFactory _serviceScopeF
             _clientProperties = new();
         }
         await CreateHassWSApiAsync();
-    }
-
-    public Task UpdateVariableAsync(Variable variable)
-    {
-        throw new NotImplementedException();
     }
 
     private async Task DisposeHassApiAsync()
@@ -125,9 +120,7 @@ public class HAClientHandler(Client _client, IServiceScopeFactory _serviceScopeF
 
     private async void _wsApi_ConnectionStateChanged(object? sender, ConnectionStates e)
     {
-        using var scope = _serviceScopeFactory.CreateScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await bus.SendAsync(this);
+        await _messageBusService.SendAsync(this);
 
         if (e == ConnectionStates.Connected && _variables.Any())
         {

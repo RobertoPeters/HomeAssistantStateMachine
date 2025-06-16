@@ -1,0 +1,1090 @@
+﻿@* @page "/editstatemachine/{Id:int}"
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.Models.Base
+@using Hasm.Models
+@using Hasm.Services
+@using Blazor.Diagrams;
+@using Blazor.Diagrams.Core.PathGenerators;
+@using Blazor.Diagrams.Core.Routers;
+@using Blazor.Diagrams.Options;
+@using Blazor.Diagrams.Core.Geometry;
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Components.Widgets;
+@inject StateMachineService StateMachineService
+@inject DialogService DialogService
+@inject ContextMenuService ContextMenuService
+@inject ClipboardService ClipboardService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>HASM - Edit State Machine</PageTitle>
+
+<NavigationLock ConfirmExternalNavigation="true"
+OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
+<style>
+    .rz-panel-titlebar {
+    flex-direction: row-reverse;
+    justify-content: left;
+    }
+</style>
+@if (StateMachine != null)
+{
+    <span>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState?.Name ?? "-"))</span>
+    @if (!string.IsNullOrWhiteSpace(StateMachineHandler?.ErrorMessage))
+    {
+        <p>@StateMachineHandler.ErrorMessage</p>
+    }
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+        <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
+            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
+                <CascadingValue Value="Diagram" IsFixed="true">
+                    <DiagramCanvas>
+                        <Widgets>
+                            <SelectionBoxWidget />
+                        </Widgets>
+                    </DiagramCanvas>
+                </CascadingValue>
+            </div>
+            <div>
+                <div style="float:left;">
+                    <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
+                </div>
+                <div style="float:right;">
+                    <RadzenButton Size="ButtonSize.Small" Text="+" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 1.25))" />
+                    <RadzenButton Size="ButtonSize.Small" Text="-" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 0.75))" />
+                    <RadzenButton Size="ButtonSize.Small" Text="Reset" Click="@(() => Diagram.SetZoom(1.0))" />
+                    <RadzenButton Size="ButtonSize.Small" Text="Fit" Click="@(() => Diagram.ZoomToFit() )" />
+                </div>
+            </div>
+            <div>
+                <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
+                <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
+            </div>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane Min="50px">
+            <RadzenPanel Text="Log" AllowCollapse="true" Collapsed="false">
+                <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
+                <RadzenButton Size="ButtonSize.Small" Text="@(_pauseLog ? "Continue" : "Pause")" Click="@PauseLog" />
+                <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
+                    @foreach (var data in logLines)
+                    {
+                        <RadzenLabel Text="@(data.Time.ToString("HH:mm.ss.fff"))" />
+                        <pre>@data.Message</pre>
+                    }
+                </div>
+            </RadzenPanel>
+            <RadzenPanel Text="Pre Start Script" AllowCollapse="true" Collapsed="true">
+                <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
+                    <pre>@StateMachine.PreStartAction</pre>
+                </div>
+            </RadzenPanel>
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+}
+else
+{
+    <h2>Edit State Machine</h2>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private sealed class NodeUIData
+    {
+        public int X { get; set; } = 50;
+        public int Y { get; set; } = 50;
+    }
+
+    private sealed class LinkUIData
+    {
+        public PortAlignment SourcePort { get; set; } = PortAlignment.Bottom;
+        public PortAlignment TargetPort { get; set; } = PortAlignment.Top;
+    }
+
+    private class LogData
+    {
+        public string Message { get; set; } = string.Empty;
+        public DateTime Time { get; set; } = DateTime.Now;
+    }
+
+    private BlazorDiagram Diagram { get; set; } = null!;
+    private StateMachine StateMachine = null!;
+    private StateMachineHandler StateMachineHandler = null!;
+    private int newIdForAdd = -1;
+    private List<LogData> logLines = [];
+    private int executeCommandPanelHeight = 50;
+    private string? executeCommand;
+    private bool _mockVariables;
+    private bool _pauseLog;
+    private bool _draggingElement;
+    private EventCallback ShowStateMachineScriptEventCallback;
+    private UndoRedo<string> _undoRedo = new();
+    private bool _unsavedChanges = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
+        StateMachineHandler = StateMachineService.GetStateMachine(Id);
+        var options = new BlazorDiagramOptions
+                {
+                    AllowMultiSelection = true,
+                    Zoom =
+                                                        {
+                        Enabled = true
+                                                        },
+                    Links =
+                                                        {
+                        DefaultRouter = new NormalRouter(),
+                        DefaultPathGenerator = new SmoothPathGenerator(),
+                        RequireTarget = true,
+                        Factory = (diagram, source, targetAnchor) =>
+                        {
+                            Anchor? source2;
+                            if (!(source is NodeModel model3))
+                            {
+                                if (!(source is PortModel port2))
+                                {
+                                    throw new NotImplementedException();
+                                }
+
+                                source2 = new SinglePortAnchor(port2);
+                            }
+                            else
+                            {
+                                source2 = new ShapeIntersectionAnchor(model3);
+                            }
+
+                            var linkModel = new LinkModel(source2, targetAnchor);
+                            linkModel.TargetMarker = LinkMarker.Arrow;
+                            //linkModel.Segmentable = true;
+                            linkModel.AddLabel("true");
+                            _draggingElement = true;
+                            return linkModel;
+                        }
+                                                        }
+                };
+
+        Diagram = new BlazorDiagram(options);
+        var keyboardBehavior = Diagram.GetBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
+        keyboardBehavior!.RemoveShortcut("g", ctrl: true, shift: false, alt: true);
+        keyboardBehavior.RemoveShortcut("Delete", ctrl: false, shift: false, alt: false);
+        keyboardBehavior.SetShortcut("Delete", ctrl: false, shift: false, alt: false, DeleteSelection);
+        keyboardBehavior.SetShortcut("a", ctrl: true, shift: false, alt: false, SelectAll);
+        keyboardBehavior.SetShortcut("z", ctrl: true, shift: false, alt: false, UndoAsync);
+        keyboardBehavior.SetShortcut("y", ctrl: true, shift: false, alt: false, RedoAsync);
+        Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
+        Diagram.PointerUp += DiagramPointerUpAsync;
+        Diagram.PointerMove += DiagramPointerMove;
+        Diagram.PointerDown += DiagramPointerDown;
+        StateMachineHandler.StateChanged += StateChanged;
+        StateMachineHandler.Log += LogEvent;
+
+        await ReloadDiagramAsync();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (_unsavedChanges)
+        {
+            var isConfirmed = await JS.InvokeAsync<bool>("confirm", "Changes are not saved. Are you sure you want to leave the page without saving changes?");
+
+            if (!isConfirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
+    }
+
+    private ValueTask SelectAll(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        foreach (var node in diagram.Nodes)
+        {
+            diagram.SelectModel(node, false);
+        }
+        foreach (var link in diagram.Links)
+        {
+            diagram.SelectModel(link, false);
+        }
+        return ValueTask.CompletedTask;
+    }
+
+    private ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        AddUndo();
+        var selectedModels = diagram.GetSelectedModels().ToList();
+        foreach (var sm in selectedModels)
+        {
+            LinkModel? link = sm as LinkModel;
+            if (link != null)
+            {
+                RemoveLink(link);
+            }
+        }
+        foreach (var sm in selectedModels)
+        {
+            NodeModel? node = sm as NodeModel;
+            if (node != null)
+            {
+                RemoveNode(node);
+            }
+        }
+        Diagram.Refresh();
+        return ValueTask.CompletedTask;
+    }
+
+
+    void ExecuteInteractive()
+    {
+        if (!string.IsNullOrWhiteSpace(executeCommand))
+        {
+            var result = executeCommand;
+            result = result + "\r\n";
+            if (StateMachineHandler?.RunningState != StateMachineHandler.StateMachineRunningState.Running)
+            {
+                result = result + "error: state machine not running";
+            }
+            else
+            {
+                result = result + StateMachineHandler.ExecuteScript(executeCommand);
+            }
+            executeCommand = result;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    void ClearLog()
+    {
+        InvokeAsync(() =>
+    {
+        logLines.Clear();
+        StateHasChanged();
+    });
+    }
+
+    void PauseLog()
+    {
+        _pauseLog = !_pauseLog;
+    }
+
+    void LogEvent(object? sender, string log)
+    {
+        if (_pauseLog) return;
+
+        InvokeAsync(() =>
+    {
+        logLines.Add(new LogData() { Message = log });
+        while (logLines.Count > 200)
+        {
+            logLines.RemoveAt(0);
+        }
+        StateHasChanged();
+    });
+    }
+
+    void StateChanged(object? sender, State? state)
+    {
+        InvokeAsync(() =>
+    {
+        var currentState = StateMachineHandler.CurrentState;
+        StateHasChanged();
+    });
+    }
+
+    async Task ReloadDiagramAsync()
+    {
+        await ReloadDiagramAsync(null);
+        _unsavedChanges = false;
+    }
+
+    async Task ReloadDiagramAsync(StateMachine? useStateMachine)
+    {
+        Diagram.Links.Clear();
+        Diagram.Nodes.Clear();
+        StateMachine = useStateMachine ?? await StateMachineService.GetStateMachineDataAsync(Id);
+        foreach (var state in StateMachine.States)
+        {
+            state.StateMachine = null;
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
+            var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
+                    {
+                        Title = state.Name
+                    });
+
+            node.AddPort(PortAlignment.Bottom);
+            node.AddPort(PortAlignment.Top);
+            node.AddPort(PortAlignment.Left);
+            node.AddPort(PortAlignment.Right);
+        }
+        foreach (var transition in StateMachine.Transitions)
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
+            transition.FromState = null;
+            transition.ToState = null;
+            transition.StateMachine = null;
+            AddLink(transition, uiData!.SourcePort, uiData!.TargetPort);
+        }
+        StateChanged(null, null);
+        Diagram.Refresh();
+    }
+
+    private void AddLink(Transition transition, PortAlignment sourcePortAllignment, PortAlignment targetPortAllignment)
+    {
+        var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.FromStateId)!.Name);
+        var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
+        var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == sourcePortAllignment), target.Ports.First(x => x.Alignment == targetPortAllignment)));
+        link.TargetMarker = LinkMarker.Arrow;
+        //link.Segmentable = true;
+        link.AddLabel(transition.Description ?? transition.Condition ?? "true");
+    }
+
+    public void Dispose()
+    {
+        StateMachineHandler.Log -= LogEvent;
+        StateMachineHandler.StateChanged -= StateChanged;
+        Diagram.PointerUp -= DiagramPointerUpAsync;
+        Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
+    }
+
+    async Task AddStateAsync(int x, int y)
+    {
+        var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
+        {
+            dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        });
+        if (state != null)
+        {
+            AddNewState(state, x, y);
+            Diagram.Refresh();
+        }
+    }
+
+    State AddNewState(State state, int x, int y)
+    {
+        newIdForAdd--;
+        state.Id = newIdForAdd;
+        StateMachine.States.Add(state);
+
+        var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
+                {
+                    Title = state.Name
+                });
+
+        node.AddPort(PortAlignment.Bottom);
+        node.AddPort(PortAlignment.Top);
+        node.AddPort(PortAlignment.Left);
+        node.AddPort(PortAlignment.Right);
+        return state;
+    }
+
+    Model? modelOnPointerUp = null;
+    async Task OnContextMenuAsync(MouseEventArgs args)
+    {
+        if (modelOnPointerUp is NodeModel node)
+        {
+            ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnNodeContextMenuItemClick">
+        <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Copy" Value="3" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
+    </RadzenMenu>);
+        }
+        else if (modelOnPointerUp is LinkModel link)
+        {
+            var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+            var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+            var targetState = StateMachine.States.First(x => x.Name == target.Title);
+
+            ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnLinkContextMenuItemClick">
+        <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Delete" Value="4"></RadzenMenuItem>
+        <RadzenMenuItem Text="Move Start To" Value="3">
+            @foreach (var state in StateMachine.States.Where(x => x.Id != targetState.Id).ToList())
+        {
+            <RadzenMenuItem Text="@(state.Name)" Value="21">
+                <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
+            </RadzenMenuItem>
+        }
+        </RadzenMenuItem>
+        <RadzenMenuItem Text="Move End To" Value="2">
+            @foreach (var state in StateMachine.States.Where(x => x.Id != sourceState.Id).ToList())
+        {
+            <RadzenMenuItem Text="@(state.Name)" Value="21">
+                <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
+                <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
+            </RadzenMenuItem>
+        }
+        </RadzenMenuItem>
+    </RadzenMenu>
+        );
+        }
+        else
+        {
+            ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnContextMenuItemClick">
+        <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
+        <RadzenMenuItem Text="Add state" Value="1"></RadzenMenuItem>
+        <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
+        <RadzenMenuItem Text="Copy" Value="8">
+            <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
+            <RadzenMenuItem Text="All states and transitions" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())" Value="10"></RadzenMenuItem>
+            <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
+        </RadzenMenuItem>
+        <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())"></RadzenMenuItem>
+        <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
+        <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
+        <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
+        <RadzenMenuItem Text="Export" Value="7"></RadzenMenuItem>
+    </RadzenMenu>
+    );
+        }
+    }
+
+    async void OnContextMenuItemClick(MenuItemEventArgs args)
+    {
+        switch (args.Value)
+        {
+            case 1:
+                AddUndo();
+                var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+                await AddStateAsync((int)p.X, (int)p.Y);
+                break;
+            case 2:
+                await SaveAsync();
+                break;
+            case 3:
+                Restart();
+                break;
+            case 4:
+                AddUndo();
+                await ReloadDiagramAsync();
+                break;
+            case 5:
+                await EditStateMachineAsync();
+                break;
+            case 6:
+                await ShowStateMachineAsync();
+                break;
+            case 7:
+                await ExportAsync();
+                break;
+            case 8:
+                return;
+            case 9:
+                CopySelectionToClipboard();
+                break;
+            case 10:
+                CopyAllStatesAndTransitionsToClipboard();
+                break;
+            case 11:
+                CopyStateMachineToClipboard();
+                break;
+            case 12:
+                PasteFromClipboard(args);
+                break;
+            case 13:
+                await SelectAll(Diagram);
+                break;
+            case 14:
+                await UndoAsync(Diagram);
+                break;
+            case 15:
+                await RedoAsync(Diagram);
+                break;
+        }
+        ContextMenuService.Close();
+    }
+
+    void CopyStateMachineToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToStatesAndTransitions();
+        content.StateMachine = StateMachine;
+
+        ClipboardService.Copy(content);
+    }
+
+    void CopyAllStatesAndTransitionsToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToStatesAndTransitions();
+        var selectedModels = Diagram.GetSelectedModels().ToList();
+        content.States.AddRange(StateMachine.States.ToList());
+        content.Transitions.AddRange(StateMachine.Transitions.ToList());
+
+        ClipboardService.Copy(content);
+    }
+
+    void CopySelectionToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToStatesAndTransitions();
+        var selectedModels = Diagram.GetSelectedModels().ToList();
+        foreach (var sm in selectedModels)
+        {
+            NodeModel? node = sm as NodeModel;
+            if (node != null)
+            {
+                var state = StateMachine.States.First(x => x.Name == node.Title);
+                content.States.Add(state);
+            }
+        }
+        foreach (var sm in selectedModels)
+        {
+            LinkModel? link = sm as LinkModel;
+            if (link != null && link.Target is Blazor.Diagrams.Core.Anchors.SinglePortAnchor)
+            {
+                var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceState = content.States.FirstOrDefault(x => x.Name == source.Title);
+                var targetState = content.States.FirstOrDefault(x => x.Name == target.Title);
+                if (sourceState != null && targetState != null)
+                {
+                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    content.Transitions.Add(transition);
+                }
+            }
+        }
+
+        ClipboardService.Copy(content);
+    }
+
+    void PasteFromClipboard(MenuItemEventArgs args)
+    {
+        var content = ClipboardService.Paste();
+        if (content == null)
+        {
+            return;
+        }
+
+        AddUndo();
+        List<Transition> transitions = content.Transitions;
+        List<State> states = content.States;
+
+        if (content.StateMachine != null)
+        {
+            StateMachine.PreStartAction = content.StateMachine.PreStartAction;
+            StateMachine.PreScheduleAction = content.StateMachine.PreScheduleAction;
+            StateMachine.Enabled = content.StateMachine.Enabled;
+            transitions = content.StateMachine.Transitions.ToList();
+            states = content.StateMachine.States.ToList();
+        }
+
+        int? minX = null;
+        int? minY = null;
+
+        foreach (var state in states)
+        {
+            if (!string.IsNullOrWhiteSpace(state.UIData))
+            {
+                var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
+                if (uiData != null && (minX == null || uiData.X < minX))
+                {
+                    minX = uiData.X;
+                }
+                if (uiData != null && (minY == null || uiData.Y < minY))
+                {
+                    minY = uiData.Y;
+                }
+            }
+        }
+        minX ??= 0;
+        minY ??= 0;
+
+        Dictionary<int, int> oldStateIdToNewId = [];
+        var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+        var existingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        foreach (var state in states)
+        {
+            var oldId = state.Id;
+            if (existingStateNames.Contains(state.Name))
+            {
+                var index = 1;
+                var orgName = state.Name;
+                state.Name = $"{orgName}({index})";
+                while (existingStateNames.Contains(state.Name))
+                {
+                    index++;
+                    state.Name = $"{orgName}({index})";
+                }
+            }
+            existingStateNames.Add(state.Name);
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
+            var newState = AddNewState(state, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            oldStateIdToNewId.Add(oldId, newState.Id);
+            Diagram.SelectModel(Diagram.Nodes.Where(x => x.Title == state.Name).First(), false);
+        }
+
+        foreach(var transition in transitions)
+        {
+            if (transition.FromStateId== null || transition.ToStateId == null) continue;
+
+            LinkUIData? uiData = null;
+            if (!string.IsNullOrWhiteSpace(transition.UIData))
+            {
+                uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
+            }
+            transition.StateMachineId = StateMachine.Id;
+            transition.FromStateId = oldStateIdToNewId[transition.FromStateId.Value];
+            transition.ToStateId = oldStateIdToNewId[transition.ToStateId.Value];
+            transition.FromState = null;
+            transition.ToState = null;
+            transition.StateMachine = null;
+            StateMachine.Transitions.Add(transition);
+            AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
+        }
+
+        Diagram.Refresh();
+    }
+
+    State? moveToState = null;
+    bool changeTarget = false;
+    async void OnLinkContextMenuItemClick(MenuItemEventArgs args)
+    {
+        var link = modelOnPointerUp as LinkModel;
+        switch (args.Value)
+        {
+            case 1:
+                ContextMenuService.Close();
+                await EditTransitionAsync(link!);
+                break;
+            case 2:
+                moveToState = null;
+                changeTarget = true;
+                break;
+            case 3:
+                moveToState = null;
+                changeTarget = false;
+                break;
+            case 21:
+                moveToState = StateMachine.States.First(x => x.Name == args.Text);
+                break;
+            case 30:
+            case 31:
+            case 32:
+            case 33:
+            case 34:
+            case 35:
+            case 36:
+                //move end of link to top of selected state
+                {
+                    AddUndo();
+                    //current situation
+                    var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
+                    var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                    var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    var sourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
+                    var targetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
+
+                    var newPortAllignment = (PortAlignment)((int)args.Value - 30);
+
+                    if (changeTarget)
+                    {
+                        transition.ToStateId = moveToState!.Id;
+                        AddLink(transition, sourcePort, newPortAllignment);
+                    }
+                    else
+                    {
+                        transition.FromStateId = moveToState!.Id;
+                        AddLink(transition, newPortAllignment, targetPort);
+                    }
+
+                    ContextMenuService.Close();
+                    Diagram.Links.Remove(link!);
+                    Diagram.Refresh();
+                }
+                break;
+            case 4:
+                {
+                    ContextMenuService.Close();
+                    AddUndo();
+                    RemoveLink(link!);
+                }
+                break;
+        }
+    }
+
+    async void OnNodeContextMenuItemClick(MenuItemEventArgs args)
+    {
+        ContextMenuService.Close();
+        var node = modelOnPointerUp as NodeModel;
+        switch (args.Value)
+        {
+            case 1:
+                await EditStateAsync(node!);
+                break;
+            case 2:
+                AddUndo();
+                RemoveNode(node!);
+                break;
+            case 3:
+                CopySelectionToClipboard();
+                break;
+        }
+    }
+
+    void RemoveLink(LinkModel link)
+    {
+        var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
+        var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+        var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+        var targetState = StateMachine.States.First(x => x.Name == target.Title);
+        var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+        StateMachine.Transitions.Remove(transition);
+        Diagram.Links.Remove(link!);
+    }
+
+    void RemoveNode(NodeModel node)
+    {
+        //should remove transitions as well
+        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+        foreach (var transition in transitions)
+        {
+            StateMachine.Transitions.Remove(transition);
+        }
+        StateMachine.States.Remove(state);
+        Diagram.Nodes.Remove(node!);
+    }
+
+    void DiagramPointerMove(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (_draggingElement)
+        {
+            var relMouse = Diagram.GetRelativePoint(args.ClientX, args.ClientY); //pointer position on canvas element (top left = 0,0)
+            var currentPan = Diagram.Pan;
+            var moveX = 0;
+            var moveY = 0;
+            var stepSize = 20;
+            var margin = 20;
+            if (relMouse.X < margin)
+            {
+                moveX = stepSize;
+            }
+            else if (relMouse.X > Diagram.Container!.Width - margin)
+            {
+                moveX = -stepSize;
+            }
+            if (relMouse.Y < margin)
+            {
+                moveY = stepSize;
+            }
+            else if (relMouse.Y > Diagram.Container!.Height - margin)
+            {
+                moveY = -stepSize;
+            }
+
+            if (moveX != 0 || moveY != 0)
+            {
+                Diagram.SetPan(currentPan.X + moveX, currentPan.Y + moveY);
+            }
+        }
+    }
+
+    void DiagramPointerDown(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (args.Button == 0)
+        {
+            AddUndo();
+        }
+    }
+
+    async void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        _draggingElement = false;
+        modelOnPointerUp = null;
+        if (args.Button == 0)
+        {
+            //check if link is added
+            foreach (var link in Diagram.Links.ToList())
+            {
+                if (link.Target.Model == null)
+                {
+                    Diagram.Links.Remove(link);
+                    continue;
+                }
+                var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
+                var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                if (transition == null)
+                {
+                    transition = new()
+                        {
+                            FromStateId = sourceState.Id,
+                            ToStateId = targetState.Id
+                        };
+                    StateMachine.Transitions.Add(transition);
+                    await EditTransitionAsync(link);
+                }
+            }
+        }
+        else if (args.Button == 2)
+        {
+            modelOnPointerUp = model;
+        }
+    }
+
+    async Task EditTransitionAsync(BaseLinkModel link)
+    {
+        var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+        var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+        var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+        var targetState = StateMachine.States.First(x => x.Name == target.Title);
+        var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
+        {
+            dialog.Transition = transition;
+            dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
+        });
+        if (result != null)
+        {
+            AddUndo();
+            transition.Condition = result.Condition;
+            transition.Description = result.Description;
+
+            link.Labels.Clear();
+            link.AddLabel(transition.Description ?? result.Condition ?? "true");
+            link.Refresh();
+        }
+    }
+
+    async Task EditStateAsync(NodeModel node)
+    {
+        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>($"Edit State: {state.Name}", dialog =>
+        {
+            dialog.State = state;
+            dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
+            dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
+        });
+        if (result != null)
+        {
+            AddUndo();
+            state.Name = result.Name;
+            state.Description = result.Description;
+            state.EntryAction = result.EntryAction;
+            state.IsErrorState = result.IsErrorState;
+            state.IsStartState = result.IsStartState;
+
+            node.Title = state.Name;
+            node.Refresh();
+        }
+    }
+
+    async void DiagramPointerDoubleClickAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (args.Button != 0) return;
+
+        if (model is NodeModel node)
+        {
+            await EditStateAsync(node);
+        }
+        else if (model is LinkModel link)
+        {
+            await EditTransitionAsync(link);
+        }
+    }
+
+    void Restart()
+    {
+        StateMachineService.RestartMachineState(StateMachine.Id);
+    }
+
+    void Stop()
+    {
+        StateMachineHandler.Stop();
+    }
+
+    async Task EditStateMachineAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Edit State Machine", dialog =>
+        {
+            dialog.StateMachine = StateMachine;
+        });
+        if (result != null)
+        {
+            AddUndo();
+            StateMachine.Enabled = result.Enabled;
+            StateMachine.Name = result.Name;
+            StateMachine.PreScheduleAction = result.PreScheduleAction;
+            StateMachine.PreStartAction = result.PreStartAction;
+            await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
+        }
+    }
+
+    async Task ShowStateMachineAsync()
+    {
+        var copy = StateMachine.CopyObject();
+        var removedStates = copy!.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
+        foreach (var state in removedStates)
+        {
+            copy.States.Remove(state);
+        }
+        await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
+         {
+             dialog.Script = StateMachineHandler.BuildEngineScript(copy);
+         });
+    }
+
+    private void AddUIDataToStatesAndTransitions()
+    {
+        foreach (var state in StateMachine.States)
+        {
+            var uiData = new NodeUIData();
+            var node = Diagram.Nodes.First(x => x.Title == state.Name);
+            uiData.X = (int)node.Position.X;
+            uiData.Y = (int)node.Position.Y;
+            state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
+        foreach (var link in Diagram.Links)
+        {
+            if (link.Target is Blazor.Diagrams.Core.Anchors.SinglePortAnchor)
+            {
+                var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceState = StateMachine.States.First(x => x.Name == source.Title);
+                var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                var uiData = new LinkUIData();
+                uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
+                uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
+                transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+            }
+        }
+    }
+
+    async Task SaveAsync()
+    {
+        var removedStates = StateMachine.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
+        foreach (var state in removedStates)
+        {
+            var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+            foreach (var transition in transitions)
+            {
+                StateMachine.Transitions.Remove(transition);
+            }
+            StateMachine.States.Remove(state);
+        }
+        AddUIDataToStatesAndTransitions();
+        await StateMachineService.UpdateMachineStateAsync(StateMachine);
+        await ReloadDiagramAsync();
+    }
+
+    private Stream GetFileStream()
+    {
+        var fileStream = new MemoryStream();
+
+        AddUIDataToStatesAndTransitions();
+        System.Text.Json.JsonSerializer.Serialize(fileStream, StateMachine);
+        fileStream.Position = 0;
+
+        return fileStream;
+    }
+
+    async Task ExportAsync()
+    {
+        var fileStream = GetFileStream();
+        var fileName = "hasm_export.json";
+
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+    }
+
+    async Task OnImport(UploadChangeEventArgs args)
+    {
+        AddUndo();
+        var file = args.Files.First();
+        var stream = file.OpenReadStream();
+        var stateMachine = await System.Text.Json.JsonSerializer.DeserializeAsync<StateMachine>(stream);
+        if (stateMachine != null)
+        {
+            await OnImport(stateMachine);
+        }
+    }
+
+    async Task OnImport(StateMachine stateMachine)
+    {
+        StateMachine.States.Clear();
+        StateMachine.Transitions.Clear();
+        foreach (var state in stateMachine!.States)
+        {
+            StateMachine.States.Add(state);
+        }
+        foreach (var transition in stateMachine!.Transitions)
+        {
+            StateMachine.Transitions.Add(transition);
+        }
+        StateMachine.PreScheduleAction = stateMachine.PreScheduleAction;
+        StateMachine.PreStartAction = stateMachine.PreStartAction;
+        await ReloadDiagramAsync(StateMachine);
+    }
+
+    private void AddUndo()
+    {
+        _unsavedChanges = true;
+        AddUIDataToStatesAndTransitions();
+        var data = System.Text.Json.JsonSerializer.Serialize(StateMachine);
+        if (data != null)
+        {
+            _undoRedo.Add(data);
+        }
+    }
+
+    private async ValueTask UndoAsync(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        if (CanUndo())
+        {
+            var data = _undoRedo.Undo();
+            if (data != null)
+            {
+                var stateMachine = System.Text.Json.JsonSerializer.Deserialize<StateMachine>(data);
+                if (stateMachine != null)
+                {
+                    await OnImport(stateMachine);
+                }
+            }
+        }
+    }
+
+    private async ValueTask RedoAsync(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        if (CanRedo())
+        {
+            var data = _undoRedo.Redo();
+            if (data != null)
+            {
+                var stateMachine = System.Text.Json.JsonSerializer.Deserialize<StateMachine>(data);
+                if (stateMachine != null)
+                {
+                    await OnImport(stateMachine);
+                }
+            }
+        }
+    }
+
+    private bool CanUndo() => _undoRedo.CanUndo();
+    private bool CanRedo() => _undoRedo.CanRedo();
+}
+ *@

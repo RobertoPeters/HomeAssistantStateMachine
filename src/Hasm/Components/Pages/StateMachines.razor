@@ -134,7 +134,7 @@
         }
 
         InvokeAsync(grid!.Reload);
-		InvokeAsync(StateHasChanged);
+        InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
@@ -160,8 +160,9 @@
         }
     }
 
-    private async Task CopyStateMachineAsync(StateMachineInfo mi)
+    private Task CopyStateMachineAsync(StateMachineInfo mi)
     {
+        return Task.CompletedTask;
         // var newStateMachine = new StateMachine();
         // newStateMachine.PreStartAction = mi.StateMachineHandler.StateMachine.PreStartAction;
         // newStateMachine.PreScheduleAction = mi.StateMachineHandler.StateMachine.PreScheduleAction;

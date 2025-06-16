@@ -33,6 +33,7 @@ builder.Host.UseWolverine(opts =>
 });
 
 builder.Services.AddSingleton<Hasm.Repository.DataRepository>();
+builder.Services.AddSingleton<MessageBusService>();
 builder.Services.AddSingleton<DataService>();
 builder.Services.AddSingleton<VariableService>();
 builder.Services.AddSingleton<ClientService>();

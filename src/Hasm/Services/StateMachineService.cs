@@ -6,7 +6,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class StateMachineService(DataService _dataService, IServiceScopeFactory _serviceScopeFactory)
+public class StateMachineService(DataService _dataService, MessageBusService _messageBusService)
 {
     private ConcurrentDictionary<int, StateMachineHandler> _handlers = [];
 
@@ -47,9 +47,7 @@ public class StateMachineService(DataService _dataService, IServiceScopeFactory 
 
         if (stateMachineHandler != null)
         {
-            using var scope = _serviceScopeFactory.CreateScope();
-            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-            await bus.SendAsync(stateMachineHandler!);
+             await _messageBusService.SendAsync(stateMachineHandler!);
         }
     }
 
@@ -66,7 +64,7 @@ public class StateMachineService(DataService _dataService, IServiceScopeFactory 
     private StateMachineHandler? AddStateMachine(StateMachine stateMachine)
     {
         StateMachineHandler? stateMachineHandler = null;
-        stateMachineHandler = new StateMachineHandler(stateMachine, _serviceScopeFactory);
+        stateMachineHandler = new StateMachineHandler(stateMachine, _messageBusService);
         if (!_handlers.TryAdd(stateMachine.Id, stateMachineHandler))
         {
             stateMachineHandler = null;
