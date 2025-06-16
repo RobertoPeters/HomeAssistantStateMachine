@@ -25,6 +25,11 @@ public class StateMachineService(DataService _dataService, MessageBusService _me
         return _handlers.Values.ToList();
     }
 
+    public StateMachineHandler GetStateMachine(int id)
+    {
+        return _handlers[id];
+    }
+
     public async Task Handle(StateMachine stateMachine)
     {
         StateMachineHandler? stateMachineHandler = null;

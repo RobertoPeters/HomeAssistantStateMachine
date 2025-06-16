@@ -144,7 +144,11 @@
 
     private async Task AddStateMachineAsync()
     {
-        await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog>("Add State Machine", dialog => { });
+        var sm = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Add State Machine", dialog => { });
+        if (sm != null)
+        {
+            await DataService.AddOrUpdateStateMachineAsync(sm);
+        }
     }
 
     void OnRowClick(DataGridRowMouseEventArgs<StateMachineInfo> item)

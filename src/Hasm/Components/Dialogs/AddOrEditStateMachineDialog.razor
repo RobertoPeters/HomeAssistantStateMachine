@@ -1,7 +1,6 @@
 ﻿@using Hasm.Models
 @using Hasm.Services
-@inject DataService DataService
-@inherits DialogBase
+@inherits ResultDialogBase<StateMachine>
 
 <RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachine">
     <RadzenStack>
@@ -61,8 +60,7 @@
         Form!.EditContext.Validate();
         if (Form.IsValid)
         {
-			await DataService.AddOrUpdateStateMachineAsync(Model!);
-            Close();
+            Close(Model!);
         };
     }
 

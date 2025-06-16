@@ -1,4 +1,4 @@
-﻿@* @page "/editstatemachine/{Id:int}"
+﻿@page "/editstatemachine/{Id:int}"
 @using Blazor.Diagrams.Core.Anchors
 @using Blazor.Diagrams.Core.Models
 @using Blazor.Diagrams.Core.Models.Base
@@ -13,6 +13,7 @@
 @using Blazor.Diagrams.Components.Widgets;
 @inject StateMachineService StateMachineService
 @inject DialogService DialogService
+@inject DataService DataService
 @inject ContextMenuService ContextMenuService
 @inject ClipboardService ClipboardService
 @inject NavigationManager Navigation
@@ -114,7 +115,6 @@ else
     private BlazorDiagram Diagram { get; set; } = null!;
     private StateMachine StateMachine = null!;
     private StateMachineHandler StateMachineHandler = null!;
-    private int newIdForAdd = -1;
     private List<LogData> logLines = [];
     private int executeCommandPanelHeight = 50;
     private string? executeCommand;
@@ -180,8 +180,8 @@ else
         Diagram.PointerUp += DiagramPointerUpAsync;
         Diagram.PointerMove += DiagramPointerMove;
         Diagram.PointerDown += DiagramPointerDown;
-        StateMachineHandler.StateChanged += StateChanged;
-        StateMachineHandler.Log += LogEvent;
+        //StateMachineHandler.StateChanged += StateChanged;
+        //StateMachineHandler.Log += LogEvent;
 
         await ReloadDiagramAsync();
         await base.OnInitializedAsync();
@@ -250,7 +250,7 @@ else
             }
             else
             {
-                result = result + StateMachineHandler.ExecuteScript(executeCommand);
+                //result = result + StateMachineHandler.ExecuteScript(executeCommand);
             }
             executeCommand = result;
             InvokeAsync(StateHasChanged);
@@ -305,10 +305,9 @@ else
     {
         Diagram.Links.Clear();
         Diagram.Nodes.Clear();
-        StateMachine = useStateMachine ?? await StateMachineService.GetStateMachineDataAsync(Id);
+        StateMachine = useStateMachine ?? StateMachineHandler.StateMachine;
         foreach (var state in StateMachine.States)
         {
-            state.StateMachine = null;
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
             var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
                     {
@@ -323,9 +322,6 @@ else
         foreach (var transition in StateMachine.Transitions)
         {
             var uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
-            transition.FromState = null;
-            transition.ToState = null;
-            transition.StateMachine = null;
             AddLink(transition, uiData!.SourcePort, uiData!.TargetPort);
         }
         StateChanged(null, null);
@@ -344,8 +340,8 @@ else
 
     public void Dispose()
     {
-        StateMachineHandler.Log -= LogEvent;
-        StateMachineHandler.StateChanged -= StateChanged;
+        //StateMachineHandler.Log -= LogEvent;
+        //StateMachineHandler.StateChanged -= StateChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
     }
@@ -365,8 +361,7 @@ else
 
     State AddNewState(State state, int x, int y)
     {
-        newIdForAdd--;
-        state.Id = newIdForAdd;
+        state.Id = Guid.NewGuid();
         StateMachine.States.Add(state);
 
         var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
@@ -608,7 +603,7 @@ else
         minX ??= 0;
         minY ??= 0;
 
-        Dictionary<int, int> oldStateIdToNewId = [];
+        Dictionary<Guid, Guid> oldStateIdToNewId = [];
         var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
         var existingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
         foreach (var state in states)
@@ -641,12 +636,8 @@ else
             {
                 uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
             }
-            transition.StateMachineId = StateMachine.Id;
             transition.FromStateId = oldStateIdToNewId[transition.FromStateId.Value];
             transition.ToStateId = oldStateIdToNewId[transition.ToStateId.Value];
-            transition.FromState = null;
-            transition.ToState = null;
-            transition.StateMachine = null;
             StateMachine.Transitions.Add(transition);
             AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
         }
@@ -908,12 +899,12 @@ else
 
     void Restart()
     {
-        StateMachineService.RestartMachineState(StateMachine.Id);
+        //StateMachineService.RestartMachineState(StateMachine.Id);
     }
 
     void Stop()
     {
-        StateMachineHandler.Stop();
+        //StateMachineHandler.Stop();
     }
 
     async Task EditStateMachineAsync()
@@ -929,7 +920,7 @@ else
             StateMachine.Name = result.Name;
             StateMachine.PreScheduleAction = result.PreScheduleAction;
             StateMachine.PreStartAction = result.PreStartAction;
-            await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
+            //await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
         }
     }
 
@@ -943,7 +934,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
          {
-             dialog.Script = StateMachineHandler.BuildEngineScript(copy);
+             //dialog.Script = StateMachineHandler.BuildEngineScript(copy);
          });
     }
 
@@ -987,8 +978,9 @@ else
             StateMachine.States.Remove(state);
         }
         AddUIDataToStatesAndTransitions();
-        await StateMachineService.UpdateMachineStateAsync(StateMachine);
-        await ReloadDiagramAsync();
+        await DataService.AddOrUpdateStateMachineAsync(StateMachine);
+        //await StateMachineService.UpdateMachineStateAsync(StateMachine);
+        //await ReloadDiagramAsync();
     }
 
     private Stream GetFileStream()
@@ -1087,4 +1079,3 @@ else
     private bool CanUndo() => _undoRedo.CanUndo();
     private bool CanRedo() => _undoRedo.CanRedo();
 }
- *@
