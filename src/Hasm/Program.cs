@@ -1,5 +1,7 @@
 using Hasm.Components;
 using Hasm.Services;
+using JasperFx;
+using JasperFx.CodeGeneration;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Radzen;
 using Wolverine;
@@ -23,14 +25,7 @@ builder.Configuration
     .AddJsonFile(settingsPath, optional: false, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Host.UseWolverine(opts =>
-{
-    // Surely plenty of other configuration for Wolverine...
-
-    // This *temporary* line of code will write out a full report about why or
-    // why not Wolverine is finding this handler and its candidate handler messages
-    Console.WriteLine(opts.DescribeHandlerMatch(typeof(Hasm.Models.Client)));
-});
+builder.Host.UseWolverine();
 
 builder.Services.AddSingleton<Hasm.Repository.DataRepository>();
 builder.Services.AddSingleton<MessageBusService>();
