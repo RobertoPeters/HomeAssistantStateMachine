@@ -30,7 +30,14 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         var variableValues = await _dataRepository.GetVariableValuesAsync();
         foreach (var variableValue in variableValues)
         {
-            _variableValues.TryAdd(variableValue.Id, variableValue);
+            if (_variables.ContainsKey(variableValue.VariableId))
+            {
+                _variableValues.TryAdd(variableValue.Id, variableValue);
+            }
+            else
+            {
+                await _dataRepository.DeleteVariableValueAsync(variableValue);
+            }
         }
 
         var stateMachines = await _dataRepository.GetStateMachinesAsync();
@@ -67,6 +74,20 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         }
         _clients.AddOrUpdate(client.Id, client, (_, _) => client);
         await _messageBusService.SendAsync(client);
+    }
+
+    public async Task AddOrUpdateVariableAsync(Variable variable)
+    {
+        if (variable.Id == 0)
+        {
+            await _dataRepository.AddVariableAsync(variable);
+        }
+        else
+        {
+            await _dataRepository.UpdateVariableAsync(variable);
+        }
+        _variables.AddOrUpdate(variable.Id, variable, (_, _) => variable);
+        await _messageBusService.SendAsync(variable);
     }
 
     public async Task DeleteClientAsync(Client client)

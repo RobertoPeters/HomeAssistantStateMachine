@@ -26,7 +26,8 @@
 		<PackageReference Include="Radzen.Blazor" />
 		<PackageReference Include="WolverineFx" />
 		<PackageReference Include="Z.Blazor.Diagrams" />
-	</ItemGroup>
+        <PackageReference Include="Jint" />
+    </ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\HassClient\HassClient.csproj" />
