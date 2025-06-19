@@ -11,6 +11,8 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
     private readonly ConcurrentDictionary<int, VariableValue> _variableValues = [];
     private readonly ConcurrentDictionary<int, StateMachine> _stateMachines = [];
 
+    private int _lastUsedNonPersistentVariableValueId = int.MaxValue;
+
     public async Task StartAsync()
     {
         await _dataRepository.SetupAsync();
@@ -57,6 +59,11 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         return _variables.Values.ToList();
     }
 
+    public List<VariableValue> GetVariableValues()
+    {
+        return _variableValues.Values.ToList();
+    }
+
     public List<StateMachine> GetStateMachines()
     {
         return _stateMachines.Values.ToList();
@@ -73,7 +80,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             await _dataRepository.UpdateClientAsync(client);
         }
         _clients.AddOrUpdate(client.Id, client, (_, _) => client);
-        await _messageBusService.SendAsync(client);
+        await _messageBusService.PublishAsync(client);
     }
 
     public async Task AddOrUpdateVariableAsync(Variable variable)
@@ -87,7 +94,35 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             await _dataRepository.UpdateVariableAsync(variable);
         }
         _variables.AddOrUpdate(variable.Id, variable, (_, _) => variable);
-        await _messageBusService.SendAsync(variable);
+        await _messageBusService.PublishAsync(variable);
+    }
+
+    public async Task AddOrUpdateVariableValueAsync(VariableValue variableValue)
+    {
+        if (variableValue.Id == 0)
+        {
+            if (_variables.TryGetValue(variableValue.Id, out var variable))
+            {
+                if (variable.Persistant)
+                {
+                    await _dataRepository.AddVariableValueAsync(variableValue);
+                }
+                else
+                {
+                    lock (this)
+                    {
+                        _lastUsedNonPersistentVariableValueId--;
+                        variableValue.Id = _lastUsedNonPersistentVariableValueId;
+                    }
+                }
+            }
+        }
+        else if (_variables.TryGetValue(variableValue.Id, out var variable) && variable.Persistant)
+        {
+            await _dataRepository.UpdateVariableValueAsync(variableValue);
+        }
+        _variableValues.AddOrUpdate(variableValue.Id, variableValue, (_, _) => variableValue);
+        await _messageBusService.PublishAsync(variableValue);
     }
 
     public async Task DeleteClientAsync(Client client)
@@ -112,7 +147,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             _variables.TryRemove(variable.Id, out _);
         }
         _clients.TryRemove(-client.Id, out _);
-        await _messageBusService.SendAsync(client);
+        await _messageBusService.PublishAsync(client);
     }
 
     public async Task AddOrUpdateStateMachineAsync(StateMachine stateMachine)
@@ -126,7 +161,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             await _dataRepository.UpdateStateMachineAsync(stateMachine);
         }
         _stateMachines.AddOrUpdate(stateMachine.Id, stateMachine, (_, _) => stateMachine);
-         await _messageBusService.SendAsync(stateMachine);
+         await _messageBusService.PublishAsync(stateMachine);
     }
 
     public async Task DeleteStateMachineAsync(StateMachine stateMachine)
@@ -151,7 +186,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             _variables.TryRemove(variable.Id, out _);
         }
         _stateMachines.TryRemove(-stateMachine.Id, out _);
-        await _messageBusService.SendAsync(stateMachine);
+        await _messageBusService.PublishAsync(stateMachine);
     }
 
 }

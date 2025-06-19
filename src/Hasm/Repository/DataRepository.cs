@@ -17,6 +17,15 @@ public class DataRepository(IConfiguration _configuration)
     {
         SQLitePCL.Batteries.Init();
 
+        var genericClient = new Client()
+        {
+            Id = 1,
+            Name = "Generic",
+            Enabled = true,
+            ClientType = ClientType.Generic,
+            Data = ""
+        };
+
         using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
         var command = connection.CreateCommand();
@@ -24,7 +33,12 @@ public class DataRepository(IConfiguration _configuration)
 @$"CREATE TABLE IF NOT EXISTS {ClientTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
 CREATE TABLE IF NOT EXISTS {VariableTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
 CREATE TABLE IF NOT EXISTS {StateMachineTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
-CREATE TABLE IF NOT EXISTS {VariableValueTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);";
+CREATE TABLE IF NOT EXISTS {VariableValueTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
+
+insert or ignore into {ClientTableName} (Id, Data) values (1, @genericClientData);
+";
+        command.Parameters.AddWithValue("@genericClientData", genericClient.ToData());
+
         await command.ExecuteNonQueryAsync();
     }
 

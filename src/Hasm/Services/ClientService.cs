@@ -27,19 +27,32 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
         return _handlers.Values.OfType<T>().ToList();
     }
 
+    public async Task<bool> SetVariableValueAsync(int variableId, int clientId, string? value)
+    {
+        if (_handlers.TryGetValue(clientId, out var client))
+        {            
+            return await client.SetVariableValueAsync(variableId, value);
+        }
+        return false;
+    }
+
+
     public async Task Handle(Variable variable)
     {
         if (!_handlers.TryGetValue(variable.ClientId, out var clientHandler))
         {
             return;
         }
-        if (variable.Id < 0)
+        if (clientHandler.Client.Enabled)
         {
-            await clientHandler.DeleteVariableAsync(variable);
-        }
-        else
-        {
-            await clientHandler.AddOrUpdateVariableAsync(variable);
+            if (variable.Id < 0)
+            {
+                await clientHandler.DeleteVariableAsync(variable);
+            }
+            else
+            {
+                await clientHandler.AddOrUpdateVariableAsync(variable);
+            }
         }
     }
 
@@ -65,7 +78,7 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
 
         if (clientHandler != null)
         {
-            await _messageBusService.SendAsync(clientHandler!);
+            await _messageBusService.PublishAsync(clientHandler!);
         }
     }
 
@@ -86,15 +99,21 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
         {
             case Models.ClientType.HomeAssistant:
                 clientHandler = new HAClientHandler(client, _messageBusService);
-                if (!_handlers.TryAdd(client.Id, clientHandler))
-                {
-                    clientHandler = null;
-                }
+                break;
+            case Models.ClientType.Generic:
+                clientHandler = new GenericClientHandler(client, _dataService);
                 break;
         }
         if (clientHandler != null)
         {
-            await clientHandler.StartAsync();
+            if (!_handlers.TryAdd(client.Id, clientHandler))
+            {
+                clientHandler = null;
+            }
+            else
+            {
+                await clientHandler.StartAsync();
+            }
         }
         return clientHandler;
     }

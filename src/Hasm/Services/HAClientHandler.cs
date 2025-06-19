@@ -31,6 +31,11 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
     public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
     public Client Client => _client;
 
+    public Task<bool> SetVariableValueAsync(int variableId, string value)
+    {        
+        return Task.FromResult(false);
+    }
+
     public Task AddOrUpdateVariableAsync(Variable variable)
     {
         throw new NotImplementedException();
@@ -120,7 +125,7 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
 
     private async void _wsApi_ConnectionStateChanged(object? sender, ConnectionStates e)
     {
-        await _messageBusService.SendAsync(this);
+        await _messageBusService.PublishAsync(this);
 
         if (e == ConnectionStates.Connected && _variables.Any())
         {

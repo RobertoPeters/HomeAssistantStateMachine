@@ -52,7 +52,7 @@ public class StateMachineService(DataService _dataService, MessageBusService _me
 
         if (stateMachineHandler != null)
         {
-             await _messageBusService.SendAsync(stateMachineHandler!);
+             await _messageBusService.PublishAsync(stateMachineHandler!);
         }
     }
 

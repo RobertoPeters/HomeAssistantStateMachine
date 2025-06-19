@@ -2,9 +2,10 @@
 
 public interface IClientHandler : IAsyncDisposable
 {
-    public Models.Client Client { get; }
-    public Task StartAsync();
-    public Task UpdateAsync(Models.Client client);
-    public Task DeleteVariableAsync(Models.Variable variable);
-    public Task AddOrUpdateVariableAsync(Models.Variable variable);
+    Models.Client Client { get; }
+    Task StartAsync();
+    Task UpdateAsync(Models.Client client);
+    Task DeleteVariableAsync(Models.Variable variable);
+    Task AddOrUpdateVariableAsync(Models.Variable variable);
+    Task<bool> SetVariableValueAsync(int variableId, string value);
 }
