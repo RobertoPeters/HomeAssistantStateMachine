@@ -17,6 +17,7 @@
 @inject ContextMenuService ContextMenuService
 @inject ClipboardService ClipboardService
 @inject NavigationManager Navigation
+@inject UIEventRegistration UIEventRegistration
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -127,6 +128,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        UIEventRegistration.LogEntryAdded += LogEvent;
         ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
@@ -250,7 +252,7 @@ else
             }
             else
             {
-                //result = result + StateMachineHandler.ExecuteScript(executeCommand);
+                result = result + StateMachineHandler.ExecuteScript(executeCommand);
             }
             executeCommand = result;
             InvokeAsync(StateHasChanged);
@@ -271,19 +273,19 @@ else
         _pauseLog = !_pauseLog;
     }
 
-    void LogEvent(object? sender, string log)
+    void LogEvent(object? sender, StateMachineHandler.LogEntry logEntry)
     {
-        if (_pauseLog) return;
+        if (_pauseLog || logEntry.StateMachineId != StateMachine.Id) return;
 
         InvokeAsync(() =>
-    {
-        logLines.Add(new LogData() { Message = log });
-        while (logLines.Count > 200)
         {
-            logLines.RemoveAt(0);
-        }
-        StateHasChanged();
-    });
+            logLines.Add(new LogData() { Message = logEntry.Message });
+            while (logLines.Count > 200)
+            {
+                logLines.RemoveAt(0);
+            }
+            StateHasChanged();
+        });
     }
 
     void StateChanged(object? sender, State? state)
@@ -340,7 +342,7 @@ else
 
     public void Dispose()
     {
-        //StateMachineHandler.Log -= LogEvent;
+        UIEventRegistration.LogEntryAdded += LogEvent;
         //StateMachineHandler.StateChanged -= StateChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
@@ -899,12 +901,12 @@ else
 
     void Restart()
     {
-        //StateMachineService.RestartMachineState(StateMachine.Id);
+        StateMachineHandler.Restart();
     }
 
     void Stop()
     {
-        //StateMachineHandler.Stop();
+        StateMachineHandler.Stop();
     }
 
     async Task EditStateMachineAsync()
@@ -934,7 +936,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
          {
-             //dialog.Script = StateMachineHandler.BuildEngineScript(copy);
+             dialog.Script = StateMachineHandler.BuildEngineScript(copy);
          });
     }
 

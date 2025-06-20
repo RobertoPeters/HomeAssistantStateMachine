@@ -59,7 +59,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-Task.Run(async () =>
+await Task.Run(async () =>
 {
     var dataService = app.Services.GetRequiredService<DataService>();
     await dataService.StartAsync();
@@ -69,6 +69,8 @@ Task.Run(async () =>
     await clientService.StartAsync();
     var stateMachineService = app.Services.GetRequiredService<StateMachineService>();
     await stateMachineService.StartAsync();
-}).Wait();
+    var messageBusService = app.Services.GetRequiredService<MessageBusService>();
+    await messageBusService.StartAsync();
+});
 
-app.Run();
+await app.RunAsync();
