@@ -6,7 +6,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class StateMachineService(DataService _dataService, ClientService _clientService, MessageBusService _messageBusService)
+public class StateMachineService(DataService _dataService, ClientService _clientService, VariableService _variableService, MessageBusService _messageBusService)
 {
     private ConcurrentDictionary<int, StateMachineHandler> _handlers = [];
 
@@ -69,7 +69,7 @@ public class StateMachineService(DataService _dataService, ClientService _client
     private StateMachineHandler? AddStateMachine(StateMachine stateMachine)
     {
         StateMachineHandler? stateMachineHandler = null;
-        stateMachineHandler = new StateMachineHandler(stateMachine, _clientService, _dataService, _messageBusService);
+        stateMachineHandler = new StateMachineHandler(stateMachine, _clientService, _dataService, _variableService, _messageBusService);
         if (!_handlers.TryAdd(stateMachine.Id, stateMachineHandler))
         {
             stateMachineHandler = null;

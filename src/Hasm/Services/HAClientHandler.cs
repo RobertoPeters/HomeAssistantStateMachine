@@ -14,17 +14,11 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
         public string? Token { get; set; }
     }
 
-    private sealed class VariableInfo
-    {
-        public Variable Variable { get; set; } = null!;
-        public VariableValue? VariableValue { get; set; }
-    }
-
-    private ClientProperties _clientProperties = new();
+     private ClientProperties _clientProperties = new();
     private HassWSApi? _wsApi;
     private bool _started = false;
     private Timer? _reconnectTimer = null;
-    private readonly ConcurrentDictionary<string, List<VariableInfo>> _variables = [];
+    private readonly ConcurrentDictionary<string, List<VariableService.VariableInfo>> _variables = [];
 
     public string? Host => _clientProperties.Host;
     public string? Token => _clientProperties.Token;
@@ -36,15 +30,6 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
         return Task.FromResult(false);
     }
 
-    public Task AddOrUpdateVariableAsync(Variable variable)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task DeleteVariableAsync(Variable variable)
-    {
-        throw new NotImplementedException();
-    }
 
     public async ValueTask DisposeAsync()
     {
@@ -178,6 +163,16 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
     }
 
     private Task UpdateVariableValue(string eventId, string state)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteVariableInfoAsync(List<VariableService.VariableInfo> variables)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task AddOrUpdateVariableInfoAsync(List<VariableService.VariableInfo> variables)
     {
         return Task.CompletedTask;
     }

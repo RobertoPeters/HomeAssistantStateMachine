@@ -5,17 +5,15 @@ namespace Hasm.Services;
 
 public class SystemMethods
 {
-    private readonly ClientService _clientService;
-    private readonly DataService _dataService;
+    private readonly VariableService _variableService;
     private readonly StateMachineHandler _stateMachineHandler;
     private readonly ConcurrentDictionary<int, Models.Variable> _variables;
     private readonly ConcurrentDictionary<int, Models.Client> _clients;
 
-    public SystemMethods(ClientService clientService, DataService dataService, StateMachineHandler stateMachineHandler)
+    public SystemMethods(ClientService clientService, DataService dataService, VariableService variableService, StateMachineHandler stateMachineHandler)
     {
 
-        _clientService = clientService;
-        _dataService = dataService;
+        _variableService = variableService;
         _stateMachineHandler = stateMachineHandler;
         var variables = dataService.GetVariables().Where(x => x.StateMachineId == null || x.StateMachineId == stateMachineHandler.StateMachine.Id);
         _variables = new ConcurrentDictionary<int, Models.Variable>(variables.ToDictionary(v => v.Id));
@@ -28,42 +26,18 @@ public class SystemMethods
         {
             return -1;
         }
-        var variable = _variables.Values.FirstOrDefault(x => x.Name == name
-        && (!isStateMachineVariable || x.StateMachineId == _stateMachineHandler.StateMachine.Id)
-        && (isStateMachineVariable || x.StateMachineId == null)
-        && client.Id == x.ClientId
-        );
 
-        if (variable != null && string.Compare(data, variable.Data) == 0)
-        {
-            return variable.Id;
-        }
-
-        if (variable == null)
-        {
-            variable = new()
-            {
-                 ClientId = client.Id,
-                 Name = name,
-                 StateMachineId = isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null,
-                 Persistant = persistant
-            };
-        }
-
-        variable.Data = data;
-        variable.MockingValues = null; //todo
-        _dataService.AddOrUpdateVariableAsync(variable).Wait();
-
-        return variable.Id;
+        return _variableService.CreateVariableAsync(name, client.Id, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data, null).Result ?? -1;
     }
 
     public bool setVariableValue(int variableId, string? value)
     {
-        if (!_variables.TryGetValue(variableId, out var variable))
-        {
-            return false;
-        }
-        return _clientService.SetVariableValueAsync(variableId, variable.ClientId, value).Result;
+        return _variableService.SetVariableValueAsync(variableId, value).Result;
+    }
+
+    public string? getVariableValue(int variableId)
+    {
+        return _variableService.GetVariable(variableId)?.Value;
     }
 
     public int GetClientId(string name)
@@ -84,6 +58,16 @@ public class SystemMethods
         return system.createVariable(name, clientId, isStateMachineVariable, persistant, data, mockingOptions)
     }
 
+    // returns the variable value
+    getVariableValue = function(variableId) {
+        return system.getVariableValue(variableId)
+    }
+
+    // sets the variable value (returns true if successful, false otherwise)
+    getVariableValue = setVariableValue(variableId, variableValue) {
+        return system.getVariableValue(variableId, variableValue)
+    }
+    
     var genericClientId = getClientId('Generic')
     
     """";

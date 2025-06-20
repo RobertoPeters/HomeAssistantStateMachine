@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Hasm.Services;
 
-public class StateMachineHandler(StateMachine _stateMachine, ClientService _clientService, DataService _dataService, MessageBusService _messageBusService) : IDisposable
+public class StateMachineHandler(StateMachine _stateMachine, ClientService _clientService, DataService _dataService, VariableService _variableService, MessageBusService _messageBusService) : IDisposable
 {
     public enum StateMachineRunningState
     {
@@ -87,7 +87,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                 if (ValidateModel())
                 {
                     _engine = new Jint.Engine();
-                    _systemMethods = new SystemMethods(_clientService, _dataService, this);
+                    _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
                     _engine.SetValue("system", _systemMethods);
 
                     try

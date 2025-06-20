@@ -18,7 +18,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         await _dataRepository.SetupAsync();
 
         var clients = await _dataRepository.GetClientsAsync();
-        foreach(var client in clients)
+        foreach (var client in clients)
         {
             _clients.TryAdd(client.Id, client);
         }
@@ -125,29 +125,48 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         await _messageBusService.PublishAsync(variableValue);
     }
 
+    public async Task DeleteVariableAsync(Variable variable)
+    {
+        if (_variables.TryRemove(Math.Abs(variable.Id), out var orgVariable))
+        {
+            _variableValues.TryRemove(orgVariable.Id, out var variableValue);
+
+            if (variableValue != null)
+            {
+                await _dataRepository.DeleteVariableValueAsync(variableValue);
+            }
+            await _dataRepository.DeleteVariableAsync(orgVariable);
+            orgVariable.Id = -orgVariable.Id;
+            await _messageBusService.PublishAsync(orgVariable);
+        }
+    }
+
     public async Task DeleteClientAsync(Client client)
     {
-        var variableIds = _variables.Values.Where(v => v.ClientId == client.Id)
+        if (_clients.TryRemove(Math.Abs(client.Id), out var orgClient))
+        {
+            var variableIds = _variables.Values.Where(v => v.ClientId == orgClient.Id)
             .Select(x => x.Id)
             .ToList();
 
-        var variableValueIds = _variableValues.Values.Where(v => variableIds.Contains(v.VariableId))
-            .Select(x => x.Id)
-            .ToList();
+            var variableValueIds = _variableValues.Values.Where(v => variableIds.Contains(v.VariableId))
+                .Select(x => x.Id)
+                .ToList();
 
-        await _dataRepository.DeleteVariableValuesAsync(variableValueIds);
-        await _dataRepository.DeleteVariablesAsync(variableIds);
-        await _dataRepository.DeleteClientAsync(client);
-        foreach (var variableValue in _variableValues.Values.Where(v => variableValueIds.Contains(v.Id)).ToList())
-        {
-            _variableValues.TryRemove(variableValue.Id, out _);
+            await _dataRepository.DeleteVariableValuesAsync(variableValueIds);
+            await _dataRepository.DeleteVariablesAsync(variableIds);
+            await _dataRepository.DeleteClientAsync(orgClient);
+            foreach (var variableValue in _variableValues.Values.Where(v => variableValueIds.Contains(v.Id)).ToList())
+            {
+                _variableValues.TryRemove(variableValue.Id, out _);
+            }
+            foreach (var variable in _variables.Values.Where(v => variableIds.Contains(v.Id)).ToList())
+            {
+                _variables.TryRemove(variable.Id, out _);
+            }
+            orgClient.Id = -orgClient.Id;
+            await _messageBusService.PublishAsync(orgClient);
         }
-        foreach (var variable in _variables.Values.Where(v => variableIds.Contains(v.Id)).ToList())
-        {
-            _variables.TryRemove(variable.Id, out _);
-        }
-        _clients.TryRemove(-client.Id, out _);
-        await _messageBusService.PublishAsync(client);
     }
 
     public async Task AddOrUpdateStateMachineAsync(StateMachine stateMachine)
@@ -161,32 +180,35 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             await _dataRepository.UpdateStateMachineAsync(stateMachine);
         }
         _stateMachines.AddOrUpdate(stateMachine.Id, stateMachine, (_, _) => stateMachine);
-         await _messageBusService.PublishAsync(stateMachine);
+        await _messageBusService.PublishAsync(stateMachine);
     }
 
     public async Task DeleteStateMachineAsync(StateMachine stateMachine)
     {
-        var variableIds = _variables.Values.Where(v => v.StateMachineId == stateMachine.Id)
-            .Select(x => x.Id)
-            .ToList();
-
-        var variableValueIds = _variableValues.Values.Where(v => variableIds.Contains(v.VariableId))
-            .Select(x => x.Id)
-            .ToList();
-
-        await _dataRepository.DeleteVariableValuesAsync(variableValueIds);
-        await _dataRepository.DeleteVariablesAsync(variableIds);
-        await _dataRepository.DeleteStateMachineAsync(stateMachine);
-        foreach (var variableValue in _variableValues.Values.Where(v => variableValueIds.Contains(v.Id)).ToList())
+        if (_stateMachines.TryRemove(-stateMachine.Id, out var orgStateMachine))
         {
-            _variableValues.TryRemove(variableValue.Id, out _);
+            var variableIds = _variables.Values.Where(v => v.StateMachineId == orgStateMachine.Id)
+                .Select(x => x.Id)
+                .ToList();
+
+            var variableValueIds = _variableValues.Values.Where(v => variableIds.Contains(v.VariableId))
+                .Select(x => x.Id)
+                .ToList();
+
+            await _dataRepository.DeleteVariableValuesAsync(variableValueIds);
+            await _dataRepository.DeleteVariablesAsync(variableIds);
+            await _dataRepository.DeleteStateMachineAsync(orgStateMachine);
+            foreach (var variableValue in _variableValues.Values.Where(v => variableValueIds.Contains(v.Id)).ToList())
+            {
+                _variableValues.TryRemove(variableValue.Id, out _);
+            }
+            foreach (var variable in _variables.Values.Where(v => variableIds.Contains(v.Id)).ToList())
+            {
+                _variables.TryRemove(variable.Id, out _);
+            }
+            orgStateMachine.Id = -orgStateMachine.Id;
+            await _messageBusService.PublishAsync(orgStateMachine);
         }
-        foreach (var variable in _variables.Values.Where(v => variableIds.Contains(v.Id)).ToList())
-        {
-            _variables.TryRemove(variable.Id, out _);
-        }
-        _stateMachines.TryRemove(-stateMachine.Id, out _);
-        await _messageBusService.PublishAsync(stateMachine);
     }
 
 }

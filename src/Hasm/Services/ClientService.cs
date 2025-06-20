@@ -27,31 +27,26 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
         return _handlers.Values.OfType<T>().ToList();
     }
 
-    public async Task<bool> SetVariableValueAsync(int variableId, int clientId, string? value)
+    public async Task Handle(List<VariableService.VariableInfo> variables)
     {
-        if (_handlers.TryGetValue(clientId, out var client))
-        {            
-            return await client.SetVariableValueAsync(variableId, value);
-        }
-        return false;
-    }
-
-
-    public async Task Handle(Variable variable)
-    {
-        if (!_handlers.TryGetValue(variable.ClientId, out var clientHandler))
+        var variablesToHandle = variables.ToLookup(x => x.Variable.ClientId, x => x);
+        foreach(var variableGroup in variablesToHandle)
         {
-            return;
-        }
-        if (clientHandler.Client.Enabled)
-        {
-            if (variable.Id < 0)
+            if (_handlers.TryGetValue(variableGroup.Key, out var clientHandler))
             {
-                await clientHandler.DeleteVariableAsync(variable);
-            }
-            else
-            {
-                await clientHandler.AddOrUpdateVariableAsync(variable);
+                if (clientHandler.Client.Enabled)
+                {
+                    var deletedGroup = variableGroup.Where(x => x.Variable.Id < 0).ToList();
+                    var addOrUpdatedGroup = variableGroup.Where(x => x.Variable.Id >= 0).ToList();
+                    if (deletedGroup.Any())
+                    {
+                        await clientHandler.DeleteVariableInfoAsync(deletedGroup);
+                    }
+                    else if (addOrUpdatedGroup.Any())
+                    {
+                        await clientHandler.AddOrUpdateVariableInfoAsync(addOrUpdatedGroup);
+                    }
+                }
             }
         }
     }
@@ -101,7 +96,7 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
                 clientHandler = new HAClientHandler(client, _messageBusService);
                 break;
             case Models.ClientType.Generic:
-                clientHandler = new GenericClientHandler(client, _dataService);
+                clientHandler = new GenericClientHandler(client);
                 break;
         }
         if (clientHandler != null)
@@ -126,8 +121,13 @@ public class ClientServiceMessageHandler
         await clientService.Handle(client);
     }
 
-    public async Task Handle(Variable variable, ClientService clientService)
+    public async Task Handle(VariableService.VariableInfo variable, ClientService clientService)
     {
-        await clientService.Handle(variable);
+        await clientService.Handle([variable]);
+    }
+
+    public async Task Handle(List<VariableService.VariableInfo> variables, ClientService clientService)
+    {
+        await clientService.Handle(variables);
     }
 }
