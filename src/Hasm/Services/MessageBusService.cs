@@ -10,6 +10,4 @@ public class MessageBusService(IServiceScopeFactory _serviceScopeFactory)
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
         return bus.PublishAsync(message, options);
     }
-
-
 }

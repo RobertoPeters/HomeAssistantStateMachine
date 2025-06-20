@@ -46,6 +46,22 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
+bool _pipelineReady = false;
+app.Use(async (context, next) =>
+{
+    if (!_pipelineReady)
+    {
+        await Task.Run(() =>
+        {
+            while (!_pipelineReady)
+            {
+                Thread.Sleep(500);
+            }
+        });
+    }
+    await next.Invoke();
+});
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -59,16 +75,20 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-Task.Run(async () =>
-{
-    var dataService = app.Services.GetRequiredService<DataService>();
-    await dataService.StartAsync();
-    var variableService = app.Services.GetRequiredService<VariableService>();
-    await variableService.StartAsync();
-    var clientService = app.Services.GetRequiredService<ClientService>();
-    await clientService.StartAsync();
-    var stateMachineService = app.Services.GetRequiredService<StateMachineService>();
-    await stateMachineService.StartAsync();
-}).Wait();
+var t = new Thread(new ThreadStart(
+    async () =>
+    {
+        await Task.Delay(2000);
+        var dataService = app.Services.GetRequiredService<DataService>();
+        await dataService.StartAsync();
+        var variableService = app.Services.GetRequiredService<VariableService>();
+        await variableService.StartAsync();
+        var clientService = app.Services.GetRequiredService<ClientService>();
+        await clientService.StartAsync();
+        var stateMachineService = app.Services.GetRequiredService<StateMachineService>();
+        await stateMachineService.StartAsync();
+        _pipelineReady = true;
+    }));
+t.Start();
 
-app.Run();
+await app.RunAsync();
