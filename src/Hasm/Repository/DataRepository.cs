@@ -26,6 +26,15 @@ public class DataRepository(IConfiguration _configuration)
             Data = ""
         };
 
+        var timerClient = new Client()
+        {
+            Id = 2,
+            Name = "Timer",
+            Enabled = true,
+            ClientType = ClientType.Timer,
+            Data = ""
+        };
+
         using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
         var command = connection.CreateCommand();
@@ -36,8 +45,10 @@ CREATE TABLE IF NOT EXISTS {StateMachineTableName}(Id INTEGER PRIMARY KEY AUTOIN
 CREATE TABLE IF NOT EXISTS {VariableValueTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
 
 insert or ignore into {ClientTableName} (Id, Data) values (1, @genericClientData);
+insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
 ";
         command.Parameters.AddWithValue("@genericClientData", genericClient.ToData());
+        command.Parameters.AddWithValue("@timerClientData", timerClient.ToData());
 
         await command.ExecuteNonQueryAsync();
     }

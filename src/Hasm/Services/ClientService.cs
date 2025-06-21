@@ -98,6 +98,9 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
             case Models.ClientType.Generic:
                 clientHandler = new GenericClientHandler(client);
                 break;
+            case Models.ClientType.Timer:
+                clientHandler = new TimerClientHandler(client);
+                break;
         }
         if (clientHandler != null)
         {
