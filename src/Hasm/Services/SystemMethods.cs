@@ -7,7 +7,6 @@ public class SystemMethods
 {
     private readonly VariableService _variableService;
     private readonly StateMachineHandler _stateMachineHandler;
-    private readonly ConcurrentDictionary<int, Models.Variable> _variables;
     private readonly ConcurrentDictionary<int, Models.Client> _clients;
 
     public SystemMethods(ClientService clientService, DataService dataService, VariableService variableService, StateMachineHandler stateMachineHandler)
@@ -15,19 +14,12 @@ public class SystemMethods
 
         _variableService = variableService;
         _stateMachineHandler = stateMachineHandler;
-        var variables = dataService.GetVariables().Where(x => x.StateMachineId == null || x.StateMachineId == stateMachineHandler.StateMachine.Id);
-        _variables = new ConcurrentDictionary<int, Models.Variable>(variables.ToDictionary(v => v.Id));
         _clients = new ConcurrentDictionary<int, Models.Client>(dataService.GetClients().ToDictionary(c => c.Id));
     }
 
-    public int createVariable(string name, int clientId, bool isStateMachineVariable, bool persistant, string? data, JsValue[]? mockingOptions)
+    public int createVariable(string name, int clientId, bool isStateMachineVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
     {
-        if (!_clients.TryGetValue(clientId, out var client) || !client.Enabled)
-        {
-            return -1;
-        }
-
-        return _variableService.CreateVariableAsync(name, client.Id, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data, null).Result ?? -1;
+        return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data?.ToString(), null).Result ?? -1;
     }
 
     public bool setVariableValue(int variableId, string? value)
@@ -64,11 +56,15 @@ public class SystemMethods
     }
 
     // sets the variable value (returns true if successful, false otherwise)
-    getVariableValue = setVariableValue(variableId, variableValue) {
+    getVariableValue = function(variableId, variableValue) {
         return system.getVariableValue(variableId, variableValue)
     }
     
     var genericClientId = getClientId('Generic')
     
+    createGenericVariable = function(name, value, mockingOptions) {
+        return createVariable(name, genericClientId, true, true, value, mockingOptions)
+    }
+
     """";
 }

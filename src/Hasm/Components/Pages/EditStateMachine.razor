@@ -640,6 +640,7 @@ else
             }
             transition.FromStateId = oldStateIdToNewId[transition.FromStateId.Value];
             transition.ToStateId = oldStateIdToNewId[transition.ToStateId.Value];
+            transition.Id = Guid.NewGuid();
             StateMachine.Transitions.Add(transition);
             AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
         }
@@ -825,7 +826,8 @@ else
                     transition = new()
                         {
                             FromStateId = sourceState.Id,
-                            ToStateId = targetState.Id
+                            ToStateId = targetState.Id,
+                            Id = Guid.NewGuid(),
                         };
                     StateMachine.Transitions.Add(transition);
                     await EditTransitionAsync(link);
