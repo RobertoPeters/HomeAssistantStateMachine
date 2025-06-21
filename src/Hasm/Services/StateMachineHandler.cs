@@ -314,6 +314,38 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         script.AppendLine($"}}");
 
 
+        script.AppendLine(""""
+            var __currentState__ = null
+            var __startState__ = '8b145be8c9f746faa88cb6c4b0265b9d'
+            var __stateTransitionMap = [
+            {'fromState': '8b145be8c9f746faa88cb6c4b0265b9d', 'transition': '89b50a269dda44cc9caed82b95ffe7cf', 'toState': 'a3cf656fb30a4761b5c166339380037f'}
+            ]
+
+            function __schedule() {
+            	preScheduleAction()
+            	if (__currentState__ == null)
+            	{
+            		__changeState(__startState__)
+            	}
+            	else
+            	{
+            	    var __transitions = __stateTransitionMap.filter((transition) => transition.fromState == __currentState__)
+            		var __successFulTransition = __transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
+            		if (__successFulTransition != null)
+            		{
+            		    __changeState(__successFulTransition.toState)
+            		}
+            	}
+            }
+
+            function __changeState(state) {
+                log('changing state to: '+state)
+            	eval('stateEntryAction'+state+'()')
+            	__currentState__ = state
+            }
+            
+            """");
+
         script.AppendLine();
         script.AppendLine("// Pre-start statemachine action");
         script.AppendLine($"{stateMachine.PreStartAction ?? ""}");

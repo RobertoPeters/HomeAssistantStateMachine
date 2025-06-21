@@ -16,7 +16,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
     }
 
     private ConcurrentDictionary<int, VariableInfo> _variables = [];
-   
+
     public Task StartAsync()
     {
         var variables = _dataService.GetVariables();
@@ -77,7 +77,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
 
     public async Task DeleteVariableAsync(int variableId)
     {
-        await DeleteVariablesAsync([ variableId ], true);
+        await DeleteVariablesAsync([variableId], true);
     }
 
     public async Task<int?> CreateVariableAsync(string name, int clientId, int? stateMachineId, bool persistant, string? data, List<string>? mockingOptions)
@@ -87,17 +87,19 @@ public class VariableService(DataService _dataService, MessageBusService _messag
             return null;
         }
         var variableInfo = _variables.Values.FirstOrDefault(x => x.Variable.Name == name
-        && (stateMachineId == null || x.Variable.StateMachineId == stateMachineId)
-        && (stateMachineId != null || x.Variable.StateMachineId == null)
+        && x.Variable.StateMachineId == stateMachineId
         && clientId == x.Variable.ClientId
         );
 
-        if (variableInfo != null && string.Compare(data, variableInfo.Variable.Data) == 0)
+        if (variableInfo != null
+            && string.Compare(data, variableInfo.Variable.Data) == 0
+            && persistant == variableInfo.Variable.Persistant)
         {
             return variableInfo.Variable.Id;
         }
 
         var variable = variableInfo?.Variable;
+        var variableValue = variableInfo?.VariableValue;
 
         if (variable == null)
         {
@@ -108,6 +110,10 @@ public class VariableService(DataService _dataService, MessageBusService _messag
                 StateMachineId = stateMachineId,
                 Persistant = persistant
             };
+        }
+        if (variableValue != null)
+        {
+            await _dataService.DeleteVariableValueAsync(variableValue);
         }
 
         variable.Data = data;

@@ -138,6 +138,16 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         }
     }
 
+    public async Task DeleteVariableValueAsync(VariableValue variableValue)
+    {
+        if (_variableValues.TryRemove(Math.Abs(variableValue.Id), out var orgVariableValue))
+        {
+            await _dataRepository.DeleteVariableValueAsync(variableValue);
+            orgVariableValue.Id = -orgVariableValue.Id;
+            await _messageBusService.PublishAsync(orgVariableValue);
+        }
+    }
+
     public async Task DeleteClientAsync(Client client)
     {
         if (_clients.TryRemove(Math.Abs(client.Id), out var orgClient))
