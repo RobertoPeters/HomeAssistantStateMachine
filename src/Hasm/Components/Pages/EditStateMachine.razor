@@ -275,11 +275,11 @@ else
 
     void LogEvent(object? sender, StateMachineHandler.LogEntry logEntry)
     {
-        if (_pauseLog || logEntry.StateMachineId != StateMachine.Id) return;
+        if (_pauseLog || logEntry.StateMachineId != StateMachine?.Id) return;
 
         InvokeAsync(() =>
         {
-            logLines.Add(new LogData() { Message = logEntry.Message });
+            logLines.Add(new LogData() { Message = logEntry.Message, Time = logEntry.Timestamp.ToLocalTime() });
             while (logLines.Count > 200)
             {
                 logLines.RemoveAt(0);
@@ -640,6 +640,7 @@ else
             }
             transition.FromStateId = oldStateIdToNewId[transition.FromStateId.Value];
             transition.ToStateId = oldStateIdToNewId[transition.ToStateId.Value];
+            transition.Id = Guid.NewGuid();
             StateMachine.Transitions.Add(transition);
             AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
         }
@@ -825,7 +826,8 @@ else
                     transition = new()
                         {
                             FromStateId = sourceState.Id,
-                            ToStateId = targetState.Id
+                            ToStateId = targetState.Id,
+                            Id = Guid.NewGuid(),
                         };
                     StateMachine.Transitions.Add(transition);
                     await EditTransitionAsync(link);

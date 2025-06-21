@@ -101,7 +101,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
     {
         if (variableValue.Id == 0)
         {
-            if (_variables.TryGetValue(variableValue.Id, out var variable))
+            if (_variables.TryGetValue(variableValue.VariableId, out var variable))
             {
                 if (variable.Persistant)
                 {
@@ -109,11 +109,8 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
                 }
                 else
                 {
-                    lock (this)
-                    {
-                        _lastUsedNonPersistentVariableValueId--;
-                        variableValue.Id = _lastUsedNonPersistentVariableValueId;
-                    }
+                    var newId = Interlocked.Decrement(ref _lastUsedNonPersistentVariableValueId);
+                    variableValue.Id = newId;
                 }
             }
         }

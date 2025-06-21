@@ -1,8 +1,6 @@
 ﻿using System.Collections.Concurrent;
-using System.Collections.Generic;
 using Hasm.Models;
-using Jint.Native;
-using Microsoft.Extensions.Primitives;
+
 
 namespace Hasm.Services;
 
@@ -18,8 +16,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
     }
 
     private ConcurrentDictionary<int, VariableInfo> _variables = [];
-    private ConcurrentDictionary<int, Client> _clients = [];
-
+   
     public Task StartAsync()
     {
         var variables = _dataService.GetVariables();
@@ -65,6 +62,10 @@ public class VariableService(DataService _dataService, MessageBusService _messag
     {
         if (_variables.TryGetValue(variableId, out var variableInfo))
         {
+            if (string.Compare(value, variableInfo.VariableValue.Value) == 0)
+            {
+                return false;
+            }
             variableInfo.VariableValue.Value = value;
             variableInfo.VariableValue.Update = DateTime.UtcNow;
             await _dataService.AddOrUpdateVariableValueAsync(variableInfo.VariableValue);
@@ -81,14 +82,14 @@ public class VariableService(DataService _dataService, MessageBusService _messag
 
     public async Task<int?> CreateVariableAsync(string name, int clientId, int? stateMachineId, bool persistant, string? data, List<string>? mockingOptions)
     {
-        if (!_clients.TryGetValue(clientId, out var client))
+        if (_dataService.GetClients().FirstOrDefault(x => x.Id == clientId) == null)
         {
             return null;
         }
         var variableInfo = _variables.Values.FirstOrDefault(x => x.Variable.Name == name
         && (stateMachineId == null || x.Variable.StateMachineId == stateMachineId)
         && (stateMachineId != null || x.Variable.StateMachineId == null)
-        && client.Id == x.Variable.ClientId
+        && clientId == x.Variable.ClientId
         );
 
         if (variableInfo != null && string.Compare(data, variableInfo.Variable.Data) == 0)
@@ -102,7 +103,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         {
             variable = new()
             {
-                ClientId = client.Id,
+                ClientId = clientId,
                 Name = name,
                 StateMachineId = stateMachineId,
                 Persistant = persistant
@@ -152,6 +153,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         {
             _variables.AddOrUpdate(variable.Id, variableInfo, (_, _) => variableInfo);
         }
+        await _dataService.AddOrUpdateVariableValueAsync(variableInfo.VariableValue);
         await _messageBusService.PublishAsync(variableInfo);
     }
 
