@@ -60,7 +60,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     }
 
     private readonly object _lockEngineObject = new object();
-    private Jint.Engine? _engine = null;
+    private List<Jint.Engine> _engines = [];
     private SystemMethods? _systemMethods = null;
     private bool _readyForTriggers = false;
 
@@ -78,19 +78,22 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         Stop();
     }
 
-    private void DisposeEngine()
+    private void DisposeEngines()
     {
-        _engine?.Dispose();
-        _engine = null;
+        foreach(var engine in _engines)
+        {
+            engine.Dispose();
+        }
+        _engines.Clear();
     }
 
     public void Restart()
     {
         Stop();
-        Start();
+        Start(true);
     }
 
-    public void Start()
+    public void Start(bool asMainStateMachine)
     {
         _readyForTriggers = false;
         if (StateMachine.Enabled)
@@ -100,19 +103,20 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                 _currentState = null;
                 if (ValidateModel(StateMachine))
                 {
-                    _engine = new Jint.Engine();
+                    var engine = new Jint.Engine();
+                    _engines.Add(engine);
                     _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
-                    _engine.SetValue("system", _systemMethods);
+                    engine.SetValue("system", _systemMethods);
 
                     try
                     {
-                        _engine.Execute(BuildEngineScript(StateMachine));
+                        engine.Execute(BuildEngineScript(StateMachine, asMainStateMachine));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }
                     catch (Exception e)
                     {
-                        DisposeEngine();
+                        DisposeEngines();
                         ErrorMessage = $"Error initializing statemachine: {e.Message}";
                         RunningState = StateMachineRunningState.Error;
                     }
@@ -137,7 +141,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         lock (_lockEngineObject)
         {
             RunningState = StateMachineRunningState.NotRunning;
-            DisposeEngine();
+            DisposeEngines();
         }
     }
 
@@ -172,11 +176,11 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
         lock (_lockEngineObject)
         {
-            if (RunningState == StateMachineRunningState.Running && _engine != null)
+            if (RunningState == StateMachineRunningState.Running && _engines.Any())
             {
                 try
                 {
-                    _engine.Invoke("schedule");
+                    _engines[_engines.Count-1].Invoke("schedule");
                 }
                 catch (Exception e)
                 {
@@ -242,7 +246,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     public string? ExecuteScript(string script)
     {
         string? result = null;
-        if (_engine != null)
+        if (_engines.Any())
         {
             var autoResetEvent = new AutoResetEvent(false);
             Task.Run(() =>
@@ -251,7 +255,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                 {
                     try
                     {
-                        var jsValue = _engine.Evaluate(script);
+                        var jsValue = _engines[0].Evaluate(script);
                         if (jsValue == null)
                         {
                             result = "null";
@@ -290,11 +294,14 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return result;
     }
 
-    public string BuildEngineScript(StateMachine stateMachine)
+    public string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine)
     {
         var script = new StringBuilder();
 
+        script.AppendLine($"var isMainStateMachine = {asMainStateMachine.ToString().ToLower()}");
+        script.AppendLine();
         script.AppendLine(SystemScript);
+        script.AppendLine();
 
         foreach (var state in stateMachine.States)
         {
@@ -355,6 +362,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
             script.AppendLine($"stateTransitionMap.push({{'fromState': '{fromState.Id.ToString("N")}', 'transition': '{transition.Id.ToString("N")}', 'toState': '{toState.Id.ToString("N")}'}})");
         }
+        script.AppendLine();
 
         script.AppendLine(""""
             function schedule() {
