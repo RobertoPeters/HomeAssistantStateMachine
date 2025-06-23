@@ -43,6 +43,16 @@ public class SystemMethods
         return client?.Id ?? -1;
     }
 
+    public void setRunningStateToFinished()
+    {
+        _stateMachineHandler.RunningState = StateMachineHandler.StateMachineRunningState.Finished;
+    }
+
+    public void setCurrentState(string stateName)
+    {
+        _stateMachineHandler.CurrentState = stateName;
+    }
+
     public const string SystemScript = """"
 
     log = function(message) {

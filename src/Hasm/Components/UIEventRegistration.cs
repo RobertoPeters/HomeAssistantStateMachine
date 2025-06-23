@@ -7,6 +7,7 @@ public class UIEventRegistration
     public event EventHandler<IClientHandler>? ClientHandlerChanged;
     public event EventHandler<StateMachineHandler>? StateMachineHandlerChanged;
     public event EventHandler<StateMachineHandler.LogEntry>? LogEntryAdded;
+    public event EventHandler<StateMachineHandler.StateMachineHandlerInfo>? StateMachineHandlerInfoChanged;
     public event EventHandler<List<VariableService.VariableInfo>>? VariablesChanged;
 
     public void Handle(IClientHandler clientHandler)
@@ -22,6 +23,11 @@ public class UIEventRegistration
     public void Handle(StateMachineHandler.LogEntry logEntry)
     {
         LogEntryAdded?.Invoke(this, logEntry);
+    }
+
+    public void Handle(StateMachineHandler.StateMachineHandlerInfo stateMachineHandlerInfo)
+    {
+        StateMachineHandlerInfoChanged?.Invoke(this, stateMachineHandlerInfo);
     }
 
     public void Handle(List<VariableService.VariableInfo> variables)
@@ -45,6 +51,11 @@ public class UIEventRegistrationMessageHandler
     public void Handle(StateMachineHandler.LogEntry logEntry, UIEventRegistration uiEventRegistration)
     {
         uiEventRegistration.Handle(logEntry);
+    }
+
+    public void Handle(StateMachineHandler.StateMachineHandlerInfo stateMachineHandlerInfo, UIEventRegistration uiEventRegistration)
+    {
+        uiEventRegistration.Handle(stateMachineHandlerInfo);
     }
 
     public void Handle(VariableService.VariableInfo variable, UIEventRegistration uiEventRegistration)

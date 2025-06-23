@@ -34,7 +34,7 @@ OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 </style>
 @if (StateMachine != null)
 {
-    <span>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState?.Name ?? "-"))</span>
+    <span>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState ?? "-"))</span>
     @if (!string.IsNullOrWhiteSpace(StateMachineHandler?.ErrorMessage))
     {
         <p>@StateMachineHandler.ErrorMessage</p>
@@ -129,6 +129,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         UIEventRegistration.LogEntryAdded += LogEvent;
+        UIEventRegistration.StateMachineHandlerInfoChanged += StateMachineHandlerInfoChanged;
         ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
@@ -340,10 +341,15 @@ else
         link.AddLabel(transition.Description ?? transition.Condition ?? "true");
     }
 
+    private void StateMachineHandlerInfoChanged(object? sender, Services.StateMachineHandler.StateMachineHandlerInfo stateMachineInfo)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
         UIEventRegistration.LogEntryAdded += LogEvent;
-        //StateMachineHandler.StateChanged -= StateChanged;
+        UIEventRegistration.StateMachineHandlerInfoChanged -= StateMachineHandlerInfoChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
     }

@@ -9,6 +9,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     {
         NotRunning,
         Running,
+        Finished,
         Error
     }
 
@@ -17,6 +18,13 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
         public int StateMachineId { get; set; }
         public string Message { get; set; } = null!;
+    }
+
+    public class StateMachineHandlerInfo
+    {
+        public int StateMachineId { get; set; }
+        public string? CurrentState { get; set; }
+        public StateMachineRunningState? RunningState { get; set; }
     }
 
     public StateMachine StateMachine { get; private set; } = _stateMachine;
@@ -28,24 +36,30 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         get => _runningState;
         set
         {
-            _runningState = value;
-        }
-    }
-
-    private State? _currentState = null;
-    public State? CurrentState
-    {
-        get => _currentState;
-        private set
-        {
-            if (value?.Id != _currentState?.Id)
+            if (_runningState != value)
             {
-                _currentState = value;
+                _runningState = value;
+                PublishStateMachineHandlerInfo();
             }
         }
     }
 
-    private readonly object _lockObject = new object();
+    private string? _currentState = null;
+    public string? CurrentState
+    {
+        get => _currentState;
+        set
+        {
+            if (_currentState != value)
+            {
+                _currentState = value;
+                RequestTriggerStateMachine();
+                PublishStateMachineHandlerInfo();
+            }
+        }
+    }
+
+    private readonly object _lockEngineObject = new object();
     private Jint.Engine? _engine = null;
     private SystemMethods? _systemMethods = null;
     private bool _readyForTriggers = false;
@@ -81,10 +95,10 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         _readyForTriggers = false;
         if (StateMachine.Enabled)
         {
-            lock (_lockObject)
+            lock (_lockEngineObject)
             {
                 _currentState = null;
-                if (ValidateModel())
+                if (ValidateModel(StateMachine))
                 {
                     _engine = new Jint.Engine();
                     _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
@@ -94,8 +108,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                     {
                         _engine.Execute(BuildEngineScript(StateMachine));
                         RunningState = StateMachineRunningState.Running;
-                        _engine.Invoke("preScheduleAction");
-                        ChangeToState(GetStartState());
+                        RequestTriggerStateMachine();
                     }
                     catch (Exception e)
                     {
@@ -121,11 +134,35 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     public void Stop()
     {
         _readyForTriggers = false;
-        lock (_lockObject)
+        lock (_lockEngineObject)
         {
             RunningState = StateMachineRunningState.NotRunning;
             DisposeEngine();
-            ChangeToState(null);
+        }
+    }
+
+    public Task Handle(List<VariableService.VariableInfo> variableInfos)
+    {
+        RequestTriggerStateMachine();
+        return Task.CompletedTask;
+    }
+
+    private long _triggering = 0;
+    private readonly object _triggerLock = new object();
+    private void RequestTriggerStateMachine()
+    {
+        var count = Interlocked.Read(ref _triggering);
+        if (count < 3)
+        {
+            Interlocked.Increment(ref _triggering);
+            Task.Factory.StartNew(() =>
+            {
+                lock (_triggerLock)
+                {
+                    TriggerProcess();
+                }
+                Interlocked.Decrement(ref _triggering);
+            });
         }
     }
 
@@ -133,31 +170,17 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     {
         if (!_readyForTriggers) return;
 
-        lock (_lockObject)
+        lock (_lockEngineObject)
         {
-            if (RunningState == StateMachineRunningState.Running && CurrentState != null && _engine != null)
+            if (RunningState == StateMachineRunningState.Running && _engine != null)
             {
-                Transition? activeTransition = null;
                 try
                 {
-                    _engine.Invoke("preScheduleAction");
-                    var transitions = StateMachine.Transitions
-                        .Where(t => t.FromStateId == CurrentState.Id)
-                        .ToList();
-                    foreach (var transition in transitions)
-                    {
-                        activeTransition = transition;
-                        var condition = _engine.Evaluate(TransitionMethodName(transition)).ToObject();
-                        if ((bool)condition!)
-                        {
-                            ChangeToState(StateMachine.States.First(s => s.Id == transition.ToStateId));
-                            break;
-                        }
-                    }
+                    _engine.Invoke("schedule");
                 }
                 catch (Exception e)
                 {
-                    ErrorMessage = $"Error in transition ({activeTransition?.Description ?? activeTransition?.Condition}): {e.Message}";
+                    ErrorMessage = $"Error in script{e.Message}";
                     RunningState = StateMachineRunningState.Error;
                 }
             }
@@ -170,16 +193,16 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return Task.CompletedTask;
     }
 
-    private bool ValidateModel()
+    private bool ValidateModel(StateMachine stateMachine)
     {
         //do we have one start state?
-        if (GetStartState() == null)
+        if (GetStartState(stateMachine) == null)
         {
             return false;
         }
 
         //one rror state
-        var states = StateMachine.States.Where(x => x.IsErrorState).ToList();
+        var states = stateMachine.States.Where(x => x.IsErrorState).ToList();
         if (states.Count > 1)
         {
             return false;
@@ -188,9 +211,9 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return true;
     }
 
-    private State? GetStartState()
+    private State? GetStartState(StateMachine stateMachine)
     {
-        var states = StateMachine.States.Where(x => x.IsStartState).ToList();
+        var states = stateMachine.States.Where(x => x.IsStartState).ToList();
         if (states.Count == 1)
         {
             return states[0];
@@ -200,9 +223,9 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             return null;
         }
 
-        foreach (var state in StateMachine.States)
+        foreach (var state in stateMachine.States)
         {
-            if (!StateMachine.Transitions.Any(x => x.ToStateId == state.Id))
+            if (!stateMachine.Transitions.Any(x => x.ToStateId == state.Id))
             {
                 states.Add(state);
             }
@@ -224,7 +247,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             var autoResetEvent = new AutoResetEvent(false);
             Task.Run(() =>
             {
-                lock (_lockObject)
+                lock (_lockEngineObject)
                 {
                     try
                     {
@@ -313,35 +336,54 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         }
         script.AppendLine($"}}");
 
+        script.AppendLine();
+        script.AppendLine("var stateInfo = []");
+        foreach (var state in stateMachine.States)
+        {
+            script.AppendLine($"stateInfo['{state.Id.ToString("N")}'] = {{");
+            script.AppendLine($"'name': '{state.Name.Replace('\'', ' ')}',");
+            script.AppendLine($"'externalId': '{state.Id.ToString()}'");
+            script.AppendLine($"}}");
+        }
+        script.AppendLine("var currentState = null");
+        script.AppendLine($"var startState = '{GetStartState(stateMachine)?.Id.ToString("N")}'");
+
+        script.AppendLine("var stateTransitionMap = []");
+        foreach (var transition in stateMachine.Transitions)
+        {
+            var fromState = stateMachine.States.First(s => s.Id == transition.FromStateId);
+            var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
+            script.AppendLine($"stateTransitionMap.push({{'fromState': '{fromState.Id.ToString("N")}', 'transition': '{transition.Id.ToString("N")}', 'toState': '{toState.Id.ToString("N")}'}})");
+        }
 
         script.AppendLine(""""
-            var __currentState__ = null
-            var __startState__ = '8b145be8c9f746faa88cb6c4b0265b9d'
-            var __stateTransitionMap = [
-            {'fromState': '8b145be8c9f746faa88cb6c4b0265b9d', 'transition': '89b50a269dda44cc9caed82b95ffe7cf', 'toState': 'a3cf656fb30a4761b5c166339380037f'}
-            ]
-
-            function __schedule() {
+            function schedule() {
             	preScheduleAction()
-            	if (__currentState__ == null)
+            	if (currentState == null)
             	{
-            		__changeState(__startState__)
+            		changeState(startState)
             	}
             	else
             	{
-            	    var __transitions = __stateTransitionMap.filter((transition) => transition.fromState == __currentState__)
-            		var __successFulTransition = __transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
-            		if (__successFulTransition != null)
+            	    var transitions = stateTransitionMap.filter((transition) => transition.fromState == currentState)
+                    if (transitions.length == 0)
+                    {
+                       log('No transitions found for current state: ' + stateInfo[currentState].name)
+                       system.setRunningStateToFinished()
+                    }
+            		var successFulTransition = transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
+            		if (successFulTransition != null)
             		{
-            		    __changeState(__successFulTransition.toState)
+            		    changeState(successFulTransition.toState)
             		}
             	}
             }
 
-            function __changeState(state) {
-                log('changing state to: '+state)
+            function changeState(state) {
+                log('changing state to: ' + stateInfo[state].name)
             	eval('stateEntryAction'+state+'()')
-            	__currentState__ = state
+            	currentState = state
+                system.setCurrentState(stateInfo[state].name)
             }
             
             """");
@@ -351,24 +393,6 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         script.AppendLine($"{stateMachine.PreStartAction ?? ""}");
 
         return script.ToString();
-    }
-
-    private void ChangeToState(State? state)
-    {
-        AddLogAsync($"Changing state to {state?.Name ?? "null"}");
-        CurrentState = state;
-        if (RunningState == StateMachineRunningState.Running && _engine != null && state != null)
-        {
-            try
-            {
-                _engine.Invoke(StateEntryMethodName(state));
-            }
-            catch (Exception e)
-            {
-                ErrorMessage = $"Error in state entry action ({state.Name}): {e.Message}";
-                RunningState = StateMachineRunningState.Error;
-            }
-        }
     }
 
     private static string TransitionMethodName(Transition transition)
@@ -402,5 +426,16 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
             await _messageBusService.PublishAsync(logEvent);
         }
+    }
+
+    public void PublishStateMachineHandlerInfo()
+    {
+        var info = new StateMachineHandlerInfo
+        {
+            StateMachineId = StateMachine.Id,
+            CurrentState = CurrentState,
+            RunningState = RunningState
+        };
+        _messageBusService.PublishAsync(info);
     }
 }

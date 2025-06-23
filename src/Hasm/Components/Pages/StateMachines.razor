@@ -93,7 +93,7 @@
         public string Name => StateMachineHandler.StateMachine.Name;
         public bool Enabled => StateMachineHandler.StateMachine.Enabled;
         public string? Mode => StateMachineHandler.RunningState.ToString();
-        public string? State => StateMachineHandler.CurrentState?.Name;
+        public string? State => StateMachineHandler.CurrentState;
     }
     private readonly ConcurrentDictionary<int, StateMachineInfo> statemachines = [];
 
@@ -111,7 +111,14 @@
             statemachines.TryAdd(statemachine.StateMachine.Id, v);
         }
         UIEventRegistration.StateMachineHandlerChanged += StateMachineHandlerChanged;
+        UIEventRegistration.StateMachineHandlerInfoChanged += StateMachineHandlerInfoChanged;
         base.OnInitialized();
+    }
+
+    private void StateMachineHandlerInfoChanged(object? sender, Services.StateMachineHandler.StateMachineHandlerInfo stateMachineInfo)
+    {
+        InvokeAsync(grid!.Reload);
+        InvokeAsync(StateHasChanged);
     }
 
     private void StateMachineHandlerChanged(object? sender, StateMachineHandler stateMachineHandler)
@@ -139,6 +146,7 @@
 
     public void Dispose()
     {
+        UIEventRegistration.StateMachineHandlerInfoChanged -= StateMachineHandlerInfoChanged;
         UIEventRegistration.StateMachineHandlerChanged -= StateMachineHandlerChanged;
     }
 
