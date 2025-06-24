@@ -52,6 +52,14 @@
                                   Title="Name" />
 
             <RadzenDataGridColumn TItem="StateMachineInfo"
+                                  Property="@nameof(StateMachineInfo.IsSubStateMachine)"
+                                  Title="Sub state machine">
+                <Template Context="statemachine">
+                    @(statemachine.IsSubStateMachine ? "Yes" : "No")
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="StateMachineInfo"
                                   Property="@nameof(StateMachineInfo.Mode)"
                                   Title="Mode" />
 
@@ -63,7 +71,7 @@
                                   Property="@nameof(StateMachineInfo.Enabled)"
                                   Title="Enabled">
                 <Template Context="statemachine">
-                    @(statemachine.Enabled ? "Yes" : "No")
+                    @(statemachine.IsSubStateMachine ? "N/A" : (statemachine.Enabled ? "Yes" : "No"))
                 </Template>
             </RadzenDataGridColumn>
 
@@ -92,6 +100,7 @@
         public int Id => StateMachineHandler.StateMachine.Id;
         public string Name => StateMachineHandler.StateMachine.Name;
         public bool Enabled => StateMachineHandler.StateMachine.Enabled;
+        public bool IsSubStateMachine => StateMachineHandler.StateMachine.IsSubStateMachine;
         public string? Mode => StateMachineHandler.RunningState.ToString();
         public string? State => StateMachineHandler.CurrentState;
     }
