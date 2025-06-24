@@ -27,6 +27,12 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         public StateMachineRunningState? RunningState { get; set; }
     }
 
+    public class StateMachineEngineInfo
+    {
+        public StateMachine StateMachine { get; set; } = null!;
+        public Jint.Engine Engine { get; set; } = null!;
+    }
+
     public StateMachine StateMachine { get; private set; } = _stateMachine;
     public string? ErrorMessage { get; private set; }
 
@@ -60,7 +66,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     }
 
     private readonly object _lockEngineObject = new object();
-    private List<Jint.Engine> _engines = [];
+    private List<StateMachineEngineInfo> _engines = [];
     private SystemMethods? _systemMethods = null;
     private bool _readyForTriggers = false;
 
@@ -82,7 +88,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     {
         foreach(var engine in _engines)
         {
-            engine.Dispose();
+            engine.Engine.Dispose();
         }
         _engines.Clear();
     }
@@ -103,14 +109,18 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                 _currentState = null;
                 if (ValidateModel(StateMachine))
                 {
-                    var engine = new Jint.Engine();
+                    var engine = new StateMachineEngineInfo()
+                    {
+                        Engine = new Jint.Engine(),
+                        StateMachine = StateMachine
+                    };
                     _engines.Add(engine);
                     _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
-                    engine.SetValue("system", _systemMethods);
+                    engine.Engine.SetValue("system", _systemMethods);
 
                     try
                     {
-                        engine.Execute(BuildEngineScript(StateMachine, asMainStateMachine));
+                        engine.Engine.Execute(BuildEngineScript(StateMachine, asMainStateMachine));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }
@@ -180,7 +190,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             {
                 try
                 {
-                    _engines[_engines.Count-1].Invoke("schedule");
+                    _engines[_engines.Count-1].Engine.Invoke("schedule");
                 }
                 catch (Exception e)
                 {
@@ -255,7 +265,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                 {
                     try
                     {
-                        var jsValue = _engines[0].Evaluate(script);
+                        var jsValue = _engines[0].Engine.Evaluate(script);
                         if (jsValue == null)
                         {
                             result = "null";
@@ -349,7 +359,10 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         {
             script.AppendLine($"stateInfo['{state.Id.ToString("N")}'] = {{");
             script.AppendLine($"'name': '{state.Name.Replace('\'', ' ')}',");
-            script.AppendLine($"'externalId': '{state.Id.ToString()}'");
+            script.AppendLine($"'externalId': '{state.Id.ToString()}',");
+            script.AppendLine($"'isSubStateMachine': {state.IsSubState.ToString().ToLower()},");
+            script.AppendLine($"'isSubStateStarted': false");
+            script.AppendLine($"'isSubStateFinished': false");
             script.AppendLine($"}}");
         }
         script.AppendLine("var currentState = null");
@@ -392,6 +405,9 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             	eval('stateEntryAction'+state+'()')
             	currentState = state
                 system.setCurrentState(stateInfo[state].name)
+                if (stateInfo[state].isSubStateMachine) {
+                    stateInfo[state].isSubStateFinished = false;
+                }
             }
             
             """");
