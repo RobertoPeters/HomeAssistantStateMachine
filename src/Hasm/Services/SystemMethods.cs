@@ -43,14 +43,24 @@ public class SystemMethods
         return client?.Id ?? -1;
     }
 
-    public void setRunningStateToFinished()
+    public void setRunningStateToFinished(string instanceId)
     {
-        _stateMachineHandler.RunningState = StateMachineHandler.StateMachineRunningState.Finished;
+        _stateMachineHandler.SetRunningStateFinished(instanceId);
+    }
+
+    public bool isSubStateMachineRunning(string instanceId)
+    {
+        return _stateMachineHandler.IsSubStateMachineRunning(instanceId);
     }
 
     public void setCurrentState(string stateName)
     {
         _stateMachineHandler.CurrentState = stateName;
+    }
+
+    public void startSubStateMachine(string stateId, string instanceId)
+    {
+        _stateMachineHandler.StartSubStateMachine(stateId, instanceId);
     }
 
     public const string SystemScript = """"
@@ -59,6 +69,18 @@ public class SystemMethods
         system.log(message)
     }
     
+    //check if sub statemachine is running
+    subStateMachineRunning = function() {
+        return system.isSubStateMachineRunning(instanceId)
+    }
+    subStateMachineFinished = function() {
+        return !subStateMachineRunning()
+    }
+
+    startSubStateMachine = function(externalStateId, instanceId) {
+        system.startSubStateMachine(externalStateId, instanceId)
+    }
+           
     // returns the client id or -1 if not found
     getClientId = function(name) {
         return system.getClientId(name)

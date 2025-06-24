@@ -29,12 +29,84 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
     public class StateMachineEngineInfo
     {
+        public Guid Id { get; set; } = Guid.NewGuid();
         public StateMachine StateMachine { get; set; } = null!;
         public Jint.Engine Engine { get; set; } = null!;
     }
 
     public StateMachine StateMachine { get; private set; } = _stateMachine;
     public string? ErrorMessage { get; private set; }
+
+    public void SetRunningStateFinished(string instanceId)
+    {
+        var indexOfEngine = _engines.FindIndex(_engines => _engines.Id.ToString() == instanceId);
+        if (indexOfEngine < 0)
+        {
+            return;
+        }
+        if (indexOfEngine == 0)
+        {
+            RunningState = StateMachineRunningState.Finished;
+        }
+        else
+        {
+            //todo: pass output parameters to parent engine
+        }
+        while (_engines.Count > indexOfEngine)
+        {
+            _engines[_engines.Count - 1].Engine.Dispose();
+            _engines.RemoveAt(_engines.Count - 1);
+        }
+    }
+
+    public void StartSubStateMachine(string stateId, string instanceId)
+    {
+        var indexOfEngine = _engines.FindIndex(_engines => _engines.Id.ToString() == instanceId);
+        if (indexOfEngine < 0)
+        {
+            return;
+        }
+
+        var stateMachineId = _engines[indexOfEngine].StateMachine.States.Where(s => s.Id.ToString() == stateId).Select(x => x.SubStateMachineId).FirstOrDefault();
+        if (stateMachineId == null)
+        {
+            return;
+        }
+
+        if (_engines.Where(x => x.StateMachine.Id == stateMachineId).Any())
+        {
+            return;
+        }
+
+        var subStateMachine = _dataService.GetStateMachines().FirstOrDefault(x => x.Id == stateMachineId);
+        if (subStateMachine == null)
+        {
+            return;
+        }
+
+        var engine = new StateMachineEngineInfo()
+        {
+            Engine = new Jint.Engine(),
+            StateMachine = subStateMachine
+        };
+        _engines.Add(engine);
+        engine.Engine.SetValue("system", _systemMethods);
+
+        //todo: pass state parameters to sub state machine
+
+        engine.Engine.Execute(BuildEngineScript(subStateMachine, false, engine.Id));
+        RequestTriggerStateMachine();
+    }
+
+    public bool IsSubStateMachineRunning(string instanceId)
+    {
+        var indexOfEngine = _engines.FindIndex(_engines => _engines.Id.ToString() == instanceId);
+        if (indexOfEngine < 0)
+        {
+            return false;
+        }
+        return indexOfEngine < (_engines.Count - 1);
+    }
 
     private StateMachineRunningState _runningState = StateMachineRunningState.NotRunning;
     public StateMachineRunningState RunningState
@@ -86,7 +158,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
     private void DisposeEngines()
     {
-        foreach(var engine in _engines)
+        foreach (var engine in _engines)
         {
             engine.Engine.Dispose();
         }
@@ -120,7 +192,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
                     try
                     {
-                        engine.Engine.Execute(BuildEngineScript(StateMachine, asMainStateMachine));
+                        engine.Engine.Execute(BuildEngineScript(StateMachine, asMainStateMachine, engine.Id));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }
@@ -190,7 +262,12 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             {
                 try
                 {
-                    _engines[_engines.Count-1].Engine.Invoke("schedule");
+                    var index = 0;
+                    while (index < _engines.Count)
+                    {
+                        _engines[index].Engine.Invoke("schedule");
+                        index++;
+                    }
                 }
                 catch (Exception e)
                 {
@@ -304,11 +381,12 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return result;
     }
 
-    public string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine)
+    public string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine, Guid instanceId)
     {
         var script = new StringBuilder();
 
         script.AppendLine($"var isMainStateMachine = {asMainStateMachine.ToString().ToLower()}");
+        script.AppendLine($"var instanceId = '{instanceId.ToString()}'");
         script.AppendLine();
         script.AppendLine(SystemScript);
         script.AppendLine();
@@ -360,9 +438,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             script.AppendLine($"stateInfo['{state.Id.ToString("N")}'] = {{");
             script.AppendLine($"'name': '{state.Name.Replace('\'', ' ')}',");
             script.AppendLine($"'externalId': '{state.Id.ToString()}',");
-            script.AppendLine($"'isSubStateMachine': {state.IsSubState.ToString().ToLower()},");
-            script.AppendLine($"'isSubStateStarted': false");
-            script.AppendLine($"'isSubStateFinished': false");
+            script.AppendLine($"'isSubStateMachine': {state.IsSubState.ToString().ToLower()}");
             script.AppendLine($"}}");
         }
         script.AppendLine("var currentState = null");
@@ -390,7 +466,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                     if (transitions.length == 0)
                     {
                        log('No transitions found for current state: ' + stateInfo[currentState].name)
-                       system.setRunningStateToFinished()
+                       system.setRunningStateToFinished(instanceId)
                     }
             		var successFulTransition = transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
             		if (successFulTransition != null)
@@ -406,7 +482,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             	currentState = state
                 system.setCurrentState(stateInfo[state].name)
                 if (stateInfo[state].isSubStateMachine) {
-                    stateInfo[state].isSubStateFinished = false;
+                    startSubStateMachine(stateInfo[state].externalId, instanceId)
                 }
             }
             
@@ -435,8 +511,8 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         {
             var logEvent = new LogEntry
             {
-                 Timestamp = DateTime.UtcNow,
-                 StateMachineId = StateMachine.Id,
+                Timestamp = DateTime.UtcNow,
+                StateMachineId = StateMachine.Id,
             };
 
             if (logObject is string txt)
