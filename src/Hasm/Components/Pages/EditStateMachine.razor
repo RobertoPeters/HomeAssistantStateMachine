@@ -887,6 +887,9 @@ else
             state.EntryAction = result.EntryAction;
             state.IsErrorState = result.IsErrorState;
             state.IsStartState = result.IsStartState;
+            state.IsSubState = result.IsSubState;
+            state.SubStateParameters = result.SubStateParameters;
+            state.SubStateMachineId = result.SubStateMachineId;
 
             node.Title = state.Name;
             node.Refresh();
@@ -930,6 +933,8 @@ else
             StateMachine.Name = result.Name;
             StateMachine.PreScheduleAction = result.PreScheduleAction;
             StateMachine.PreStartAction = result.PreStartAction;
+            StateMachine.IsSubStateMachine = result.IsSubStateMachine;
+            StateMachine.SubStateMachineParameters = result.SubStateMachineParameters;
             //await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
         }
     }
@@ -944,7 +949,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
          {
-             dialog.Script = StateMachineHandler.BuildEngineScript(copy, true);
+             dialog.Script = StateMachineHandler.BuildEngineScript(copy, true, Guid.NewGuid());
          });
     }
 
