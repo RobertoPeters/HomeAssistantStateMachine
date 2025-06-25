@@ -73,8 +73,7 @@ OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
                 <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
                     @foreach (var data in logLines)
                     {
-                        <RadzenLabel Text="@(data.Time.ToString("HH:mm.ss.fff"))" />
-                        <pre>@data.Message</pre>
+                        <pre style="margin:0px;padding:0px;">@($"{data.Time.ToString("HH:mm.ss.fff")} {data.Message}")")</pre>
                     }
                 </div>
             </RadzenPanel>
