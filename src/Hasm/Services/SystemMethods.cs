@@ -17,9 +17,9 @@ public class SystemMethods
         _clients = new ConcurrentDictionary<int, Models.Client>(dataService.GetClients().ToDictionary(c => c.Id));
     }
 
-    public void log(object? message)
+    public void log(string instanceId, object? message)
     {
-        _stateMachineHandler.AddLogAsync(message).Wait();
+        _stateMachineHandler.AddLogAsync(instanceId, message).Wait();
     }
 
     public int createVariable(string name, int clientId, bool isStateMachineVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
@@ -66,7 +66,7 @@ public class SystemMethods
     public const string SystemScript = """"
 
     log = function(message) {
-        system.log(message)
+        system.log(instanceId, message)
     }
     
     //check if sub statemachine is running

@@ -24,12 +24,12 @@
 <PageTitle>HASM - Edit State Machine</PageTitle>
 
 <NavigationLock ConfirmExternalNavigation="true"
-OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+                OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
 <style>
     .rz-panel-titlebar {
-    flex-direction: row-reverse;
-    justify-content: left;
+        flex-direction: row-reverse;
+        justify-content: left;
     }
 </style>
 @if (StateMachine != null)
@@ -40,6 +40,16 @@ OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
         <p>@StateMachineHandler.ErrorMessage</p>
     }
     <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+        <RadzenSplitterPane Size="120px" Min="30px" Max="30%">
+            <RadzenPanelMenu>
+                <RadzenPanelMenuItem Text="Save" Icon="save" Click="@SaveAsync" />
+                <RadzenPanelMenuItem Text="Restart" Icon="restart_alt" Click="@Restart" />
+                <RadzenPanelMenuItem Text="Reload" Icon="refresh" Click="@ReloadDiagramAsync" />
+                <RadzenPanelMenuItem Text="Script" Icon="code" Click="@ShowStateMachineScriptEventCallback" />
+                <RadzenPanelMenuItem Text="Export" Icon="save_alt" Click="@ExportAsync" />
+                <RadzenPanelMenuItem Text="Properties" Icon="settings" Click="@EditStateMachineAsync" />
+            </RadzenPanelMenu>
+        </RadzenSplitterPane>
         <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
             <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
                 <CascadingValue Value="Diagram" IsFixed="true">
@@ -58,12 +68,12 @@ OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
                     <RadzenButton Size="ButtonSize.Small" Text="+" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 1.25))" />
                     <RadzenButton Size="ButtonSize.Small" Text="-" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 0.75))" />
                     <RadzenButton Size="ButtonSize.Small" Text="Reset" Click="@(() => Diagram.SetZoom(1.0))" />
-                    <RadzenButton Size="ButtonSize.Small" Text="Fit" Click="@(() => Diagram.ZoomToFit() )" />
+                    <RadzenButton Size="ButtonSize.Small" Text="Fit" Click="@(() => Diagram.ZoomToFit())" />
                 </div>
             </div>
             <div>
                 <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
-                <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Import" }})" />
+                <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string, object>() { { "aria-label", "Import" } })" />
             </div>
         </RadzenSplitterPane>
         <RadzenSplitterPane Min="50px">
@@ -132,13 +142,13 @@ else
         ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
-                {
-                    AllowMultiSelection = true,
-                    Zoom =
+        {
+            AllowMultiSelection = true,
+            Zoom =
                                                         {
                         Enabled = true
                                                         },
-                    Links =
+            Links =
                                                         {
                         DefaultRouter = new NormalRouter(),
                         DefaultPathGenerator = new SmoothPathGenerator(),
@@ -168,7 +178,7 @@ else
                             return linkModel;
                         }
                                                         }
-                };
+        };
 
         Diagram = new BlazorDiagram(options);
         var keyboardBehavior = Diagram.GetBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
@@ -183,7 +193,6 @@ else
         Diagram.PointerMove += DiagramPointerMove;
         Diagram.PointerDown += DiagramPointerDown;
         //StateMachineHandler.StateChanged += StateChanged;
-        //StateMachineHandler.Log += LogEvent;
 
         await ReloadDiagramAsync();
         await base.OnInitializedAsync();
@@ -312,9 +321,9 @@ else
         {
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
             var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
-                    {
-                        Title = state.Name
-                    });
+            {
+                Title = state.Name
+            });
 
             node.AddPort(PortAlignment.Bottom);
             node.AddPort(PortAlignment.Top);
@@ -372,9 +381,9 @@ else
         StateMachine.States.Add(state);
 
         var node = Diagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
-                {
-                    Title = state.Name
-                });
+        {
+            Title = state.Name
+        });
 
         node.AddPort(PortAlignment.Bottom);
         node.AddPort(PortAlignment.Top);
@@ -390,10 +399,10 @@ else
         {
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnNodeContextMenuItemClick">
-        <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
-        <RadzenMenuItem Text="Copy" Value="3" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
-        <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
-    </RadzenMenu>);
+                <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+                <RadzenMenuItem Text="Copy" Value="3" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
+                <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
+            </RadzenMenu>);
         }
         else if (modelOnPointerUp is LinkModel link)
         {
@@ -404,54 +413,54 @@ else
 
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnLinkContextMenuItemClick">
-        <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
-        <RadzenMenuItem Text="Delete" Value="4"></RadzenMenuItem>
-        <RadzenMenuItem Text="Move Start To" Value="3">
-            @foreach (var state in StateMachine.States.Where(x => x.Id != targetState.Id).ToList())
-        {
-            <RadzenMenuItem Text="@(state.Name)" Value="21">
-                <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
-                <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
-                <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
-                <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
-            </RadzenMenuItem>
-        }
-        </RadzenMenuItem>
-        <RadzenMenuItem Text="Move End To" Value="2">
-            @foreach (var state in StateMachine.States.Where(x => x.Id != sourceState.Id).ToList())
-        {
-            <RadzenMenuItem Text="@(state.Name)" Value="21">
-                <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
-                <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
-                <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
-                <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
-            </RadzenMenuItem>
-        }
-        </RadzenMenuItem>
-    </RadzenMenu>
+                <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+                <RadzenMenuItem Text="Delete" Value="4"></RadzenMenuItem>
+                <RadzenMenuItem Text="Move Start To" Value="3">
+                    @foreach (var state in StateMachine.States.Where(x => x.Id != targetState.Id).ToList())
+                    {
+                        <RadzenMenuItem Text="@(state.Name)" Value="21">
+                            <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
+                            <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
+                            <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
+                            <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
+                        </RadzenMenuItem>
+                    }
+                </RadzenMenuItem>
+                <RadzenMenuItem Text="Move End To" Value="2">
+                    @foreach (var state in StateMachine.States.Where(x => x.Id != sourceState.Id).ToList())
+                    {
+                        <RadzenMenuItem Text="@(state.Name)" Value="21">
+                            <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
+                            <RadzenMenuItem Text="@(PortAlignment.Left.ToString())" Value="@((int)(30 + PortAlignment.Left))"></RadzenMenuItem>
+                            <RadzenMenuItem Text="@(PortAlignment.Bottom.ToString())" Value="@((int)(30 + PortAlignment.Bottom))"></RadzenMenuItem>
+                            <RadzenMenuItem Text="@(PortAlignment.Right.ToString())" Value="@((int)(30 + PortAlignment.Right))"></RadzenMenuItem>
+                        </RadzenMenuItem>
+                    }
+    </RadzenMenuItem>
+</RadzenMenu>
         );
         }
         else
         {
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnContextMenuItemClick">
-        <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
-        <RadzenMenuItem Text="Add state" Value="1"></RadzenMenuItem>
-        <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
-        <RadzenMenuItem Text="Copy" Value="8">
-            <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
-            <RadzenMenuItem Text="All states and transitions" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())" Value="10"></RadzenMenuItem>
-            <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
-        </RadzenMenuItem>
-        <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
-        <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
-        <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
-        <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())"></RadzenMenuItem>
-        <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
-        <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
-        <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
-        <RadzenMenuItem Text="Export" Value="7"></RadzenMenuItem>
-    </RadzenMenu>
+    <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
+    <RadzenMenuItem Text="Add state" Value="1"></RadzenMenuItem>
+    <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
+    <RadzenMenuItem Text="Copy" Value="8">
+        <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
+        <RadzenMenuItem Text="All states and transitions" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())" Value="10"></RadzenMenuItem>
+        <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
+    </RadzenMenuItem>
+    <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
+    <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
+    <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
+    <RadzenMenuItem Text="Export" Value="7"></RadzenMenuItem>
+</RadzenMenu>
     );
         }
     }
@@ -634,9 +643,9 @@ else
             Diagram.SelectModel(Diagram.Nodes.Where(x => x.Title == state.Name).First(), false);
         }
 
-        foreach(var transition in transitions)
+        foreach (var transition in transitions)
         {
-            if (transition.FromStateId== null || transition.ToStateId == null) continue;
+            if (transition.FromStateId == null || transition.ToStateId == null) continue;
 
             LinkUIData? uiData = null;
             if (!string.IsNullOrWhiteSpace(transition.UIData))
@@ -829,11 +838,11 @@ else
                 if (transition == null)
                 {
                     transition = new()
-                        {
-                            FromStateId = sourceState.Id,
-                            ToStateId = targetState.Id,
-                            Id = Guid.NewGuid(),
-                        };
+                    {
+                        FromStateId = sourceState.Id,
+                        ToStateId = targetState.Id,
+                        Id = Guid.NewGuid(),
+                    };
                     StateMachine.Transitions.Add(transition);
                     await EditTransitionAsync(link);
                 }
@@ -948,7 +957,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
          {
-             dialog.Script = StateMachineHandler.BuildEngineScript(copy, true, Guid.NewGuid());
+             dialog.Script = EngineScriptBuilder.BuildEngineScript(copy, true, Guid.NewGuid());
          });
     }
 
