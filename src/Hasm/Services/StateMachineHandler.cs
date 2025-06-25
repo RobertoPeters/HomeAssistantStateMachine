@@ -94,7 +94,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
         //todo: pass state parameters to sub state machine
 
-        engine.Engine.Execute(BuildEngineScript(subStateMachine, false, engine.Id));
+        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id));
         RequestTriggerStateMachine();
     }
 
@@ -179,7 +179,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             lock (_lockEngineObject)
             {
                 _currentState = null;
-                if (ValidateModel(StateMachine))
+                if (EngineScriptBuilder.ValidateModel(StateMachine))
                 {
                     var engine = new StateMachineEngineInfo()
                     {
@@ -192,7 +192,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
                     try
                     {
-                        engine.Engine.Execute(BuildEngineScript(StateMachine, asMainStateMachine, engine.Id));
+                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(StateMachine, asMainStateMachine, engine.Id));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }
@@ -284,52 +284,6 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return Task.CompletedTask;
     }
 
-    private bool ValidateModel(StateMachine stateMachine)
-    {
-        //do we have one start state?
-        if (GetStartState(stateMachine) == null)
-        {
-            return false;
-        }
-
-        //one rror state
-        var states = stateMachine.States.Where(x => x.IsErrorState).ToList();
-        if (states.Count > 1)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private State? GetStartState(StateMachine stateMachine)
-    {
-        var states = stateMachine.States.Where(x => x.IsStartState).ToList();
-        if (states.Count == 1)
-        {
-            return states[0];
-        }
-        else if (states.Count > 1)
-        {
-            return null;
-        }
-
-        foreach (var state in stateMachine.States)
-        {
-            if (!stateMachine.Transitions.Any(x => x.ToStateId == state.Id))
-            {
-                states.Add(state);
-            }
-        }
-
-        if (states.Count == 1)
-        {
-            return states[0];
-        }
-
-        return null;
-    }
-
     public string? ExecuteScript(string script)
     {
         string? result = null;
@@ -379,130 +333,6 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             autoResetEvent.Dispose();
         }
         return result;
-    }
-
-    public string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine, Guid instanceId)
-    {
-        var script = new StringBuilder();
-
-        script.AppendLine($"var isMainStateMachine = {asMainStateMachine.ToString().ToLower()}");
-        script.AppendLine($"var instanceId = '{instanceId.ToString()}'");
-        script.AppendLine();
-        script.AppendLine(SystemScript);
-        script.AppendLine();
-
-        foreach (var state in stateMachine.States)
-        {
-            script.AppendLine();
-            script.AppendLine($"//State Entry [{state.Name}]");
-            script.AppendLine($"function {StateEntryMethodName(state)}() {{ ");
-            if (state.EntryAction != null)
-            {
-                var allLines = state.EntryAction.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in allLines)
-                {
-                    script.AppendLine($"  {line}");
-                }
-            }
-            script.AppendLine($"}}");
-        }
-
-        foreach (var transition in stateMachine.Transitions)
-        {
-            script.AppendLine();
-            var fromState = stateMachine.States.First(s => s.Id == transition.FromStateId);
-            var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
-            script.AppendLine($"//Transition from [{fromState.Name}] to [{toState.Name}]");
-            script.AppendLine($"function {TransitionMethodName(transition)}() {{ ");
-            script.AppendLine($"  return {transition.Condition ?? "true"} ;");
-            script.AppendLine($"}}");
-        }
-
-        script.AppendLine();
-        script.AppendLine($"//Pre schedule action");
-        script.AppendLine($"function preScheduleAction() {{ ");
-        if (stateMachine.PreScheduleAction != null)
-        {
-            var allLines = stateMachine.PreScheduleAction.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in allLines)
-            {
-                script.AppendLine($"  {line}");
-            }
-        }
-        script.AppendLine($"}}");
-
-        script.AppendLine();
-        script.AppendLine("var stateInfo = []");
-        foreach (var state in stateMachine.States)
-        {
-            script.AppendLine($"stateInfo['{state.Id.ToString("N")}'] = {{");
-            script.AppendLine($"'name': '{state.Name.Replace('\'', ' ')}',");
-            script.AppendLine($"'externalId': '{state.Id.ToString()}',");
-            script.AppendLine($"'isSubStateMachine': {state.IsSubState.ToString().ToLower()}");
-            script.AppendLine($"}}");
-        }
-        script.AppendLine("var currentState = null");
-        script.AppendLine($"var startState = '{GetStartState(stateMachine)?.Id.ToString("N")}'");
-
-        script.AppendLine("var stateTransitionMap = []");
-        foreach (var transition in stateMachine.Transitions)
-        {
-            var fromState = stateMachine.States.First(s => s.Id == transition.FromStateId);
-            var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
-            script.AppendLine($"stateTransitionMap.push({{'fromState': '{fromState.Id.ToString("N")}', 'transition': '{transition.Id.ToString("N")}', 'toState': '{toState.Id.ToString("N")}'}})");
-        }
-        script.AppendLine();
-
-        script.AppendLine(""""
-            function schedule() {
-            	preScheduleAction()
-            	if (currentState == null)
-            	{
-            		changeState(startState)
-            	}
-            	else
-            	{
-            	    var transitions = stateTransitionMap.filter((transition) => transition.fromState == currentState)
-                    if (transitions.length == 0)
-                    {
-                       log('No transitions found for current state: ' + stateInfo[currentState].name)
-                       system.setRunningStateToFinished(instanceId)
-                    }
-            		var successFulTransition = transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
-            		if (successFulTransition != null)
-            		{
-            		    changeState(successFulTransition.toState)
-            		}
-            	}
-            }
-
-            function changeState(state) {
-                log('changing state to: ' + stateInfo[state].name)
-            	eval('stateEntryAction'+state+'()')
-            	currentState = state
-                system.setCurrentState(stateInfo[state].name)
-                if (stateInfo[state].isSubStateMachine) {
-                    startSubStateMachine(stateInfo[state].externalId, instanceId)
-                }
-            }
-            
-            """");
-
-        script.AppendLine();
-        script.AppendLine("// Pre-start statemachine action");
-        script.AppendLine($"{stateMachine.PreStartAction ?? ""}");
-
-        return script.ToString();
-    }
-
-    private static string TransitionMethodName(Transition transition)
-    {
-        return $"transitionResult{transition.Id.ToString("N")}";
-    }
-
-    private static string StateEntryMethodName(State state)
-    {
-        return $"stateEntryAction{state.Id.ToString("N")}";
     }
 
     public async Task AddLogAsync(object? logObject)

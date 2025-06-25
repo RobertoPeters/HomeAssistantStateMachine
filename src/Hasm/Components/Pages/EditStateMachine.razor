@@ -948,7 +948,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
          {
-             dialog.Script = StateMachineHandler.BuildEngineScript(copy, true, Guid.NewGuid());
+             dialog.Script = EngineScriptBuilder.BuildEngineScript(copy, true, Guid.NewGuid());
          });
     }
 
