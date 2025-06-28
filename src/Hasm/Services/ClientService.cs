@@ -4,7 +4,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class ClientService(DataService _dataService, MessageBusService _messageBusService)
+public class ClientService(DataService _dataService, VariableService _variableService, MessageBusService _messageBusService)
 {
     private readonly ConcurrentDictionary<int, IClientHandler> _handlers = [];
 
@@ -99,7 +99,7 @@ public class ClientService(DataService _dataService, MessageBusService _messageB
                 clientHandler = new GenericClientHandler(client);
                 break;
             case Models.ClientType.Timer:
-                clientHandler = new TimerClientHandler(client);
+                clientHandler = new TimerClientHandler(client, _variableService);
                 break;
         }
         if (clientHandler != null)

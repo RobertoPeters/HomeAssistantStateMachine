@@ -129,6 +129,7 @@ else
     {
         UIEventRegistration.LogEntryAdded += LogEvent;
         UIEventRegistration.StateMachineHandlerInfoChanged += StateMachineHandlerInfoChanged;
+        UIEventRegistration.StateMachineHandlerChanged += StateMachineHandlerChanged;
         ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
@@ -182,9 +183,7 @@ else
         Diagram.PointerUp += DiagramPointerUpAsync;
         Diagram.PointerMove += DiagramPointerMove;
         Diagram.PointerDown += DiagramPointerDown;
-        //StateMachineHandler.StateChanged += StateChanged;
-        //StateMachineHandler.Log += LogEvent;
-
+ 
         await ReloadDiagramAsync();
         await base.OnInitializedAsync();
     }
@@ -345,8 +344,25 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private void StateMachineHandlerChanged(object? sender, StateMachineHandler stateMachine)
+    {
+        InvokeAsync(async () =>
+        {
+            _unsavedChanges = false;
+            if (stateMachine.StateMachine.Id < 0)
+            {
+                NavigationManager.NavigateTo("\\");
+            }
+            else
+            {
+                await ReloadDiagramAsync();
+            }
+        });
+    }
+
     public void Dispose()
     {
+        UIEventRegistration.StateMachineHandlerChanged -= StateMachineHandlerChanged;
         UIEventRegistration.LogEntryAdded += LogEvent;
         UIEventRegistration.StateMachineHandlerInfoChanged -= StateMachineHandlerInfoChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
@@ -993,7 +1009,6 @@ else
         }
         AddUIDataToStatesAndTransitions();
         await DataService.AddOrUpdateStateMachineAsync(StateMachine);
-        //await StateMachineService.UpdateMachineStateAsync(StateMachine);
         //await ReloadDiagramAsync();
     }
 

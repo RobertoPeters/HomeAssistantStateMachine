@@ -75,7 +75,7 @@
 			<RadzenDataGridColumn TItem="VariableService.VariableInfo"
 								  Filterable="false"
 								  Property="VariableValue.Update"
-								  Title="Update" >
+								  Title="Update">
 				<Template Context="variable">
 					@(variable.VariableValue.Update.ToLocalTime().ToString("ddd dd MMM HH:mm.sss"))
 				</Template>
@@ -114,6 +114,7 @@
 		variables = new ConcurrentDictionary<int, VariableService.VariableInfo>(VariableService.GetVariables().ToDictionary(x => x.Variable.Id, x => x));
 		gridData = variables.Values.ToList();
 		UIEventRegistration.VariablesChanged += VariablesChanged;
+		UIEventRegistration.VariableValuesChanged += VariableValuesChanged;
 		UIEventRegistration.ClientHandlerChanged += ClientHandlerChanged;
 		UIEventRegistration.StateMachineHandlerChanged += StateMachineHandlerChanged;
 		if (Client != null)
@@ -131,6 +132,18 @@
 			grid.Data = gridData;
 			grid!.Reload();
 		}
+	}
+
+	private void VariableValuesChanged(object? sender, List<VariableService.VariableValueInfo> variablesInfos)
+	{
+		foreach (var variable in variablesInfos)
+		{
+			this.variables.AddOrUpdate(variable.Variable.Id, variable, (_, _) => variable);
+		}
+		InvokeAsync(() =>
+		{
+			grid?.Reload();
+		});
 	}
 
 	private void VariablesChanged(object? sender, List<VariableService.VariableInfo> variablesInfos)
@@ -206,6 +219,7 @@
 
 	public void Dispose()
 	{
+		UIEventRegistration.VariableValuesChanged -= VariableValuesChanged;
 		UIEventRegistration.StateMachineHandlerChanged -= StateMachineHandlerChanged;
 		UIEventRegistration.ClientHandlerChanged -= ClientHandlerChanged;
 		UIEventRegistration.VariablesChanged += VariablesChanged;

@@ -29,7 +29,7 @@ public class SystemMethods
 
     public bool setVariableValue(int variableId, string? value)
     {
-        return _variableService.SetVariableValueAsync(variableId, value).Result;
+        return _variableService.SetVariableValueAsync([(variableId, value)]).Result;
     }
 
     public string? getVariableValue(int variableId)

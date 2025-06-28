@@ -15,6 +15,10 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         public string? Value => IsMocking ? MockingValue?.Value : VariableValue.Value;
     }
 
+    public class VariableValueInfo : VariableInfo
+    {
+    }
+
     private ConcurrentDictionary<int, VariableInfo> _variables = [];
 
     public Task StartAsync()
@@ -58,21 +62,28 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         return variableInfo;
     }
 
-    public async Task<bool> SetVariableValueAsync(int variableId, string? value)
+
+    public async Task<bool> SetVariableValueAsync(List<(int variableId, string? value)> vaiableValues)
     {
-        if (_variables.TryGetValue(variableId, out var variableInfo))
+        List<VariableValueInfo> updatedVariables = [];
+        foreach(var (variableId, value) in vaiableValues)
         {
-            if (string.Compare(value, variableInfo.VariableValue.Value) == 0)
+            if (_variables.TryGetValue(variableId, out var variableInfo))
             {
-                return false;
+                if (string.Compare(value, variableInfo.VariableValue.Value) != 0)
+                {
+                    variableInfo.VariableValue.Value = value;
+                    variableInfo.VariableValue.Update = DateTime.UtcNow;
+                    await _dataService.AddOrUpdateVariableValueAsync(variableInfo.VariableValue);
+                    updatedVariables.Add((VariableValueInfo)variableInfo);
+                }
             }
-            variableInfo.VariableValue.Value = value;
-            variableInfo.VariableValue.Update = DateTime.UtcNow;
-            await _dataService.AddOrUpdateVariableValueAsync(variableInfo.VariableValue);
-            await _messageBusService.PublishAsync(variableInfo);
-            return true;
         }
-        return false;
+        if (updatedVariables.Any())
+        {
+            await _messageBusService.PublishAsync(updatedVariables);
+        }
+        return true;
     }
 
     public async Task DeleteVariableAsync(int variableId)
