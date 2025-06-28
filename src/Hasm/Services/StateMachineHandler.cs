@@ -103,33 +103,8 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         foreach(var parameter in subStateMachine.SubStateMachineParameters)
         {
             var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
-            string? srcVariableValue = null;
             var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
-            if (jsValue == null)
-            {
-                srcVariableValue = "null";
-            }
-            else
-            {
-                var obj = jsValue.ToObject();
-                if (obj == null)
-                {
-                    srcVariableValue = "null";
-                }
-                else if (obj is string s)
-                {
-                    srcVariableValue = s;
-                }
-                else if (obj.GetType().IsValueType)
-                {
-                    srcVariableValue = obj.ToString();
-                }
-                else
-                {
-                    srcVariableValue = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
-                }
-            }
-
+            var srcVariableValue = JsValueToString(jsValue);
             machineStateParameters.Add((variableName: parameter.Name, variableValue: srcVariableValue));
         }
 
@@ -336,30 +311,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                     try
                     {
                         var jsValue = _engines[0].Engine.Evaluate(script);
-                        if (jsValue == null)
-                        {
-                            result = "null";
-                        }
-                        else
-                        {
-                            var obj = jsValue.ToObject();
-                            if (obj == null)
-                            {
-                                result = "null";
-                            }
-                            else if (obj is string s)
-                            {
-                                result = s;
-                            }
-                            else if (obj.GetType().IsValueType)
-                            {
-                                result = obj.ToString();
-                            }
-                            else
-                            {
-                                result = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
-                            }
-                        }
+                        result = JsValueToString(jsValue);
                     }
                     catch (Exception e)
                     {
@@ -372,6 +324,36 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             autoResetEvent.Dispose();
         }
         return result;
+    }
+
+    private string JsValueToString(JsValue? jsValue)
+    {
+        string result;
+        if (jsValue == null)
+        {
+            result = "null";
+        }
+        else
+        {
+            var obj = jsValue.ToObject();
+            if (obj == null)
+            {
+                result = "null";
+            }
+            else if (obj is string s)
+            {
+                result = s;
+            }
+            else if (obj.GetType().IsValueType)
+            {
+                result = obj.ToString();
+            }
+            else
+            {
+                result = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
+            }
+        }
+        return result!;
     }
 
     public async Task AddLogAsync(string instanceId, object? logObject)
