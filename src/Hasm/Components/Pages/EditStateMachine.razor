@@ -83,7 +83,7 @@
                 <div style="width: 100%;height: 800px;border: 1px solid black; overflow: scroll">
                     @foreach (var data in logLines)
                     {
-                        <pre style="margin:0px;padding:0px;">@($"{data.Time.ToString("HH:mm.ss.fff")} {data.Message}")")</pre>
+                        <pre style="margin:0px;padding:0px;">@($"{data.Time.ToString("HH:mm.ss.fff")} {data.Message}")</pre>
                     }
                 </div>
             </RadzenPanel>
@@ -255,13 +255,14 @@ else
         {
             var result = executeCommand;
             result = result + "\r\n";
-            if (StateMachineHandler?.RunningState != StateMachineHandler.StateMachineRunningState.Running)
+            if (StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running 
+                || StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Finished)
             {
-                result = result + "error: state machine not running";
+                result = result + StateMachineHandler.ExecuteScript(executeCommand);
             }
             else
             {
-                result = result + StateMachineHandler.ExecuteScript(executeCommand);
+                result = result + "error: state machine not running";
             }
             executeCommand = result;
             InvokeAsync(StateHasChanged);
@@ -974,7 +975,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
          {
-             dialog.Script = EngineScriptBuilder.BuildEngineScript(copy, true, Guid.NewGuid());
+             dialog.Script = EngineScriptBuilder.BuildEngineScript(copy, true, Guid.NewGuid(), null);
          });
     }
 

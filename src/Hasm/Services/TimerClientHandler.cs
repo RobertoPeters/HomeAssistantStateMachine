@@ -100,7 +100,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
         //idea: remove timer variables on start to reduce slack variables
         //for now, we just set them to null
         CountdownTimers = new ConcurrentDictionary<int, CountdownTimer>(variables);
-        await _variableService.SetVariableValueAsync(
+        await _variableService.SetVariableValuesAsync(
             CountdownTimers.Values
                 .Where(x => x.Start != null && x.Duration != null)
                 .Select(x => (variableId: x.Variable.Id, value: (string?)null))
@@ -125,7 +125,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
             {
                 if (timer.IsRunning)
                 {
-                    var value = (int)(DateTime.UtcNow - timer.Start!.Value.Add(timer.Duration!.Value)).TotalSeconds;
+                    var value = (int)Math.Round((timer.Start!.Value.Add(timer.Duration!.Value) - DateTime.UtcNow).TotalSeconds);
                     if (value < 0)
                     {
                         value = 0;
@@ -141,7 +141,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
         }
         if (updatedValues.Any())
         {
-            await _variableService.SetVariableValueAsync(updatedValues);
+            await _variableService.SetVariableValuesAsync(updatedValues);
         }
     }
 

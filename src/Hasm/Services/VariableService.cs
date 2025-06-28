@@ -63,7 +63,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
     }
 
 
-    public async Task<bool> SetVariableValueAsync(List<(int variableId, string? value)> vaiableValues)
+    public async Task<bool> SetVariableValuesAsync(List<(int variableId, string? value)> vaiableValues)
     {
         List<VariableValueInfo> updatedVariables = [];
         foreach(var (variableId, value) in vaiableValues)
@@ -75,7 +75,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
                     variableInfo.VariableValue.Value = value;
                     variableInfo.VariableValue.Update = DateTime.UtcNow;
                     await _dataService.AddOrUpdateVariableValueAsync(variableInfo.VariableValue);
-                    updatedVariables.Add((VariableValueInfo)variableInfo);
+                    updatedVariables.Add(variableInfo.CopyObjectToOtherType<VariableInfo, VariableValueInfo>()!);
                 }
             }
         }
@@ -102,12 +102,12 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         && clientId == x.Variable.ClientId
         );
 
-        if (variableInfo != null
-            && string.Compare(data, variableInfo.Variable.Data) == 0
-            && persistant == variableInfo.Variable.Persistant)
-        {
-            return variableInfo.Variable.Id;
-        }
+        //if (variableInfo != null
+        //    && string.Compare(data, variableInfo.Variable.Data) == 0
+        //    && persistant == variableInfo.Variable.Persistant)
+        //{
+        //    return variableInfo.Variable.Id;
+        //}
 
         var variable = variableInfo?.Variable;
         var variableValue = variableInfo?.VariableValue;

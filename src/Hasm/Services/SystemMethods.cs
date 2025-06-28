@@ -29,7 +29,7 @@ public class SystemMethods
 
     public bool setVariableValue(int variableId, string? value)
     {
-        return _variableService.SetVariableValueAsync([(variableId, value)]).Result;
+        return _variableService.SetVariableValuesAsync([(variableId, value)]).Result;
     }
 
     public string? getVariableValue(int variableId)
@@ -102,10 +102,15 @@ public class SystemMethods
     }
     
     var genericClientId = getClientId('Generic')
-    
+    var timerClientId = getClientId('Timer')
+        
     createGenericVariable = function(name, value, mockingOptions) {
         return createVariable(name, genericClientId, true, true, value, mockingOptions)
     }
 
+    createTimerVariable = function(name, seconds) {
+        return createVariable(name, timerClientId, true, false, seconds, [0, 10])
+    }
+    
     """";
 }

@@ -5,12 +5,22 @@ namespace Hasm.Services;
 
 public static class EngineScriptBuilder
 {
-    public static string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine, Guid instanceId)
+    public static string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine, Guid instanceId, List<(string variableName, string? variableValue)>? machineStateParameters)
     {
         var script = new StringBuilder();
 
         script.AppendLine($"var isMainStateMachine = {asMainStateMachine.ToString().ToLower()}");
         script.AppendLine($"var instanceId = '{instanceId.ToString()}'");
+        script.AppendLine();
+        if (machineStateParameters != null && machineStateParameters.Count > 0)
+        {
+            foreach (var parameter in machineStateParameters)
+            {
+                script.AppendLine($"var {parameter.variableName} = {parameter.variableValue ?? "null"}");
+            }
+            script.AppendLine();
+        }
+
         script.AppendLine();
         script.AppendLine(SystemMethods.SystemScript);
         script.AppendLine();

@@ -1,5 +1,6 @@
-﻿using Hasm.Models;
-using System.Text;
+﻿using System.Text;
+using Hasm.Models;
+using Jint.Native;
 
 namespace Hasm.Services;
 
@@ -52,7 +53,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         {
             //todo: pass output parameters to parent engine
         }
-        while (_engines.Count > indexOfEngine)
+        while (_engines.Count > indexOfEngine && _engines.Count > 1)
         {
             _engines[_engines.Count - 1].Engine.Dispose();
             _engines.RemoveAt(_engines.Count - 1);
@@ -67,7 +68,13 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             return;
         }
 
-        var stateMachineId = _engines[indexOfEngine].StateMachine.States.Where(s => s.Id.ToString() == stateId).Select(x => x.SubStateMachineId).FirstOrDefault();
+        var stateState = _engines[indexOfEngine].StateMachine.States.Where(s => s.Id.ToString() == stateId).FirstOrDefault();
+        if (stateState == null)
+        {
+            return;
+        }
+
+        var stateMachineId = stateState.SubStateMachineId;
         if (stateMachineId == null)
         {
             return;
@@ -92,9 +99,41 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         _engines.Add(engine);
         engine.Engine.SetValue("system", _systemMethods);
 
-        //todo: pass state parameters to sub state machine
+        List<(string variableName, string? variableValue)> machineStateParameters = [];
+        foreach(var parameter in subStateMachine.SubStateMachineParameters)
+        {
+            var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
+            string? srcVariableValue = null;
+            var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
+            if (jsValue == null)
+            {
+                srcVariableValue = "null";
+            }
+            else
+            {
+                var obj = jsValue.ToObject();
+                if (obj == null)
+                {
+                    srcVariableValue = "null";
+                }
+                else if (obj is string s)
+                {
+                    srcVariableValue = s;
+                }
+                else if (obj.GetType().IsValueType)
+                {
+                    srcVariableValue = obj.ToString();
+                }
+                else
+                {
+                    srcVariableValue = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
+                }
+            }
 
-        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id));
+            machineStateParameters.Add((variableName: parameter.Name, variableValue: srcVariableValue));
+        }
+
+        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id, machineStateParameters));
         RequestTriggerStateMachine();
     }
 
@@ -174,7 +213,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     public void Start(bool asMainStateMachine)
     {
         _readyForTriggers = false;
-        if (StateMachine.Enabled)
+        if (StateMachine.Enabled || StateMachine.IsSubStateMachine)
         {
             lock (_lockEngineObject)
             {
@@ -192,7 +231,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
                     try
                     {
-                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(StateMachine, asMainStateMachine, engine.Id));
+                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(StateMachine, asMainStateMachine, engine.Id, null));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }
