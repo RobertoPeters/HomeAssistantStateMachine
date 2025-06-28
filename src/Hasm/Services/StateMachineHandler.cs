@@ -335,10 +335,12 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return result;
     }
 
-    public async Task AddLogAsync(object? logObject)
+    public async Task AddLogAsync(string instanceId, object? logObject)
     {
         if (logObject != null)
         {
+            var indexOfEngine = _engines.FindIndex(_engines => _engines.Id.ToString() == instanceId);
+            var prefix = $"[{string.Join("].[", _engines.Take(indexOfEngine+1).Select(e => e.StateMachine.Name))}]";
             var logEvent = new LogEntry
             {
                 Timestamp = DateTime.UtcNow,
@@ -353,6 +355,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             {
                 logEvent.Message = System.Text.Json.JsonSerializer.Serialize(logObject, logJsonOptions);
             }
+            logEvent.Message = $"{prefix}: {logEvent.Message}";
 
             await _messageBusService.PublishAsync(logEvent);
         }
