@@ -67,6 +67,11 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
         await CreateHassWSApiAsync();
     }
 
+    public Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    {
+        return Task.FromResult(false);
+    }
+
     private async Task DisposeHassApiAsync()
     {
         _reconnectTimer?.Dispose();

@@ -11,7 +11,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
     public class CountdownTimer
     {
         public Variable Variable { get; set; }
-        public DateTime? Start { get; set; }
+        public DateTime? StartTime { get; set; }
         public TimeSpan? Duration { get; set; }
         public bool IsRunning { get; set; }
 
@@ -22,6 +22,23 @@ public class TimerClientHandler(Client _client, VariableService _variableService
             {
                 Duration = TimeSpan.FromSeconds(seconds);
             }
+        }
+
+        public bool Start()
+        {
+            if (Duration == null)
+            {
+                return false;
+            }
+            StartTime = DateTime.UtcNow;
+            IsRunning = true;
+            return true;
+        }
+
+        public void Stop()
+        {
+            IsRunning = false;
+            StartTime = null;
         }
     }
 
@@ -38,26 +55,19 @@ public class TimerClientHandler(Client _client, VariableService _variableService
                 if (CountdownTimers.TryGetValue(variable.Variable.Id, out var cdtimer))
                 {
                     cdtimer.Variable = variable.Variable;
+                    cdtimer.Stop();
                     if (int.TryParse(variable.Variable.Data, out var seconds))
                     {
                         cdtimer.Duration = TimeSpan.FromSeconds(seconds);
-                        cdtimer.Start = DateTime.UtcNow;
-                        cdtimer.IsRunning = true;
                     }
                     else
                     {
                         cdtimer.Duration = null;
-                        cdtimer.IsRunning = false;
                     }
                 }
                 else
                 {
                     cdtimer = new CountdownTimer(variable.Variable);
-                    if (cdtimer.Duration != null)
-                    {
-                        cdtimer.Start = DateTime.UtcNow;
-                        cdtimer.IsRunning = true;
-                    }
                     CountdownTimers.TryAdd(variable.Variable.Id, cdtimer);
                 }
             }
@@ -97,12 +107,10 @@ public class TimerClientHandler(Client _client, VariableService _variableService
                 .Where(x => x.Variable.ClientId == _client.Id)
                 .Select(x => new CountdownTimer(x.Variable))
                 .ToDictionary(x => x.Variable.Id, x => x);
-        //idea: remove timer variables on start to reduce slack variables
-        //for now, we just set them to null
         CountdownTimers = new ConcurrentDictionary<int, CountdownTimer>(variables);
         await _variableService.SetVariableValuesAsync(
             CountdownTimers.Values
-                .Where(x => x.Start != null && x.Duration != null)
+                .Where(x => x.StartTime != null && x.Duration != null)
                 .Select(x => (variableId: x.Variable.Id, value: (string?)null))
                 .ToList()
         );
@@ -115,6 +123,27 @@ public class TimerClientHandler(Client _client, VariableService _variableService
         await StartAsync();
     }
 
+    public Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    {
+        if (variableId == null || !CountdownTimers.TryGetValue(variableId.Value, out var timer))
+        {
+            return Task.FromResult(false);
+        }
+        var result = true;
+        switch (command.ToLower())
+        {
+            case "start":
+                result = timer.Start();
+                break;
+            case "stop":
+                timer.Stop();
+                break;
+            default:
+                result = false;
+                break;
+        }
+        return Task.FromResult(result);
+    }
 
     private async void CheckCountdownTimers(object? state)
     {
@@ -125,7 +154,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
             {
                 if (timer.IsRunning)
                 {
-                    var value = (int)Math.Round((timer.Start!.Value.Add(timer.Duration!.Value) - DateTime.UtcNow).TotalSeconds);
+                    var value = (int)Math.Round((timer.StartTime!.Value.Add(timer.Duration!.Value) - DateTime.UtcNow).TotalSeconds);
                     if (value < 0)
                     {
                         value = 0;

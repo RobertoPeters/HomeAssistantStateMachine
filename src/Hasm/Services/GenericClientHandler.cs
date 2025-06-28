@@ -32,4 +32,10 @@ public class GenericClientHandler(Client _client) : IClientHandler
         _client = client;
         await StartAsync();
     }
+
+    public Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    {
+        return Task.FromResult(false);
+    }
+
 }

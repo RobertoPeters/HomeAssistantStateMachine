@@ -7,6 +7,7 @@ public class SystemMethods
 {
     private readonly VariableService _variableService;
     private readonly StateMachineHandler _stateMachineHandler;
+    private readonly ClientService _clientService;
     private readonly ConcurrentDictionary<int, Models.Client> _clients;
 
     public SystemMethods(ClientService clientService, DataService dataService, VariableService variableService, StateMachineHandler stateMachineHandler)
@@ -14,6 +15,7 @@ public class SystemMethods
 
         _variableService = variableService;
         _stateMachineHandler = stateMachineHandler;
+        _clientService = clientService;
         _clients = new ConcurrentDictionary<int, Models.Client>(dataService.GetClients().ToDictionary(c => c.Id));
     }
 
@@ -41,6 +43,11 @@ public class SystemMethods
     {
         var client = _clients.Values.FirstOrDefault(c => c.Name == name);
         return client?.Id ?? -1;
+    }
+
+    public bool ClientExecuteAsync(int clientId, int? variableId, string command, string? parameter)
+    {
+        return _clientService.ExecuteAsync(clientId, variableId, command, parameter).Result;
     }
 
     public void setRunningStateToFinished(string instanceId)
@@ -86,6 +93,11 @@ public class SystemMethods
         return system.getClientId(name)
     }
 
+    //execute specific client commands (-1 if it fails)
+    executeOnClient = function(clientId, variableId, command, parameter) {
+        return system.clientExecuteAsync(clientId, variableId, command, parameter)
+    }
+
     // creates a variable and returns the variable id (-1 if it fails)
     createVariable = function(name, clientId, isStateMachineVariable, persistant, data, mockingOptions) {
         return system.createVariable(name, clientId, isStateMachineVariable, persistant, data, mockingOptions)
@@ -111,6 +123,16 @@ public class SystemMethods
     createTimerVariable = function(name, seconds) {
         return createVariable(name, timerClientId, true, false, seconds, [0, 10])
     }
+
+    startTimer = function(variableId) {
+        return executeOnClient(timerClientId, variableId, 'start')
+    }
+
+    cancelTimer = function(variableId) {
+        return executeOnClient(timerClientId, variableId, 'stop')
+    }
+    stopTimer = cancelTimer
     
+
     """";
 }

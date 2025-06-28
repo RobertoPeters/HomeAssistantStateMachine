@@ -102,12 +102,12 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         && clientId == x.Variable.ClientId
         );
 
-        //if (variableInfo != null
-        //    && string.Compare(data, variableInfo.Variable.Data) == 0
-        //    && persistant == variableInfo.Variable.Persistant)
-        //{
-        //    return variableInfo.Variable.Id;
-        //}
+        if (variableInfo != null
+            && string.Compare(data, variableInfo.Variable.Data) == 0
+            && persistant == variableInfo.Variable.Persistant)
+        {
+            return variableInfo.Variable.Id;
+        }
 
         var variable = variableInfo?.Variable;
         var variableValue = variableInfo?.VariableValue;
