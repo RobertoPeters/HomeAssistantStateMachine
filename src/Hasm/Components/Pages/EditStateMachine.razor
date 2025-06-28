@@ -255,13 +255,14 @@ else
         {
             var result = executeCommand;
             result = result + "\r\n";
-            if (StateMachineHandler?.RunningState != StateMachineHandler.StateMachineRunningState.Running)
+            if (StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running 
+                || StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Finished)
             {
-                result = result + "error: state machine not running";
+                result = result + StateMachineHandler.ExecuteScript(executeCommand);
             }
             else
             {
-                result = result + StateMachineHandler.ExecuteScript(executeCommand);
+                result = result + "error: state machine not running";
             }
             executeCommand = result;
             InvokeAsync(StateHasChanged);

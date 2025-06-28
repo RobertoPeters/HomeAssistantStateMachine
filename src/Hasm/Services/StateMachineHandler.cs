@@ -52,7 +52,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         {
             //todo: pass output parameters to parent engine
         }
-        while (_engines.Count > indexOfEngine)
+        while (_engines.Count > indexOfEngine && _engines.Count > 1)
         {
             _engines[_engines.Count - 1].Engine.Dispose();
             _engines.RemoveAt(_engines.Count - 1);

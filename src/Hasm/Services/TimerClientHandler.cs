@@ -125,7 +125,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
             {
                 if (timer.IsRunning)
                 {
-                    var value = (int)(DateTime.UtcNow - timer.Start!.Value.Add(timer.Duration!.Value)).TotalSeconds;
+                    var value = (int)Math.Round((timer.Start!.Value.Add(timer.Duration!.Value) - DateTime.UtcNow).TotalSeconds);
                     if (value < 0)
                     {
                         value = 0;
