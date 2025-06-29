@@ -51,7 +51,25 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         }
         else
         {
-            //todo: pass output parameters to parent engine
+            //get the parameter mappings
+            //we need the current state of the parent state machine
+            var parentEngine = _engines[indexOfEngine - 1];
+            var parentStateId = JsValueToString(parentEngine.Engine.Evaluate("stateInfo[currentState].externalId"));
+            var parentState = parentEngine.StateMachine.States.FirstOrDefault(s => s.Id.ToString() == parentStateId);
+            if (parentState != null)
+            {
+                foreach (var parameter in _engines[indexOfEngine].StateMachine.SubStateMachineParameters.Where(x => x.IsOutput).ToList())
+                {
+                    var subScriptVariableName = parentState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
+                    var parentScriptVariableName = parameter.ScriptVariableName;
+                    if (!string.IsNullOrWhiteSpace(subScriptVariableName) && !string.IsNullOrWhiteSpace(parentScriptVariableName))
+                    {
+                        var jsValue = _engines[indexOfEngine].Engine.Evaluate(parentScriptVariableName);
+                        var srcVariableValue = JsValueToString(jsValue, true);
+                        parentEngine.Engine.Evaluate($"{subScriptVariableName} = {srcVariableValue}");
+                    }
+                }
+            }
         }
         while (_engines.Count > indexOfEngine && _engines.Count > 1)
         {
@@ -100,11 +118,11 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         engine.Engine.SetValue("system", _systemMethods);
 
         List<(string variableName, string? variableValue)> machineStateParameters = [];
-        foreach(var parameter in subStateMachine.SubStateMachineParameters)
+        foreach(var parameter in subStateMachine.SubStateMachineParameters.Where(x => x.IsInput).ToList())
         {
             var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
             var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
-            var srcVariableValue = JsValueToString(jsValue);
+            var srcVariableValue = JsValueToString(jsValue, true);
             machineStateParameters.Add((variableName: parameter.Name, variableValue: srcVariableValue));
         }
 
@@ -326,7 +344,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         return result;
     }
 
-    private string JsValueToString(JsValue? jsValue)
+    private string JsValueToString(JsValue? jsValue, bool autoStringQuotes = false)
     {
         string result;
         if (jsValue == null)
@@ -342,7 +360,14 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             }
             else if (obj is string s)
             {
-                result = s;
+                if (autoStringQuotes)
+                {
+                    result = $"'{s}'";
+                }
+                else
+                {
+                    result = s;
+                }
             }
             else if (obj.GetType().IsValueType)
             {
