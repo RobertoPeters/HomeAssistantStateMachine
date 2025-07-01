@@ -123,7 +123,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
             var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
             var srcVariableValue = JsValueToString(jsValue, true);
-            machineStateParameters.Add((variableName: parameter.Name, variableValue: srcVariableValue));
+            machineStateParameters.Add((variableName: parameter.ScriptVariableName, variableValue: srcVariableValue));
         }
 
         engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id, machineStateParameters));

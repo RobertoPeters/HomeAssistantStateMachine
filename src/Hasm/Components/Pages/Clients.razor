@@ -14,9 +14,7 @@
 
 @if (gridData != null)
 {
-	<RadzenButton Size="ButtonSize.Small" Text="Add Generic Client" Click="@(() => AddOrEditClientAsync(null, Models.ClientType.Generic))" />
-	<RadzenButton Size="ButtonSize.Small" Text="Add Timer Client" Click="@(() => AddOrEditClientAsync(null, Models.ClientType.Timer))" />
-	<RadzenButton Size="ButtonSize.Small" Text="Add HA Client" Click="@(() => AddOrEditClientAsync(null, Models.ClientType.HomeAssistant))" />
+	<RadzenButton Size="ButtonSize.Small" Text="Add Client" Click="@(() => AddOrEditClientAsync(null))" />
 
 	<RadzenDataGrid @ref="grid" AllowFiltering="true"
 					AllowColumnResize="true"
@@ -56,7 +54,7 @@
 								  Title="">
 
 				<Template Context="client">
-					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Edit" Click="@(() => AddOrEditClientAsync(client, null))" />
+					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Edit" Click="@(() => AddOrEditClientAsync(client))" />
 					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Text="Delete" Click="@(() => OnDeleteAsync(client))" />
 				</Template>
 			</RadzenDataGridColumn>
@@ -115,28 +113,11 @@
 		}
 	}
 
-	private async Task AddOrEditClientAsync(IClientHandler? client, Models.ClientType? clientType)
+	private async Task AddOrEditClientAsync(IClientHandler? client)
 	{
-		if ((clientType ?? client?.Client.ClientType) == Models.ClientType.Generic)
+		await DialogService.ShowDialogAsync<Dialogs.AddOrEditClientDialog>($"{(client == null ? "Add" : "Edit")} Client", dialog =>
 		{
-			await DialogService.ShowDialogAsync<Dialogs.AddOrEditGenericClientDialog>($"{(client == null ? "Add" : "Edit")} Generic Client", dialog =>
-			{
-				dialog.Id = client?.Client.Id;
-			});
-		}
-		else if ((clientType ?? client?.Client.ClientType) == Models.ClientType.Timer)
-		{
-			await DialogService.ShowDialogAsync<Dialogs.AddOrEditTimerClientDialog>($"{(client == null ? "Add" : "Edit")} Timer Client", dialog =>
-			{
-				dialog.Id = client?.Client.Id;
-			});
-		}
-		else if ((clientType ?? client?.Client.ClientType) == Models.ClientType.HomeAssistant)
-		{
-			await DialogService.ShowDialogAsync<Dialogs.AddOrEditHAClientDialog>($"{(client == null ? "Add" : "Edit")} Home Assistant Client", dialog =>
-			{
-				dialog.Id = client?.Client.Id;
-			});
-		}
+			dialog.Id = client?.Client.Id;
+		});
 	}
 }

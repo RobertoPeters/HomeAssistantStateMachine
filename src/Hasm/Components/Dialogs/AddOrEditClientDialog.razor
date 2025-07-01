@@ -1,0 +1,110 @@
+﻿@using Hasm.Models
+@using Hasm.Services
+@inject DataService DataService
+@inherits DialogBase
+
+@if (Model != null)
+{
+    <RadzenTemplateForm @ref="Form" Data="@Model" TItem="Client">
+        <RadzenStack>
+            <RadzenFormField Text="Type *" Variant="@Variant.Outlined">
+                <ChildContent>
+                    <RadzenDropDown Data="(Models.ClientType[])Enum.GetValues(typeof(Models.ClientType))" @bind-Value="@Model!.ClientType" Name="ClientType" Disabled=@(Id != null) />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="ClientType" Text="This field is required" />
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Enabled" Variant="@Variant.Outlined">
+                <RadzenRadioButtonList @bind-Value="@Model!.Enabled" TValue="bool" class="rz-m-4 rz-mt-8">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                        <RadzenRadioButtonListItem Text="No" Value="false" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </RadzenFormField>
+            <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@Model!.Name" Name="Name" Placeholder="name" spellcheck="false" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Name" Text="This field is required" />
+                    <RadzenCustomValidator Component="Name" Validator="@(() => !ExistingClientNames.Contains(Model!.Name))" Text="Name should be unique" />
+                </Helper>
+            </RadzenFormField>
+            @if (Model.ClientType == ClientType.HomeAssistant)
+            {
+                <RadzenFormField Text="Host *" Variant="@Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@HAClientProperties!.Host" Name="Host" Placeholder="http://localhost:8123" spellcheck="false" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Host" Text="This field is required" />
+                    </Helper>
+                </RadzenFormField>
+                <RadzenFormField Text="Token *" Variant="@Variant.Outlined">
+                    <ChildContent>
+                        <RadzenPassword @bind-Value="@HAClientProperties!.Token" Name="Token" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Token" Text="This field is required" />
+                    </Helper>
+                </RadzenFormField>
+            }
+            <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+        </RadzenStack>
+    </RadzenTemplateForm>
+}
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    [Parameter]
+    public int? Id { get; set; }
+
+    [Parameter]
+    public HashSet<string> ExistingClientNames { get; set; } = [];
+
+    private Client? Model;
+    private HAClientHandler.ClientProperties HAClientProperties = new();
+    private RadzenTemplateForm<Client>? Form;
+
+    protected override void OnInitialized()
+    {
+        var allClients = DataService.GetClients();
+        if (Id == null)
+        {
+            Model = new();
+        }
+        else
+        {
+            Model = allClients.First(x => x.Id == Id).CopyObject();
+            if (!string.IsNullOrWhiteSpace(Model!.Data) && Model.ClientType == ClientType.HomeAssistant)
+            {
+                HAClientProperties = System.Text.Json.JsonSerializer.Deserialize<HAClientHandler.ClientProperties>(Model.Data) ?? new();
+            }
+        }
+        ExistingClientNames = allClients.Where(x => x.Id != Id).Select(x => x.Name).ToHashSet();
+
+        base.OnInitialized();
+    }
+
+    async Task OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            if (Model!.ClientType == ClientType.HomeAssistant)
+            {
+                Model!.Data = System.Text.Json.JsonSerializer.Serialize(HAClientProperties);
+            }
+            await DataService.AddOrUpdateClientAsync(Model);
+            Close();
+        }
+        ;
+    }
+
+}
