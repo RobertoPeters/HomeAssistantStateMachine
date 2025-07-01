@@ -123,17 +123,26 @@ public class TimerClientHandler(Client _client, VariableService _variableService
         await StartAsync();
     }
 
-    public Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    public async Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
     {
         if (variableId == null || !CountdownTimers.TryGetValue(variableId.Value, out var timer))
         {
-            return Task.FromResult(false);
+            return false;
         }
         var result = true;
         switch (command.ToLower())
         {
             case "start":
                 result = timer.Start();
+                if (timer.IsRunning)
+                {
+                    var value = (int)Math.Round((timer.StartTime!.Value.Add(timer.Duration!.Value) - DateTime.UtcNow).TotalSeconds);
+                    if (value < 0)
+                    {
+                        value = 0;
+                    }
+                    await _variableService.SetVariableValuesAsync([(variableId: timer.Variable.Id, value: value.ToString())]);
+                }
                 break;
             case "stop":
                 timer.Stop();
@@ -142,7 +151,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
                 result = false;
                 break;
         }
-        return Task.FromResult(result);
+        return result;
     }
 
     private async void CheckCountdownTimers(object? state)

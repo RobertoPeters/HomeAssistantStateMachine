@@ -38,6 +38,14 @@ public class StateMachineService(DataService _dataService, ClientService _client
         }
     }
 
+    public async Task Handle(List<VariableService.VariableValueInfo> variableValueInfos)
+    {
+        foreach (var stateMachineHandler in _handlers.Values.ToList())
+        {
+            await stateMachineHandler.Handle(variableValueInfos);
+        }
+    }
+
     public async Task Handle(StateMachine stateMachine)
     {
         StateMachineHandler? stateMachineHandler = null;
@@ -105,5 +113,10 @@ public class StateMachineServiceMessageHandler
     public async Task Handle(List<VariableService.VariableInfo> variableInfos, StateMachineService stateMachineService)
     {
         await stateMachineService.Handle(variableInfos);
+    }
+
+    public async Task Handle(List<VariableService.VariableValueInfo> variableValueInfos, StateMachineService stateMachineService)
+    {
+        await stateMachineService.Handle(variableValueInfos);
     }
 }

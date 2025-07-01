@@ -76,6 +76,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             _engines[_engines.Count - 1].Engine.Dispose();
             _engines.RemoveAt(_engines.Count - 1);
         }
+        RequestTriggerStateMachine();
     }
 
     public void StartSubStateMachine(string stateId, string instanceId)
@@ -123,7 +124,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
             var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
             var srcVariableValue = JsValueToString(jsValue, true);
-            machineStateParameters.Add((variableName: parameter.Name, variableValue: srcVariableValue));
+            machineStateParameters.Add((variableName: parameter.ScriptVariableName, variableValue: srcVariableValue));
         }
 
         engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id, machineStateParameters));
@@ -199,6 +200,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
     public void Restart()
     {
+        ErrorMessage = null;
         Stop();
         Start(true);
     }
@@ -260,6 +262,12 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     }
 
     public Task Handle(List<VariableService.VariableInfo> variableInfos)
+    {
+        RequestTriggerStateMachine();
+        return Task.CompletedTask;
+    }
+
+    public Task Handle(List<VariableService.VariableValueInfo> variableValueInfos)
     {
         RequestTriggerStateMachine();
         return Task.CompletedTask;

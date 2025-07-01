@@ -8,7 +8,7 @@ public static class EngineScriptBuilder
     public static string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine, Guid instanceId, List<(string variableName, string? variableValue)>? machineStateParameters)
     {
         var script = new StringBuilder();
-
+        script.AppendLine("var global = this");
         script.AppendLine($"var isMainStateMachine = {asMainStateMachine.ToString().ToLower()}");
         script.AppendLine($"var instanceId = '{instanceId.ToString()}'");
         script.AppendLine();
