@@ -970,9 +970,10 @@ else
         {
             copy.States.Remove(state);
         }
-        await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("State Machine Script", dialog =>
+        await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Machine Script", dialog =>
          {
              dialog.Script = StateMachineHandler.BuildEngineScript(copy);
+             dialog.ReadOnly = true;
          });
     }
 

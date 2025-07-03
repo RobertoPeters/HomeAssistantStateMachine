@@ -21,6 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="BlazorMonaco" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
 		<PackageReference Include="Radzen.Blazor" />

@@ -1,0 +1,28 @@
+﻿@page "/systemscript"
+
+<PageTitle>HASM - System Script</PageTitle>
+
+<h1>System Script</h1>
+
+<style>
+    #my-code-editor {
+        height: 800px;
+    }
+</style>
+
+<StandaloneCodeEditor Id="my-code-editor"
+                      ConstructionOptions="EditorConstructionOptions" />
+
+@code {
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "javascript",
+            Value = Services.StateMachineHandler.SystemScript ?? "",
+            ReadOnly = true
+        };
+    }
+
+}

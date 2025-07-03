@@ -98,10 +98,16 @@
             </RadzenFormField>
         }
         <RadzenFormField Text="Pre Start Action" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.PreStartAction" Name="PreStartAction" Rows="10" spellcheck="false" />
+            <div class="textarea-wrapper">
+                <RadzenTextArea @bind-Value="@Model!.PreStartAction" Name="PreStartAction" Rows="10" Style="width: 100%;" spellcheck="false" />
+                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPreStartActionAsync"></RadzenIcon>
+            </div>
         </RadzenFormField>
         <RadzenFormField Text="Pre Schedule Action" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.PreScheduleAction" Name="PreScheduleAction" Rows="10" spellcheck="false" />
+            <div class="textarea-wrapper">
+                <RadzenTextArea @bind-Value="@Model!.PreScheduleAction" Name="PreScheduleAction" Rows="10" Style="width: 100%;" spellcheck="false" />
+                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPreScheduleActionAsync"></RadzenIcon>
+            </div>
         </RadzenFormField>
     </RadzenStack>
     <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
@@ -147,10 +153,35 @@
 
     async Task OnSystemScriptAsync()
     {
-        await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("System Script", dialog =>
+        await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("System Script", dialog =>
         {
             dialog.Script = Services.StateMachineHandler.SystemScript;
+            dialog.ReadOnly = true;
         });
+    }
+
+    async Task EditPreStartActionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
+        {
+            dialog.Script = Model!.PreStartAction;
+        });
+        if (result != null)
+        {
+            Model!.PreStartAction = result;
+        }
+    }
+
+    async Task EditPreScheduleActionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Schedule Action", dialog =>
+        {
+            dialog.Script = Model!.PreScheduleAction;
+        });
+        if (result != null)
+        {
+            Model!.PreScheduleAction = result;
+        }
     }
 
     void Reset()

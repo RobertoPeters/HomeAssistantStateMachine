@@ -65,9 +65,10 @@
 
     async Task OnSystemScriptAsync()
     {
-        await DialogService.ShowDialogAsync<Dialogs.ShowScriptDialog>("System Script", dialog =>
+        await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("System Script", dialog =>
         {
-           dialog.Script = Services.StateMachineHandler.SystemScript;
+            dialog.Script = Services.StateMachineHandler.SystemScript;
+            dialog.ReadOnly = true;
         });
     }
 
