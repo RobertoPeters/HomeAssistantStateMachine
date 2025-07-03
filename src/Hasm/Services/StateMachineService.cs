@@ -92,7 +92,7 @@ public class StateMachineService(DataService _dataService, ClientService _client
         }
         if (stateMachineHandler != null && !stateMachineHandler.StateMachine.IsSubStateMachine)
         {
-            stateMachineHandler.Start(true);
+            stateMachineHandler.Start();
         }
         return stateMachineHandler;
     }

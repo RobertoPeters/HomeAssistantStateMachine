@@ -31,6 +31,9 @@
     [Parameter]
     public EventCallback ShowStateMachineScript { get; set; }
 
+    [Parameter]
+    public StateMachine? StateMachine { get; set; }
+
     private Transition? Model;
     private RadzenTemplateForm<Transition>? Form;
 
@@ -49,6 +52,10 @@
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Transition Condition", dialog =>
         {
             dialog.Script = Model!.Condition;
+            if (StateMachine != null)
+            {
+                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+            }
         });
         if (result != null)
         {

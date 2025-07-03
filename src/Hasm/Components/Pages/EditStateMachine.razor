@@ -385,6 +385,7 @@ else
         var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
         {
             dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+            dialog.StateMachine = StateMachine;
         });
         if (state != null)
         {
@@ -883,6 +884,7 @@ else
         {
             dialog.Transition = transition;
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
+            dialog.StateMachine = StateMachine;
         });
         if (result != null)
         {
@@ -904,6 +906,7 @@ else
             dialog.State = state;
             dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
+            dialog.StateMachine = StateMachine;
         });
         if (result != null)
         {
@@ -975,7 +978,7 @@ else
         }
         await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Machine Script", dialog =>
          {
-             dialog.Script = EngineScriptBuilder.BuildEngineScript(copy, true, Guid.NewGuid(), null);
+             dialog.Script = EngineScriptBuilder.BuildEngineScriptForEditor(copy);
              dialog.ReadOnly = true;
          });
     }

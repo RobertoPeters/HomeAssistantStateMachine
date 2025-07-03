@@ -90,6 +90,9 @@
     [Parameter]
     public EventCallback ShowStateMachineScript { get; set; }
 
+    [Parameter]
+    public StateMachine? StateMachine { get; set; }
+
     public class StateMachineVariable(SubStateMachineParameter subStateMachineParameter, SubStateParameter subStateParameter)
     {
         public SubStateMachineParameter SubStateMachineParameter { get; private set; } = subStateMachineParameter;
@@ -147,6 +150,10 @@
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Entry Action", dialog =>
         {
             dialog.Script = Model!.EntryAction;
+            if (StateMachine != null)
+            {
+                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+            }
         });
         if (result != null)
         {

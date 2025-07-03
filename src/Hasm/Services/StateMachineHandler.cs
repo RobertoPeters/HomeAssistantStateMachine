@@ -119,12 +119,19 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         engine.Engine.SetValue("system", _systemMethods);
 
         List<(string variableName, string? variableValue)> machineStateParameters = [];
-        foreach(var parameter in subStateMachine.SubStateMachineParameters.Where(x => x.IsInput).ToList())
+        foreach(var parameter in subStateMachine.SubStateMachineParameters)
         {
-            var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
-            var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
-            var srcVariableValue = JsValueToString(jsValue, true);
-            machineStateParameters.Add((variableName: parameter.ScriptVariableName, variableValue: srcVariableValue));
+            if (parameter.IsInput)
+            {
+                var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
+                var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
+                var srcVariableValue = JsValueToString(jsValue, true);
+                machineStateParameters.Add((variableName: parameter.ScriptVariableName, variableValue: srcVariableValue));
+            }
+            else
+            {
+                machineStateParameters.Add((variableName: parameter.ScriptVariableName, variableValue: string.IsNullOrWhiteSpace(parameter.DefaultValue) ? "null" : parameter.DefaultValue));
+            }
         }
 
         engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id, machineStateParameters));
@@ -202,10 +209,10 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     {
         ErrorMessage = null;
         Stop();
-        Start(true);
+        Start();
     }
 
-    public void Start(bool asMainStateMachine)
+    public void Start()
     {
         _readyForTriggers = false;
         if (StateMachine.Enabled || StateMachine.IsSubStateMachine)
@@ -226,7 +233,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
                     try
                     {
-                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(StateMachine, asMainStateMachine, engine.Id, null));
+                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(StateMachine, true, engine.Id, null));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }

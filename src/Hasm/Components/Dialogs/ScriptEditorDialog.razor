@@ -2,20 +2,37 @@
 @inherits ResultDialogBase<string?>
 
 <style>
-    #my-code-editor {
+    .my-editor-class {
         height: 600px;
     }
 </style>
 
-<StandaloneCodeEditor
-    @ref="standaloneCodeEditor" 
-    Id="my-code-editor" 
-    ConstructionOptions="EditorConstructionOptions" />
+@if (string.IsNullOrEmpty(SystemScript))
+{
+    <StandaloneCodeEditor @ref="standaloneCodeEditor"
+                          CssClass="my-editor-class"
+                          ConstructionOptions="EditorConstructionOptions" />
+}
+else
+{
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+        <RadzenSplitterPane Min="10px">
+            <StandaloneCodeEditor @ref="standaloneCodeEditor"
+                                  CssClass="my-editor-class"
+                                  ConstructionOptions="EditorConstructionOptions" />
+        </RadzenSplitterPane>
+        <RadzenSplitterPane Size="100px" Min="10px">
+            <StandaloneCodeEditor CssClass="my-editor-class"
+                                  ConstructionOptions="SystemScriptEditorConstructionOptions" />
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+}
 
-<RadzenButton 
-    Click="@(async () => Close(await standaloneCodeEditor!.GetValue()))" 
-    Text="OK" />
-
+@if (!ReadOnly)
+{
+    <RadzenButton Click="@(async () => Close(await standaloneCodeEditor!.GetValue()))"
+                  Text="OK" />
+}
 <RadzenButton Click="@(() => Close(null))"
               ButtonStyle="ButtonStyle.Secondary"
               Text="Cancel" />
@@ -34,6 +51,9 @@
     [Parameter]
     public bool ReadOnly { get; set; }
 
+    [Parameter]
+    public string? SystemScript { get; set; }
+
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
     {
         return new StandaloneEditorConstructionOptions
@@ -45,5 +65,15 @@
         };
     }
 
+    private StandaloneEditorConstructionOptions SystemScriptEditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "javascript",
+            Value = SystemScript ?? "",
+            ReadOnly = ReadOnly
+        };
+    }
 
 }
