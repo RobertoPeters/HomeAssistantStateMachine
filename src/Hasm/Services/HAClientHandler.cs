@@ -6,7 +6,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class HAClientHandler(Client _client, MessageBusService _messageBusService) : IClientHandler
+public class HAClientHandler(Client _client, VariableService _variableService, MessageBusService _messageBusService) : IClientHandler
 {
     public class ClientProperties
     {
@@ -14,46 +14,55 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
         public string? Token { get; set; }
     }
 
-     private ClientProperties _clientProperties = new();
+    private ClientProperties _clientProperties = new();
     private HassWSApi? _wsApi;
-    private bool _started = false;
     private Timer? _reconnectTimer = null;
     private readonly ConcurrentDictionary<string, List<VariableService.VariableInfo>> _variables = [];
 
-    public string? Host => _clientProperties.Host;
-    public string? Token => _clientProperties.Token;
     public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
     public Client Client => _client;
 
     public Task<bool> SetVariableValueAsync(int variableId, string value)
-    {        
+    {
         return Task.FromResult(false);
     }
 
 
     public async ValueTask DisposeAsync()
     {
-        if (_started)
-        {
-            await DisposeHassApiAsync();
-        }
+        await DisposeHassApiAsync();
     }
 
     public async Task StartAsync()
     {
-        if (!_started)
+        await DisposeHassApiAsync();
+        _variables.Clear();
+        var variables = _variableService.GetVariables()
+          .Where(x => x.Variable.ClientId == _client.Id);
+        foreach(var variable in variables)
         {
-            if (!string.IsNullOrWhiteSpace(_client.Data))
+            if (string.IsNullOrWhiteSpace(variable.Variable.Data))
             {
-                _clientProperties = System.Text.Json.JsonSerializer.Deserialize<ClientProperties>(_client.Data) ?? new();
+                continue;
             }
-            await CreateHassWSApiAsync();
+
+            if (!_variables.TryGetValue(variable.Variable.Data, out var list))
+            {
+                list = new List<VariableService.VariableInfo>();
+                _variables.TryAdd(variable.Variable.Data, list);
+            }
+            list.Add(variable);
         }
+
+        if (!string.IsNullOrWhiteSpace(_client.Data))
+        {
+            _clientProperties = System.Text.Json.JsonSerializer.Deserialize<ClientProperties>(_client.Data) ?? new();
+        }
+        await CreateHassWSApiAsync();
     }
 
     public async Task UpdateAsync(Client client)
     {
-        _started = false;
         await DisposeHassApiAsync();
         _client = client;
         if (!string.IsNullOrWhiteSpace(client.Data))
@@ -109,7 +118,6 @@ public class HAClientHandler(Client _client, MessageBusService _messageBusServic
                     //none
                 }
             }
-            _started = true;
         }
     }
 

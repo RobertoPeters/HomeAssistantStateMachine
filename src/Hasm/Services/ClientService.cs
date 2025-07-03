@@ -101,7 +101,7 @@ public class ClientService(DataService _dataService, VariableService _variableSe
         switch (client.ClientType)
         {
             case Models.ClientType.HomeAssistant:
-                clientHandler = new HAClientHandler(client, _messageBusService);
+                clientHandler = new HAClientHandler(client, _variableService, _messageBusService);
                 break;
             case Models.ClientType.Generic:
                 clientHandler = new GenericClientHandler(client);
