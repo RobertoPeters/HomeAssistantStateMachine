@@ -7,6 +7,10 @@
             <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" spellcheck="false" />
         </RadzenFormField>
         <RadzenFormField Text="Condition" Variant="@Variant.Outlined">
+            <div class="textarea-wrapper">
+                <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Rows="10" Style="width: 100%;" spellcheck="false" />
+                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditConditionAsync"></RadzenIcon>
+            </div>
             <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Rows="10" spellcheck="false" />
         </RadzenFormField>
     </RadzenStack>
@@ -38,6 +42,18 @@
         }
         Model = Transition.CopyObject();
         base.OnInitialized();
+    }
+
+    async Task EditConditionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Transition Condition", dialog =>
+        {
+            dialog.Script = Model!.Condition;
+        });
+        if (result != null)
+        {
+            Model!.Condition = result;
+        }
     }
 
     void OnSubmit()

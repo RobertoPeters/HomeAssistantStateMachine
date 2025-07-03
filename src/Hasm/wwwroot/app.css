@@ -36,3 +36,40 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* De container die de textarea en het icoon omvat */
+.textarea-wrapper {
+    position: relative; /* Cruciaal: maakt dit de referentie voor absolute positionering van het icoon */
+    display: inline-block; /* Zodat de container zich aanpast aan de grootte van de inhoud */
+    width: 100%; /* Voorbeeld breedte. Pas aan naar wens. */
+}
+
+    /* Styling voor de RadzenTextArea zelf */
+    .textarea-wrapper .rz-textarea {
+        width: 100%; /* Zorgt ervoor dat de RadzenTextArea de volledige breedte van de wrapper inneemt */
+        /* Belangrijk: Voeg padding toe zodat de tekst niet onder het icoon verdwijnt */
+        padding-right: 40px; /* Genoeg ruimte voor de breedte van het icoon */
+        padding-bottom: 30px; /* Genoeg ruimte voor de hoogte van het icoon */
+        box-sizing: border-box; /* Zorgt ervoor dat padding en border binnen de breedte/hoogte vallen */
+        min-height: 120px; /* Zorg voor voldoende initiële hoogte */
+    }
+
+
+/* Styling voor het overlay icoon */
+.overlay-icon {
+    position: absolute; /* Haalt het icoon uit de normale documentstroom */
+    bottom: 5px; /* Afstand vanaf de onderkant van de .textarea-wrapper */
+    right: 5px; /* Afstand vanaf de rechterkant van de .textarea-wrapper */
+    z-index: 1; /* Zorgt ervoor dat het icoon boven de textarea ligt */
+    font-size: 1.5em; /* Maak het icoon groter */
+    color: #007bff; /* Kleur van het icoon */
+    cursor: pointer; /* Verandert de muiscursor in een handje */
+    padding: 5px; /* Optionele padding rondom het icoon voor een groter klikgebied */
+    background-color: rgba(255, 255, 255, 0.7); /* Licht doorzichtige achtergrond */
+    border-radius: 4px; /* Afgeronde hoeken */
+}
+
+    .overlay-icon:hover {
+        color: #0056b3; /* Donkerdere kleur bij hover */
+        background-color: rgba(255, 255, 255, 0.9); /* Minder doorzichtig bij hover */
+    }

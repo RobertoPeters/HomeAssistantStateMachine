@@ -1,0 +1,49 @@
+﻿@using Hasm.Models
+@inherits ResultDialogBase<string?>
+
+<style>
+    #my-code-editor {
+        height: 600px;
+    }
+</style>
+
+<StandaloneCodeEditor
+    @ref="standaloneCodeEditor" 
+    Id="my-code-editor" 
+    ConstructionOptions="EditorConstructionOptions" />
+
+<RadzenButton 
+    Click="@(async () => Close(await standaloneCodeEditor!.GetValue()))" 
+    Text="OK" />
+
+<RadzenButton Click="@(() => Close(null))"
+              ButtonStyle="ButtonStyle.Secondary"
+              Text="Cancel" />
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    private StandaloneCodeEditor? standaloneCodeEditor;
+
+    [Parameter]
+    public string? Script { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "javascript",
+            Value = Script ?? "",
+            ReadOnly = ReadOnly
+        };
+    }
+
+
+}

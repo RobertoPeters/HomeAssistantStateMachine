@@ -64,8 +64,11 @@
             <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" spellcheck="false" />
         </RadzenFormField>
         <RadzenFormField Text="Entry Action" Variant="@Variant.Outlined">
-            <RadzenTextArea @bind-Value="@Model!.EntryAction" Name="EntryAction" Rows="10" spellcheck="false" />
-        </RadzenFormField>
+            <div class="textarea-wrapper">
+                <RadzenTextArea @bind-Value="@Model!.EntryAction" Name="EntryAction" Rows="10" Style="width: 100%;" spellcheck="false" />
+                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditEntryActionAsync"></RadzenIcon>
+            </div>
+         </RadzenFormField>
     </RadzenStack>
     <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     <RadzenButton ButtonType="ButtonType.Button" Text="Script" Click="@(() => ShowStateMachineScript.InvokeAsync())" />
@@ -137,6 +140,18 @@
             }
         }
         base.OnInitialized();
+    }
+
+    async Task EditEntryActionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Entry Action", dialog =>
+        {
+            dialog.Script = Model!.EntryAction;
+        });
+        if (result != null)
+        {
+            Model!.EntryAction = result;
+        }
     }
 
     private void OnSubStateMachineChanged(object? value)
