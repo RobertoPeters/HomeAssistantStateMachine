@@ -50,11 +50,11 @@ public class ClientService(DataService _dataService, VariableService _variableSe
         }
     }
 
-    public async Task<bool> ExecuteAsync(int clientId, int? variableId, string command, string? parameter)
+    public async Task<bool> ExecuteAsync(int clientId, int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
     {
         if (_handlers.TryGetValue(clientId, out var clientHandler))
         {
-            return await clientHandler.ExecuteAsync(variableId, command, parameter);
+            return await clientHandler.ExecuteAsync(variableId, command, parameter1, parameter2, parameter3);
         }
         return false;
     }

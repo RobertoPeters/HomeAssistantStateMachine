@@ -39,15 +39,20 @@ public class SystemMethods
         return _variableService.GetVariable(variableId)?.Value;
     }
 
-    public int GetClientId(string name)
+    public int getClientId(string name)
     {
         var client = _clients.Values.FirstOrDefault(c => c.Name == name);
         return client?.Id ?? -1;
     }
 
-    public bool ClientExecuteAsync(int clientId, int? variableId, string command, string? parameter)
+    public int[] getClientIdsByType(int id)
     {
-        return _clientService.ExecuteAsync(clientId, variableId, command, parameter).Result;
+        return _clients.Values.Where(c => (int)c.ClientType == id).Select(x => x.Id).ToArray();
+    }
+
+    public bool clientExecute(int clientId, int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
+    {
+        return _clientService.ExecuteAsync(clientId, variableId, command, parameter1, parameter2, parameter3).Result;
     }
 
     public void setRunningStateToFinished(string instanceId)
@@ -70,7 +75,9 @@ public class SystemMethods
         _stateMachineHandler.StartSubStateMachine(stateId, instanceId);
     }
 
-    public const string SystemScript = """"
+    public readonly static string SystemScript = $$""""
+
+    var {{string.Join("\r\nvar ", (((Models.ClientType[])Enum.GetValues(typeof(Models.ClientType))).Select(x => $"client_{Enum.GetName(x)} = {(int)x}").ToList()))}}
 
     log = function(message) {
         system.log(instanceId, message)
@@ -93,9 +100,13 @@ public class SystemMethods
         return system.getClientId(name)
     }
 
+    getClientIdsByType = function(value) {
+        return system.getClientIdsByType(value)
+    }
+
     //execute specific client commands (-1 if it fails)
-    executeOnClient = function(clientId, variableId, command, parameter) {
-        return system.clientExecuteAsync(clientId, variableId, command, parameter)
+    executeOnClient = function(clientId, variableId, command, parameter1, parameter2, parameter3) {
+        return system.clientExecute(clientId, variableId, command, parameter1, parameter2, parameter3)
     }
 
     // creates a variable and returns the variable id (-1 if it fails)
@@ -115,11 +126,18 @@ public class SystemMethods
     
     var genericClientId = getClientId('Generic')
     var timerClientId = getClientId('Timer')
-        
+    
+    //====================================================================================
+    // GENERIC CLIENT HELPER METHODS
+    //====================================================================================
     createGenericVariable = function(name, value, mockingOptions) {
         return createVariable(name, genericClientId, true, true, value, mockingOptions)
     }
 
+    //====================================================================================
+    // TIMER CLIENT HELPER METHODS
+    //====================================================================================
+        
     createTimerVariable = function(name, seconds) {
         return createVariable(name, timerClientId, true, false, seconds, [0, 10])
     }
@@ -133,6 +151,52 @@ public class SystemMethods
     }
     stopTimer = cancelTimer
     
+    //====================================================================================
+    // HOME ASSISTANT CLIENT HELPER METHODS
+    //====================================================================================
 
+    haClientCallService = function(clientname, name, service, data) {
+        //e.g. haClientCallService(null, 'light', 'turn_on', { "entity_id": "light.my_light", "brightness_pct": 20})
+        var client = null
+        if (clientname != null) {
+            client = getClientId(clientname)
+            if (client < 0) {
+                log('Error: Client not found: ' + clientname)
+                return false
+            }
+        }
+        else {
+            var haClientIds = getClientIdsByType('client_HomeAssistant')
+            if (haClientIds == null || haClientIds.length != 1) {
+                log('Error: None of multiple Home Assistant clients found')
+                return false
+            }
+            client = haClientIds[0]
+        }
+        log(client)
+        return executeOnClient(client, null, 'callservice', name, service, data)
+    }
+
+    haClientCallServiceForEntities = function(clientname, name, service, entities) {
+        //e.g. haClientCallService(null, 'light', 'turn_off', [ "light.my_light" ])
+        var client = null
+        if (clientname != null) {
+            client = getClientId(clientname)
+            if (client < 0) {
+                log('Error: Client not found: ' + clientname)
+                return false
+            }
+        }
+        else {
+            var haClientIds = getClientIdsByType('client_HomeAssistant')
+            if (haClientIds == null || haClientIds.length != 1) {
+                log('Error: None of multiple Home Assistant clients found')
+                return false
+            }
+            client = haClientIds[0]
+        }
+        log(client)
+        return executeOnClient(client, null, 'callserviceforentities', name, service, entities)
+    }
     """";
 }

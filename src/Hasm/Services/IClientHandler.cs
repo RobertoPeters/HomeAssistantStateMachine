@@ -7,5 +7,5 @@ public interface IClientHandler : IAsyncDisposable
     Task UpdateAsync(Models.Client client);
     Task DeleteVariableInfoAsync(List<VariableService.VariableInfo> variables);
     Task AddOrUpdateVariableInfoAsync(List<VariableService.VariableInfo> variables);
-    Task<bool> ExecuteAsync(int? variableId, string command, string? parameter);
+    Task<bool> ExecuteAsync(int? variableId, string command, object? parameter1, object? parameter2, object? parameter3);
 }

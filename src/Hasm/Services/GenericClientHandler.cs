@@ -33,7 +33,7 @@ public class GenericClientHandler(Client _client) : IClientHandler
         await StartAsync();
     }
 
-    public Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    public Task<bool> ExecuteAsync(int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
     {
         return Task.FromResult(false);
     }
