@@ -126,8 +126,11 @@
 
     private void StateMachineHandlerInfoChanged(object? sender, Services.StateMachineHandler.StateMachineHandlerInfo stateMachineInfo)
     {
-        InvokeAsync(grid!.Reload);
-        InvokeAsync(StateHasChanged);
+        if (grid != null)
+        {
+            InvokeAsync(grid!.Reload);
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private void StateMachineHandlerChanged(object? sender, StateMachineHandler stateMachineHandler)

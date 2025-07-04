@@ -133,7 +133,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
                 await _dataRepository.DeleteVariableValueAsync(variableValue);
             }
             await _dataRepository.DeleteVariableAsync(orgVariable);
-            orgVariable.Id = -orgVariable.Id;
+            orgVariable.Id = -Math.Abs(orgVariable.Id);
             await _messageBusService.PublishAsync(orgVariable);
         }
     }
@@ -143,7 +143,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         if (_variableValues.TryRemove(Math.Abs(variableValue.Id), out var orgVariableValue))
         {
             await _dataRepository.DeleteVariableValueAsync(variableValue);
-            orgVariableValue.Id = -orgVariableValue.Id;
+            orgVariableValue.Id = -Math.Abs(orgVariableValue.Id);
             await _messageBusService.PublishAsync(orgVariableValue);
         }
     }
@@ -171,7 +171,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             {
                 _variables.TryRemove(variable.Id, out _);
             }
-            orgClient.Id = -orgClient.Id;
+            orgClient.Id = -Math.Abs(orgClient.Id);
             await _messageBusService.PublishAsync(orgClient);
         }
     }
@@ -213,7 +213,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             {
                 _variables.TryRemove(variable.Id, out _);
             }
-            orgStateMachine.Id = -orgStateMachine.Id;
+            orgStateMachine.Id = -Math.Abs(orgStateMachine.Id);
             await _messageBusService.PublishAsync(orgStateMachine);
         }
     }

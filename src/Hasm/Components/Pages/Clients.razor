@@ -50,6 +50,22 @@
 			<RadzenDataGridColumn TItem="IClientHandler"
 								  Filterable="false"
 								  Sortable="false"
+								  Title="Connected">
+				<Template Context="client">
+					@if(client is IClientConnected connected)
+					{
+						<RadzenLabel>@(connected.IsConnected ? "Yes" : "No")</RadzenLabel>
+					}
+					else
+					{
+						<RadzenLabel>N/A</RadzenLabel>
+					}
+				</Template>
+			</RadzenDataGridColumn>
+
+			<RadzenDataGridColumn TItem="IClientHandler"
+								  Filterable="false"
+								  Sortable="false"
 								  Property="Client.Id"
 								  Title="">
 
@@ -71,6 +87,7 @@
 	protected override void OnInitialized()
 	{
 		UIEventRegistration.ClientHandlerChanged += ClientHandlerChanged;
+		UIEventRegistration.ClientConnectionInfoChanged += ClientConnectionInfoChanged;
 		clients = new ConcurrentDictionary<int, IClientHandler>(ClientService.GetClients<IClientHandler>().ToDictionary(x => x.Client.Id, x => x));
 		gridData = clients.Values.ToList();
 		base.OnInitialized();
@@ -82,8 +99,13 @@
 		if (grid != null)
 		{
 			grid.Data = gridData;
-			grid!.Reload();
+			grid.Reload();
 		}
+	}
+
+	private void ClientConnectionInfoChanged(object? sender, ClientConnectionInfo clientConnectionInfo)
+	{
+		InvokeAsync(UpdateGridData);
 	}
 
 	private void ClientHandlerChanged(object? sender, IClientHandler clientHandler)
@@ -102,6 +124,7 @@
 
 	public void Dispose()
 	{
+		UIEventRegistration.ClientConnectionInfoChanged -= ClientConnectionInfoChanged;
 		UIEventRegistration.ClientHandlerChanged -= ClientHandlerChanged;
 	}
 

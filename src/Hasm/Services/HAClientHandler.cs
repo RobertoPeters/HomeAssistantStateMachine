@@ -6,7 +6,7 @@ using Wolverine;
 
 namespace Hasm.Services;
 
-public class HAClientHandler(Client _client, VariableService _variableService, MessageBusService _messageBusService) : IClientHandler
+public class HAClientHandler(Client _client, VariableService _variableService, MessageBusService _messageBusService) : IClientHandler, IClientConnected
 {
     public class ClientProperties
     {
@@ -19,7 +19,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
     private Timer? _reconnectTimer = null;
     private readonly ConcurrentDictionary<string, List<VariableService.VariableInfo>> _variables = [];
 
-    public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
+    public bool IsConnected => _wsApi?.ConnectionState == ConnectionStates.Connected;
     public Client Client => _client;
 
     public async ValueTask DisposeAsync()
@@ -106,7 +106,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
     private async Task<bool> CallServiceAsync(string name, string service, object? data = null)
     {
         var result = false;
-        if (ConnectionState == ConnectionStates.Connected)
+        if (IsConnected)
         {
             try
             {
@@ -124,7 +124,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
     private async Task<bool> CallServiceForEntitiesAsync(string name, string service, params string[] entityIds)
     {
         var result = false;
-        if (ConnectionState == ConnectionStates.Connected)
+        if (IsConnected)
         {
             try
             {
@@ -180,7 +180,11 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
 
     private async void _wsApi_ConnectionStateChanged(object? sender, ConnectionStates e)
     {
-        await _messageBusService.PublishAsync(this);
+        await _messageBusService.PublishAsync(new ClientConnectionInfo()
+        {
+            ClientId = _client.Id,
+            IsConnected = e == ConnectionStates.Connected
+        });
 
         if (e == ConnectionStates.Connected && _variables.Any())
         {
