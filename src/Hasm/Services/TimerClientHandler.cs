@@ -123,7 +123,7 @@ public class TimerClientHandler(Client _client, VariableService _variableService
         await StartAsync();
     }
 
-    public async Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    public async Task<bool> ExecuteAsync(int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
     {
         if (variableId == null || !CountdownTimers.TryGetValue(variableId.Value, out var timer))
         {

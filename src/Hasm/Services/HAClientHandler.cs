@@ -22,12 +22,6 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
     public ConnectionStates ConnectionState => _wsApi?.ConnectionState ?? ConnectionStates.Disconnected;
     public Client Client => _client;
 
-    public Task<bool> SetVariableValueAsync(int variableId, string value)
-    {
-        return Task.FromResult(false);
-    }
-
-
     public async ValueTask DisposeAsync()
     {
         await DisposeHassApiAsync();
@@ -39,7 +33,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         _variables.Clear();
         var variables = _variableService.GetVariables()
           .Where(x => x.Variable.ClientId == _client.Id);
-        foreach(var variable in variables)
+        foreach (var variable in variables)
         {
             if (string.IsNullOrWhiteSpace(variable.Variable.Data))
             {
@@ -76,9 +70,72 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         await CreateHassWSApiAsync();
     }
 
-    public Task<bool> ExecuteAsync(int? variableId, string command, string? parameter)
+    public async Task<bool> ExecuteAsync(int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
     {
-        return Task.FromResult(false);
+        var existingVariable = variableId== null ? null : _variables.Values.SelectMany(x => x)
+             .Where(x => x.Variable.Id == variableId)
+             .Select(x => x)
+             .FirstOrDefault();
+
+        if (variableId != null && existingVariable == null)
+        {
+            return false;
+        }
+
+        var result = false;
+        switch (command.ToLower())
+        {
+            case "callservice":
+                if (parameter1 != null && parameter2 != null)
+                {
+                    result = await CallServiceAsync(parameter1.ToString()!, parameter2.ToString()!, parameter3);
+                }
+                break;
+            case "callserviceforentities":
+                if (parameter1 != null && parameter2 != null && parameter3 != null)
+                {
+                    result = await CallServiceForEntitiesAsync(parameter1.ToString()!, parameter2.ToString()!, ((System.Collections.IEnumerable)parameter3).Cast<object>()
+                                 .Select(x => x.ToString()!)
+                                 .ToArray());
+                }
+                break;
+        }
+        return result;
+    }
+
+    private async Task<bool> CallServiceAsync(string name, string service, object? data = null)
+    {
+        var result = false;
+        if (ConnectionState == ConnectionStates.Connected)
+        {
+            try
+            {
+                using var ct = new CancellationTokenSource(1000);
+                var callResult = await _wsApi!.CallServiceAsync(name, service, data, ct.Token);
+                result = callResult != null;
+            }
+            catch
+            {//ignore
+            }
+        }
+        return result;
+    }
+
+    private async Task<bool> CallServiceForEntitiesAsync(string name, string service, params string[] entityIds)
+    {
+        var result = false;
+        if (ConnectionState == ConnectionStates.Connected)
+        {
+            try
+            {
+                using var ct = new CancellationTokenSource(1000);
+                result = await _wsApi!.CallServiceForEntitiesAsync(name, service, ct.Token, entityIds);
+            }
+            catch
+            {//ignore
+            }
+        }
+        return result;
     }
 
     private async Task DisposeHassApiAsync()
@@ -175,18 +232,104 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         await UpdateVariableValue(stateChangedArgs.EntityId, stateChangedArgs.NewState.State);
     }
 
-    private Task UpdateVariableValue(string eventId, string state)
+    private async Task UpdateVariableValue(string eventId, string? state)
     {
-        return Task.CompletedTask;
+        if (_variables.TryGetValue(eventId, out var variableList))
+        {
+            if (variableList.Any())
+            {
+                await _variableService.SetVariableValuesAsync(variableList.Select(x => (variableId: x.Variable.Id, value: state)).ToList());
+            }
+        }
     }
 
     public Task DeleteVariableInfoAsync(List<VariableService.VariableInfo> variables)
     {
+        foreach (var variable in variables)
+        {
+            if (!string.IsNullOrWhiteSpace(variable.Variable.Data) && _variables.TryGetValue(variable.Variable.Data, out var variableList))
+            {
+                var variableInList = variableList.FirstOrDefault(x => x.Variable.Id == Math.Abs(variable.Variable.Id));
+                if (variableInList != null)
+                {
+                    variableList.Remove(variableInList);
+                    if (!variableList.Any())
+                    {
+                        _variables.TryRemove(variable.Variable.Data, out _);
+                        if (_wsApi != null)
+                        {
+                            try
+                            {
+                                _wsApi.StateChagedEventListener.UnsubscribeEntityStatusChanged(variable.Variable.Data, EventHandlerEventStateChanged);
+                            }
+                            catch
+                            {
+                                //nothing
+                            }
+                        }
+                    }
+                }
+            }
+        }
         return Task.CompletedTask;
     }
 
     public Task AddOrUpdateVariableInfoAsync(List<VariableService.VariableInfo> variables)
     {
+        foreach (var variable in variables)
+        {
+            var existingVariable = _variables.Values.SelectMany(x => x)
+                .Where(x => x.Variable.Id == variable.Variable.Id)
+                .Select(x => x)
+                .FirstOrDefault();
+
+            if (existingVariable != null)
+            {
+                UpdateVariableInfoAsync(existingVariable, variable);
+            }
+            else if (!string.IsNullOrWhiteSpace(variable.Variable.Data))
+            {
+                AddVariableInfoAsync(variable);
+            }
+        }
         return Task.CompletedTask;
+    }
+
+    private Task AddVariableInfoAsync(VariableService.VariableInfo variable)
+    {
+        if (!_variables.TryGetValue(variable.Variable.Data!, out var variableList))
+        {
+            variableList = [];
+            _variables.TryAdd(variable.Variable.Data, variableList);
+        }
+        variableList.Add(variable);
+        if (variableList.Count == 1)
+        {
+            if (_wsApi != null)
+            {
+                try
+                {
+                    _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Variable.Data, EventHandlerEventStateChanged);
+                }
+                catch
+                {
+                    //nothing
+                }
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task UpdateVariableInfoAsync(VariableService.VariableInfo orgVariable, VariableService.VariableInfo variable)
+    {
+        if (orgVariable.Variable.Data != variable.Variable.Data)
+        {
+            await DeleteVariableInfoAsync([orgVariable]);
+            if (!string.IsNullOrWhiteSpace(variable.Variable.Data))
+            {
+                await AddVariableInfoAsync(orgVariable);
+            }
+        }
     }
 }
