@@ -8,6 +8,33 @@ public static class DataRepositoryUpgrades
 {
     public static async Task CheckUpgradesAsync(SqliteConnection connection)
     {
+        int targetVersion = 2;
+
+        var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version";
+        var userVersion = await command.ExecuteScalarAsync();
+        await command.DisposeAsync();
+
+        if (userVersion is long version)
+        {
+            if (version == targetVersion)
+            {
+                return;
+            }
+        }
+        else if (userVersion == null)
+        {
+            await CheckUpgradeTo2Async(connection);
+        }
+
+        command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA user_version = {targetVersion}";
+        await command.ExecuteNonQueryAsync();
+        await command.DisposeAsync();
+    }
+
+    public static async Task CheckUpgradeTo2Async(SqliteConnection connection)
+    {
         var command = connection.CreateCommand();
         command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS VariableValues; DROP TABLE IF EXISTS Variables; PRAGMA foreign_keys = ON;";
         await command.ExecuteNonQueryAsync();
