@@ -1,9 +1,19 @@
-﻿using Hasm.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using Hasm.Models;
 
 namespace Hasm.Services;
 
 public class MqttClientHandler(Client _client, VariableService _variableService, MessageBusService _messageBusService) : IClientHandler, IClientConnected
 {
+    public class ClientProperties
+    {
+        public string? Host { get; set; }
+        public bool Tls { get; set; }
+        public bool WebSocket { get; set; }
+        public string? Username { get; set; }
+        public string? Password { get; set; }
+    }
+
     public Client Client => throw new NotImplementedException();
 
     public bool IsConnected => throw new NotImplementedException();

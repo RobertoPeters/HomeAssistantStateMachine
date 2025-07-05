@@ -6,7 +6,7 @@ namespace Hasm.Repository;
 
 public class DataRepository(IConfiguration _configuration)
 {
-    private readonly string _connectionString = _configuration.GetConnectionString("hasmv2")!;
+    private readonly string _connectionString = _configuration.GetConnectionString("hasm")!;
 
     const string ClientTableName = "Client";
     const string VariableTableName = "Variable";
@@ -51,6 +51,9 @@ insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
         command.Parameters.AddWithValue("@timerClientData", timerClient.ToData());
 
         await command.ExecuteNonQueryAsync();
+        await command.DisposeAsync();
+
+        await DataRepositoryUpgrades.CheckUpgradesAsync(connection);
     }
 
     public async Task<List<Client>> GetClientsAsync()

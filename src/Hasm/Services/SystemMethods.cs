@@ -120,7 +120,7 @@ public class SystemMethods
     }
 
     // creates a variable and returns the variable id (-1 if it fails)
-    createVariable = function(name, clientId, isStateMachineVariable, persistant, data, mockingOptions) {
+    createVariableOnClient = function(name, clientId, isStateMachineVariable, persistant, data, mockingOptions) {
         return system.createVariable(name, clientId, isStateMachineVariable, persistant, data, mockingOptions)
     }
 
@@ -146,7 +146,7 @@ public class SystemMethods
     // GENERIC CLIENT HELPER METHODS
     //====================================================================================
     createGenericVariable = function(name, value, mockingOptions) {
-        return createVariable(name, genericClientId, true, true, value, mockingOptions)
+        return createVariableOnClient(name, genericClientId, true, true, value, mockingOptions)
     }
 
     //====================================================================================
@@ -154,7 +154,7 @@ public class SystemMethods
     //====================================================================================
         
     createTimerVariable = function(name, seconds) {
-        return createVariable(name, timerClientId, true, false, seconds, [0, 10])
+        return createVariableOnClient(name, timerClientId, true, false, seconds, [0, 10])
     }
 
     startTimerVariable = function(variableId) {
@@ -258,7 +258,9 @@ public class SystemMethods
     }
     
     createTimer = function(name, seconds) {
-        return createTimerVariable(name, seconds)
+        var timerId = createTimerVariable(name, seconds)
+        startTimerVariable(timerId)
+        return timerId
     }
     startTimer = createTimer
     
@@ -277,12 +279,12 @@ public class SystemMethods
     
     createGlobalVariableWithMockingValues = function(name, valueOptions) {
         //e.g. createGlobalVariableWithMockingValues('test', [true, false]); this will create a persistant variable accessible from any state machine
-        return createVariable(name, genericClientId, false, true, null, valueOptions)
+        return createVariableOnClient(name, genericClientId, false, true, null, valueOptions)
     }
     
     createGlobalVariable = function(name) {
         //e.g. createGlobalVariable('test'); this will create a persistant variable accessible from any state machine
-        return createVariable(name, genericClientId, false, true, null)
+        return createVariableOnClient(name, genericClientId, false, true, null)
     }
     
     setGlobalVariable = function(name, newValue) {
@@ -326,7 +328,7 @@ public class SystemMethods
         if (client == null) {
             return false
         }
-        return createVariable(name, client, true, true, entityId, valueOptions)
+        return createVariableOnClient(name, client, true, true, entityId, valueOptions)
     }
     
     createHAVariable = function(clientname, name, entityId) {
@@ -335,7 +337,7 @@ public class SystemMethods
         if (client == null) {
             return false
         }
-        return createVariable(name, client, true, true, entityId)
+        return createVariableOnClient(name, client, true, true, entityId)
     }
     
     getHAVariable = function(clientname, name) {
@@ -359,7 +361,7 @@ public class SystemMethods
         if (client == null) {
             return false
         }
-        return createVariable(name, client, true, true, topic, valueOptions)
+        return createVariableOnClient(name, client, true, true, topic, valueOptions)
     }
     
     createMqttVariable = function(clientname, name, topic) {
@@ -368,7 +370,7 @@ public class SystemMethods
         if (client == null) {
             return false
         }
-        return createVariable(name, client, true, true, topic)
+        return createVariableOnClient(name, client, true, true, topic)
     }
     
     getMqttVariable = function(clientname, name) {
