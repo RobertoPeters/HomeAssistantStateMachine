@@ -1,6 +1,6 @@
 @ECHO OFF
 
-SET Hasm=src\HomeAssistantStateMachine
+SET Hasm=src\Hasm
 RMDIR /S /Q "%Hasm%\DeployLinux" >NUL
 
 ECHO.
@@ -13,8 +13,8 @@ popd
 ECHO.
 ECHO ** Checking HASM for Linux
 ECHO.
-IF NOT EXIST "%Hasm%\DeployLinux\HomeAssistantStateMachine.dll" (
-  ECHO Camas Release build not found "%Hasm%\DeployLinux\HomeAssistantStateMachine.dll"
+IF NOT EXIST "%Hasm%\DeployLinux\Hasm.dll" (
+  ECHO Camas Release build not found "%Hasm%\DeployLinux\Hasm.dll"
   GOTO ERROR
 )
 

@@ -51,7 +51,7 @@
             </RadzenPanelMenu>
         </RadzenSplitterPane>
         <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
-            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="true">
+            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="true">
                 <CascadingValue Value="Diagram" IsFixed="true">
                     <DiagramCanvas>
                         <Widgets>
@@ -126,9 +126,7 @@ else
     private StateMachine StateMachine = null!;
     private StateMachineHandler StateMachineHandler = null!;
     private List<LogData> logLines = [];
-    private int executeCommandPanelHeight = 50;
     private string? executeCommand;
-    private bool _mockVariables;
     private bool _pauseLog;
     private bool _draggingElement;
     private EventCallback ShowStateMachineScriptEventCallback;
@@ -193,7 +191,7 @@ else
         Diagram.PointerUp += DiagramPointerUpAsync;
         Diagram.PointerMove += DiagramPointerMove;
         Diagram.PointerDown += DiagramPointerDown;
- 
+
         await ReloadDiagramAsync();
         await base.OnInitializedAsync();
     }
@@ -313,7 +311,7 @@ else
         _unsavedChanges = false;
     }
 
-    async Task ReloadDiagramAsync(StateMachine? useStateMachine)
+    Task ReloadDiagramAsync(StateMachine? useStateMachine)
     {
         Diagram.Links.Clear();
         Diagram.Nodes.Clear();
@@ -338,6 +336,7 @@ else
         }
         StateChanged(null, null);
         Diagram.Refresh();
+        return Task.CompletedTask;
     }
 
     private void AddLink(Transition transition, PortAlignment sourcePortAllignment, PortAlignment targetPortAllignment)
@@ -412,7 +411,7 @@ else
     }
 
     Model? modelOnPointerUp = null;
-    async Task OnContextMenuAsync(MouseEventArgs args)
+    void OnContextMenu(MouseEventArgs args)
     {
         if (modelOnPointerUp is NodeModel node)
         {

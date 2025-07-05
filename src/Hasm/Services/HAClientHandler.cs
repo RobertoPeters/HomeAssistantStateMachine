@@ -278,7 +278,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         return Task.CompletedTask;
     }
 
-    public Task AddOrUpdateVariableInfoAsync(List<VariableService.VariableInfo> variables)
+    public async Task AddOrUpdateVariableInfoAsync(List<VariableService.VariableInfo> variables)
     {
         foreach (var variable in variables)
         {
@@ -289,14 +289,13 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
 
             if (existingVariable != null)
             {
-                UpdateVariableInfoAsync(existingVariable, variable);
+                await UpdateVariableInfoAsync(existingVariable, variable);
             }
             else if (!string.IsNullOrWhiteSpace(variable.Variable.Data))
             {
-                AddVariableInfoAsync(variable);
+                await AddVariableInfoAsync(variable);
             }
         }
-        return Task.CompletedTask;
     }
 
     private Task AddVariableInfoAsync(VariableService.VariableInfo variable)
@@ -304,7 +303,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         if (!_variables.TryGetValue(variable.Variable.Data!, out var variableList))
         {
             variableList = [];
-            _variables.TryAdd(variable.Variable.Data, variableList);
+            _variables.TryAdd(variable.Variable.Data!, variableList);
         }
         variableList.Add(variable);
         if (variableList.Count == 1)

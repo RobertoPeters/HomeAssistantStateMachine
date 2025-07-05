@@ -386,7 +386,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             }
             else if (obj.GetType().IsValueType)
             {
-                result = obj.ToString();
+                result = obj.ToString()!;
             }
             else
             {

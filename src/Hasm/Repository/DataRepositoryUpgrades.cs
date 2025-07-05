@@ -9,7 +9,7 @@ public static class DataRepositoryUpgrades
     public static async Task CheckUpgradesAsync(SqliteConnection connection)
     {
         var command = connection.CreateCommand();
-        command.CommandText = "DROP TABLE IF EXISTS VariableValues; DROP TABLE IF EXISTS Variables;";
+        command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS VariableValues; DROP TABLE IF EXISTS Variables; PRAGMA foreign_keys = ON;";
         await command.ExecuteNonQueryAsync();
         await command.DisposeAsync();
 
@@ -149,7 +149,7 @@ public static class DataRepositoryUpgrades
         }
 
         command = connection.CreateCommand();
-        command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS States; DROP TABLE IF EXISTS Transitions; DROP TABLE IF EXISTS StateMachines; PRAGMA foreign_keys = ON;";
+        command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS HAClients; DROP TABLE IF EXISTS MqttClients; DROP TABLE IF EXISTS States; DROP TABLE IF EXISTS Transitions; DROP TABLE IF EXISTS StateMachines; PRAGMA foreign_keys = ON;";
         await command.ExecuteNonQueryAsync();
         await command.DisposeAsync();
     }
