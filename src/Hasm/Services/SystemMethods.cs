@@ -29,6 +29,16 @@ public class SystemMethods
         return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data?.ToString(), null).Result ?? -1;
     }
 
+    public int? getVariableIdByName(string name, int clientId, bool isStateMachineVariable)
+    {
+        var variable = _variableService
+                .GetVariables()
+                .FirstOrDefault(v => v.Variable.Name == name
+                                    && v.Variable.ClientId == clientId
+                                    && ((isStateMachineVariable && v.Variable.StateMachineId == _stateMachineHandler.StateMachine.Id) || (!isStateMachineVariable && v.Variable.StateMachineId == null)));
+        return variable?.Variable.Id;
+    }
+
     public bool setVariableValue(int variableId, string? value)
     {
         return _variableService.SetVariableValuesAsync([(variableId, value)]).Result;
@@ -123,6 +133,11 @@ public class SystemMethods
     setVariableValue = function(variableId, variableValue) {
         return system.setVariableValue(variableId, variableValue)
     }
+
+    //get the variable Id by name
+    getVariableIdByName = function(name, clientId, isStateMachineVariable) {
+        return system.getVariableIdByName(name, clientId, isStateMachineVariable)
+    }
     
     var genericClientId = getClientId('Generic')
     var timerClientId = getClientId('Timer')
@@ -155,48 +170,221 @@ public class SystemMethods
     // HOME ASSISTANT CLIENT HELPER METHODS
     //====================================================================================
 
-    haClientCallService = function(clientname, name, service, data) {
-        //e.g. haClientCallService(null, 'light', 'turn_on', { "entity_id": "light.my_light", "brightness_pct": 20})
+    getHomeAssistantClientId = function(clientname) {
         var client = null
         if (clientname != null) {
             client = getClientId(clientname)
             if (client < 0) {
                 log('Error: Client not found: ' + clientname)
-                return false
+                return null
             }
         }
         else {
             var haClientIds = getClientIdsByType(client_HomeAssistant)
             if (haClientIds == null || haClientIds.length != 1) {
                 log('Error: None of multiple Home Assistant clients found')
-                return false
+                return null
             }
             client = haClientIds[0]
         }
-        log(client)
+        return client
+    }
+
+    haClientCallService = function(clientname, name, service, data) {
+        //e.g. haClientCallService(null, 'light', 'turn_on', { "entity_id": "light.my_light", "brightness_pct": 20})
+        var client = getHomeAssistantClientId(clientname)
+        if (client == null) {
+            return false
+        }
         return executeOnClient(client, null, 'callservice', name, service, data)
     }
 
     haClientCallServiceForEntities = function(clientname, name, service, entities) {
         //e.g. haClientCallService(null, 'light', 'turn_off', [ "light.my_light" ])
+        var client = getHomeAssistantClientId(clientname)
+        if (client == null) {
+            return false
+        }
+        return executeOnClient(client, null, 'callserviceforentities', name, service, entities)
+    }
+
+    //====================================================================================
+    // MQTT CLIENT HELPER METHODS
+    //====================================================================================
+    
+    getMqttClientId = function(clientname) {
         var client = null
         if (clientname != null) {
             client = getClientId(clientname)
             if (client < 0) {
                 log('Error: Client not found: ' + clientname)
-                return false
+                return null
             }
         }
         else {
-            var haClientIds = getClientIdsByType(client_HomeAssistant)
-            if (haClientIds == null || haClientIds.length != 1) {
-                log('Error: None of multiple Home Assistant clients found')
-                return false
+            var mqttClientIds = getClientIdsByType(client_Mqtt)
+            if (mqttClientIds == null || mqttClientIds.length != 1) {
+                log('Error: None of multiple MQTT clients found')
+                return null
             }
-            client = haClientIds[0]
+            client = mqttClientIds[0]
         }
-        log(client)
-        return executeOnClient(client, null, 'callserviceforentities', name, service, entities)
+        return client
     }
+
+    mqttClientPublish = function(clientname, topic, payload) {
+        //e.g. mqttClientPublish(null, 'mqttnet/samples/topic/2', 'on');
+        var client = getMqttClientId(clientname)
+        if (client == null) {
+            return false
+        }
+        return executeOnClient(client, null, 'publish', topic, payload)
+    }
+    
+    //====================================================================================
+    // BACKWARDS COMPATIBILITY METHODS
+    //====================================================================================
+    getCurrentState = function() {
+        if (currentState == null)
+        {
+           return null
+        }
+        return stateInfo[currentState].name
+    }
+
+    getValue = function(name) {
+        var variableId = getVariableIdByName(name, genericClientId, true)
+        return getVariableValue(variableId);
+    }
+    
+    createTimer = function(name, seconds) {
+        return createTimerVariable(name, seconds)
+    }
+    startTimer = createTimer
+    
+    timerExpired = function(name) {
+        var variableId = getVariableIdByName(name, timerClientId, true)
+        return getVariableValue(variableId) == '0'
+    }
+    
+    isMockingVariablesActive = function() {
+        return false
+    }
+
+    gotoState = function(state) {
+        return false
+    }
+    
+    createGlobalVariableWithMockingValues = function(name, valueOptions) {
+        //e.g. createGlobalVariableWithMockingValues('test', [true, false]); this will create a persistant variable accessible from any state machine
+        return createVariable(name, genericClientId, false, true, null, valueOptions)
+    }
+    
+    createGlobalVariable = function(name) {
+        //e.g. createGlobalVariable('test'); this will create a persistant variable accessible from any state machine
+        return createVariable(name, genericClientId, false, true, null)
+    }
+    
+    setGlobalVariable = function(name, newValue) {
+        //e.g. setGlobalVariable('test', 10); update the value of the given (global) variable
+        var variableId = getVariableIdByName(name, genericClientId, false)
+        return setVariableValue(variableId, newValue)
+    }
+    
+    getGlobalVariable = function(name) {
+        //e.g. getGlobalVariable('test'); get the value of the given (global) variable
+        var variableId = getVariableIdByName(name, genericClientId, false)
+        return getVariableValue(variableId)
+    }
+    
+    createVariableWithMockingValues = function(name, valueOptions) {
+        //e.g. createVariableWithMockingValues('test', [true, false]); this will create a persistant variable accessible from current state machine
+        return createGenericVariable(name, null, valueOptions)
+    }
+    
+    createVariable = function(name) {
+        //e.g. createVariable('test'); this will create a persistant variable accessible from current state machine
+        return createGenericVariable(name, null, null)
+    }
+    
+    setVariable = function(name, newValue) {
+        //e.g. setVariable('test', 10); update the value of the given (state machine) variable
+        var variableId = getVariableIdByName(name, genericClientId, true)
+        return setVariableValue(variableId, newValue)
+    }
+    
+
+    getVariable = function(name) {
+        //e.g. getVariable('test'); get the value of the given (state machine) variable
+        var variableId = getVariableIdByName(name, genericClientId, true)
+        return getVariableValue(variableId)
+    }
+    
+    createHAVariableWithMockingValues = function(clientname, name, entityId, valueOptions) {
+        //e.g. createHAVariableWithMockingValues(null, 'kitchenLight', 'light.my_light', ['on', 'off'])
+        var client = getHomeAssistantClientId(clientname)
+        if (client == null) {
+            return false
+        }
+        return createVariable(name, client, true, true, entityId, valueOptions)
+    }
+    
+    createHAVariable = function(clientname, name, entityId) {
+        //e.g. createHAVariable(null, 'kitchenLight', 'light.my_light')
+        var client = getHomeAssistantClientId(clientname)
+        if (client == null) {
+            return false
+        }
+        return createVariable(name, client, true, true, entityId)
+    }
+    
+    getHAVariable = function(clientname, name) {
+        //e.g. getHAVariable(clientname, 'test'); get the value of the given (HA) variable
+        var client = getHomeAssistantClientId(clientname)
+        if (client == null) {
+            return null
+        }
+        var variableId = getVariableIdByName(name, client, true)
+        return getVariableValue(variableId)
+    }
+    
+    setHAStateChanged = function(clientname, name, functionRef) {
+        //e.g. setHAStateChanged(null, 'kitchenLight', function(data) { log(data) })
+        return false
+    }
+    
+    createMqttVariableWithMockingValues = function(clientname, name, topic, valueOptions) {
+        //e.g. createMqttVariableWithMockingValues(null, 'kitchenLight', 'mqttnet/samples/topic/2', ['on', 'off'])
+        var client = getMqttClientId(clientname)
+        if (client == null) {
+            return false
+        }
+        return createVariable(name, client, true, true, topic, valueOptions)
+    }
+    
+    createMqttVariable = function(clientname, name, topic) {
+        //e.g. createMqttVariable(null, 'kitchenLight', 'mqttnet/samples/topic/2');
+        var client = getMqttClientId(clientname)
+        if (client == null) {
+            return false
+        }
+        return createVariable(name, client, true, true, topic)
+    }
+    
+    getMqttVariable = function(clientname, name) {
+        //e.g. getMqttVariable(clientname, 'test'); get the value of the given (MQTT topic) variable
+        var client = getMqttClientId(clientname)
+        if (client == null) {
+            return null
+        }
+        var variableId = getVariableIdByName(name, client, true)
+        return getVariableValue(variableId)
+    }
+    
+    setMqttStateChanged = function(clientname, name, functionRef) {
+        //e.g. setMqttStateChanged(null, 'kitchenLight', function(data) { log(data) })
+        return null
+    }
+    
     """";
 }

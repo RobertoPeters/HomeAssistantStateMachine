@@ -70,8 +70,8 @@
 								  Title="">
 
 				<Template Context="client">
-					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Edit" Click="@(() => AddOrEditClientAsync(client))" />
-					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Text="Delete" Click="@(() => OnDeleteAsync(client))" />
+					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Edit" Visible="@(client.Client.Id >= 3)" Click="@(() => AddOrEditClientAsync(client))" />
+					<RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Text="Delete" Visible="@(client.Client.Id >= 3)" Click="@(() => OnDeleteAsync(client))" />
 				</Template>
 			</RadzenDataGridColumn>
 		</Columns>

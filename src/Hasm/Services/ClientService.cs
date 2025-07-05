@@ -103,6 +103,9 @@ public class ClientService(DataService _dataService, VariableService _variableSe
             case Models.ClientType.HomeAssistant:
                 clientHandler = new HAClientHandler(client, _variableService, _messageBusService);
                 break;
+            case Models.ClientType.Mqtt:
+                clientHandler = new MqttClientHandler(client, _variableService, _messageBusService);
+                break;
             case Models.ClientType.Generic:
                 clientHandler = new GenericClientHandler(client);
                 break;
