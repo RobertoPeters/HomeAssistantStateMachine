@@ -11,8 +11,8 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         public Variable Variable { get; set; } = null!;
         public VariableValue VariableValue { get; set; } = null!;
         public bool IsMocking { get; set; } = false;
-        public VariableValue? MockingValue { get; set; } = null!;
-        public string? Value => IsMocking ? MockingValue?.Value : VariableValue.Value;
+        public string? MockingValue { get; set; }
+        public string? Value => IsMocking ? MockingValue : VariableValue.Value;
     }
 
     public class VariableValueInfo : VariableInfo
@@ -62,6 +62,24 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         return variableInfo;
     }
 
+    public async Task<bool> SetVariableValuesAsync(List<(int variableId, bool isMocking, string? mockingValue)> vaiableValues)
+    {
+        List<VariableValueInfo> updatedVariables = [];
+        foreach (var (variableId, isMocking, mockingValue) in vaiableValues)
+        {
+            if (_variables.TryGetValue(variableId, out var variableInfo))
+            {
+                variableInfo.MockingValue = mockingValue;
+                variableInfo.IsMocking = isMocking;
+                updatedVariables.Add(variableInfo.CopyObjectToOtherType<VariableInfo, VariableValueInfo>()!);
+            }
+        }
+        if (updatedVariables.Any())
+        {
+            await _messageBusService.PublishAsync(updatedVariables);
+        }
+        return true;
+    }
 
     public async Task<bool> SetVariableValuesAsync(List<(int variableId, string? value)> vaiableValues)
     {
