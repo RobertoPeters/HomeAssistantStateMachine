@@ -29,7 +29,8 @@
 		<PackageReference Include="WolverineFx" />
 		<PackageReference Include="Z.Blazor.Diagrams" />
         <PackageReference Include="Jint" />
-    </ItemGroup>
+		<PackageReference Include="MQTTnet" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\HassClient\HassClient.csproj" />

@@ -1,4 +1,6 @@
-﻿namespace Hasm.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace Hasm.Models;
 
 public class Client: ModelBase
 {

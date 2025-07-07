@@ -51,6 +51,31 @@
                     </Helper>
                 </RadzenFormField>
             }
+            @if (Model.ClientType == ClientType.Mqtt)
+            {
+                <RadzenFormField Text="Host *" Variant="@Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@MqttClientProperties!.Host" Name="Host" Placeholder="test.mosquitto.org" spellcheck="false" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Host" Text="This field is required" />
+                    </Helper>
+                </RadzenFormField>
+                <RadzenFormField Text="Tls" Variant="@Variant.Outlined">
+                    <RadzenRadioButtonList @bind-Value="@MqttClientProperties!.Tls" TValue="bool" class="rz-m-4 rz-mt-8">
+                        <Items>
+                            <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                            <RadzenRadioButtonListItem Text="No" Value="false" />
+                        </Items>
+                    </RadzenRadioButtonList>
+                </RadzenFormField>
+                <RadzenFormField Text="Username" Variant="@Variant.Outlined">
+                    <RadzenTextBox @bind-Value="@MqttClientProperties!.Username" Name="Username" Placeholder="Username" spellcheck="false" />
+                </RadzenFormField>
+                <RadzenFormField Text="Password" Variant="@Variant.Outlined">
+                    <RadzenPassword @bind-Value="@MqttClientProperties!.Password" Name="Password" />
+                </RadzenFormField>
+            }
             <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
         </RadzenStack>
     </RadzenTemplateForm>
@@ -70,21 +95,28 @@
 
     private Client? Model;
     private HAClientHandler.ClientProperties HAClientProperties = new();
+    private MqttClientHandler.ClientProperties MqttClientProperties = new();
     private RadzenTemplateForm<Client>? Form;
 
     protected override void OnInitialized()
     {
         var allClients = DataService.GetClients();
-        if (Id == null)
+        Id ??= 0;
+        if (Id == 0)
         {
             Model = new();
         }
         else
         {
-            Model = allClients.First(x => x.Id == Id).CopyObject();
+            Model = allClients.First(x => x.Id == Id).CopyObject()!;
+            Model.Id = Id.Value;
             if (!string.IsNullOrWhiteSpace(Model!.Data) && Model.ClientType == ClientType.HomeAssistant)
             {
                 HAClientProperties = System.Text.Json.JsonSerializer.Deserialize<HAClientHandler.ClientProperties>(Model.Data) ?? new();
+            }
+            else if (!string.IsNullOrWhiteSpace(Model!.Data) && Model.ClientType == ClientType.Mqtt)
+            {
+                MqttClientProperties = System.Text.Json.JsonSerializer.Deserialize<MqttClientHandler.ClientProperties>(Model.Data) ?? new();
             }
         }
         ExistingClientNames = allClients.Where(x => x.Id != Id).Select(x => x.Name).ToHashSet();
@@ -100,6 +132,10 @@
             if (Model!.ClientType == ClientType.HomeAssistant)
             {
                 Model!.Data = System.Text.Json.JsonSerializer.Serialize(HAClientProperties);
+            }
+            else if (Model!.ClientType == ClientType.Mqtt)
+            {
+                Model!.Data = System.Text.Json.JsonSerializer.Serialize(MqttClientProperties);
             }
             await DataService.AddOrUpdateClientAsync(Model);
             Close();
