@@ -1,4 +1,6 @@
-﻿namespace Hasm.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace Hasm.Models;
 
 public class Variable: ModelBase
 {
@@ -8,4 +10,7 @@ public class Variable: ModelBase
     public int? StateMachineId { get; set; }
     public bool Persistant { get; set; }
     public string? Data { get; set; }
+
+    [JsonIgnore]
+    public string? PreviousData { get; set; }
 }

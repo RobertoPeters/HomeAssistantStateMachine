@@ -56,7 +56,7 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
         variableList.Add(variable);
         if (variableList.Count == 1)
         {
-            if (_mqttClient == null && _mqttClient?.IsConnected == true)
+            if (_mqttClient != null && _mqttClient?.IsConnected == true)
             {
                 try
                 {
@@ -76,9 +76,9 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
 
     private async Task UpdateVariableInfoAsync(VariableService.VariableInfo orgVariable, VariableService.VariableInfo variable)
     {
-        if (orgVariable.Variable.Data != variable.Variable.Data)
+        if (orgVariable.Variable.PreviousData != variable.Variable.Data)
         {
-            await DeleteVariableInfoAsync([orgVariable]);
+            await DeleteVariableInfoAsync(variable, variable.Variable.PreviousData);
             if (!string.IsNullOrWhiteSpace(variable.Variable.Data))
             {
                 await AddVariableInfoAsync(orgVariable);
@@ -90,29 +90,34 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
     {
         foreach (var variable in variables)
         {
-            if (!string.IsNullOrWhiteSpace(variable.Variable.Data) && _variables.TryGetValue(variable.Variable.Data, out var variableList))
+            await DeleteVariableInfoAsync(variable, variable.Variable.Data);
+        }
+    }
+
+    private async Task DeleteVariableInfoAsync(VariableService.VariableInfo variable, string? topic)
+    {
+        if (!string.IsNullOrWhiteSpace(topic) && _variables.TryGetValue(topic, out var variableList))
+        {
+            var variableInList = variableList.FirstOrDefault(x => x.Variable.Id == Math.Abs(variable.Variable.Id));
+            if (variableInList != null)
             {
-                var variableInList = variableList.FirstOrDefault(x => x.Variable.Id == Math.Abs(variable.Variable.Id));
-                if (variableInList != null)
+                variableList.Remove(variableInList);
+                if (!variableList.Any())
                 {
-                    variableList.Remove(variableInList);
-                    if (!variableList.Any())
+                    _variables.TryRemove(topic, out _);
+                    if (_mqttClient != null && _mqttClient.IsConnected)
                     {
-                        _variables.TryRemove(variable.Variable.Data, out _);
-                        if (_mqttClient != null && _mqttClient.IsConnected)
+                        try
                         {
-                            try
+                            var options = new MqttClientUnsubscribeOptions()
                             {
-                                var options = new MqttClientUnsubscribeOptions()
-                                {
-                                    TopicFilters = [variable.Variable.Data]
-                                };
-                                await _mqttClient.UnsubscribeAsync(options);
-                            }
-                            catch
-                            {
-                                //nothing
-                            }
+                                TopicFilters = [topic]
+                            };
+                            await _mqttClient.UnsubscribeAsync(options);
+                        }
+                        catch
+                        {
+                            //nothing
                         }
                     }
                 }

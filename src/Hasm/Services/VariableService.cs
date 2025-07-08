@@ -145,6 +145,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
             await _dataService.DeleteVariableValueAsync(variableValue);
         }
 
+        variable.PreviousData = variable.Data;
         variable.Data = data;
         variable.MockingValues = mockingOptions;
         await _dataService.AddOrUpdateVariableAsync(variable);
