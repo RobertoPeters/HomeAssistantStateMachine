@@ -58,6 +58,11 @@ public class SystemMethods
         return _variableService.GetVariable(variableId)?.Value;
     }
 
+    public bool isMockingVariableActive(int variableId)
+    {
+        return _variableService.GetVariable(variableId)?.IsMocking ?? false;
+    }
+
     public int getClientId(string name)
     {
         var client = _clients.Values.FirstOrDefault(c => c.Name == name);
@@ -110,6 +115,7 @@ public class SystemMethods
         return !subStateMachineRunning()
     }
 
+    // INTERNAL USE ONLY
     startSubStateMachine = function(externalStateId, instanceId) {
         system.startSubStateMachine(externalStateId, instanceId)
     }
@@ -119,16 +125,20 @@ public class SystemMethods
         return system.getClientId(name)
     }
 
+    //returns array of all client ids of the given type
+    //e.g. getClientIdsByType(client_HomeAssistant) will return all Home Assistant client ids
     getClientIdsByType = function(value) {
         return system.getClientIdsByType(value)
     }
 
     //execute specific client commands (-1 if it fails)
+    //e.g. executeOnClient(clientIdOfHomeAssistant, null, 'callservice', 'light', 'turn_on', { "entity_id": "light.my_light", "brightness_pct": 20})
     executeOnClient = function(clientId, variableId, command, parameter1, parameter2, parameter3) {
         return system.clientExecute(clientId, variableId, command, parameter1, parameter2, parameter3)
     }
 
     // creates a variable and returns the variable id (-1 if it fails)
+    // e.g. createVariable('test', clientId, true, true, 'initialValue', ['option1', 'option2'])
     createVariableOnClient = function(name, clientId, isStateMachineVariable, persistant, data, mockingOptions) {
         return system.createVariable(name, clientId, isStateMachineVariable, persistant, data, mockingOptions)
     }
@@ -147,7 +157,12 @@ public class SystemMethods
     getVariableIdByName = function(name, clientId, isStateMachineVariable) {
         return system.getVariableIdByName(name, clientId, isStateMachineVariable)
     }
+
+    isMockingVariableActive = function(variableId) {
+        return system.isMockingVariableActive(variableId)
+    }    
     
+    //the two system clients
     var genericClientId = getClientId('Generic')
     var timerClientId = getClientId('Timer')
     
@@ -155,21 +170,26 @@ public class SystemMethods
     // GENERIC CLIENT HELPER METHODS
     //====================================================================================
     createGenericVariable = function(name, value, mockingOptions) {
+        //e.g. createGenericVariable('test', 'initialValue', ['option1', 'option2'])
         return createVariableOnClient(name, genericClientId, true, true, value, mockingOptions)
     }
 
     //====================================================================================
     // TIMER CLIENT HELPER METHODS
     //====================================================================================
-        
+    
+    //creates a timer variable and returns the variable id (-1 if it fails)
+    //it does not start the timer automatically, you need to call startTimerVariable(variableId) in order to actually start the timer
     createTimerVariable = function(name, seconds) {
         return createVariableOnClient(name, timerClientId, true, false, seconds, [0, 10])
     }
 
+    //starts the timer (-1 if it fails)
     startTimerVariable = function(variableId) {
         return executeOnClient(timerClientId, variableId, 'start')
     }
 
+    //stops/cancels the timer (-1 if it fails)
     cancelTimerVariable = function(variableId) {
         return executeOnClient(timerClientId, variableId, 'stop')
     }
@@ -242,7 +262,7 @@ public class SystemMethods
     }
 
     mqttClientPublish = function(clientname, topic, payload) {
-        //e.g. mqttClientPublish(null, 'mqttnet/samples/topic/2', 'on');
+        //e.g. mqttClientPublish(null, 'mqttnet/samples/topic/2', 'on')
         var client = getMqttClientId(clientname)
         if (client == null) {
             return false
@@ -278,10 +298,13 @@ public class SystemMethods
         return getVariableValue(variableId) == '0'
     }
     
+    //not suported anymore use isMockingVariableActive instead
+    //mocking variables is now per variable
     isMockingVariablesActive = function() {
         return false
     }
 
+    //not supported anymore
     gotoState = function(state) {
         return false
     }

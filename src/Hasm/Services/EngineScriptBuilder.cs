@@ -93,6 +93,15 @@ public static class EngineScriptBuilder
         }
         script.AppendLine("var currentState = null");
         script.AppendLine($"var startState = '{GetStartState(stateMachine)?.Id.ToString("N")}'");
+        var errorState = stateMachine.States.FirstOrDefault(s => s.IsErrorState);
+        if (errorState == null)
+        {
+            script.AppendLine($"var errorState = null");
+        }
+        else
+        {
+            script.AppendLine($"var errorState = '{errorState.Id.ToString("N")}'");
+        }
 
         script.AppendLine("var stateTransitionMap = []");
         foreach (var transition in stateMachine.Transitions)
@@ -105,25 +114,45 @@ public static class EngineScriptBuilder
 
         script.AppendLine(""""
             function schedule() {
-            	preScheduleAction()
-            	if (currentState == null)
-            	{
-            		changeState(startState)
-            	}
-            	else
-            	{
-            	    var transitions = stateTransitionMap.filter((transition) => transition.fromState == currentState)
-                    if (transitions.length == 0)
-                    {
-                       log('No transitions found for current state: ' + stateInfo[currentState].name)
-                       system.setRunningStateToFinished(instanceId)
-                    }
-            		var successFulTransition = transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
-            		if (successFulTransition != null)
-            		{
-            		    changeState(successFulTransition.toState)
-            		}
-            	}
+                var errorInSchedule = false
+                var errorLogInfo = ''
+
+                try
+                {
+                    errorLogInfo = 'Pre Schedule Action'
+            	    preScheduleAction()
+
+            	    if (currentState == null)
+            	    {
+                        errorLogInfo = 'State Entry (stateInfo[startState].name)'
+            		    changeState(startState)
+            	    }
+            	    else
+            	    {
+            	        var transitions = stateTransitionMap.filter((transition) => transition.fromState == currentState)
+                        if (transitions.length == 0)
+                        {
+                           log('No transitions found for current state: ' + stateInfo[currentState].name)
+                           system.setRunningStateToFinished(instanceId)
+                        }
+
+                        errorLogInfo = 'Evaluation transitions of State: ' + stateInfo[currentState].name
+               		    var successFulTransition = transitions.find((transition) => eval('transitionResult'+transition.transition+'()'))
+            		    if (successFulTransition != null)
+            		    {
+                           errorLogInfo = 'State Entry (' + stateInfo[successFulTransition.toState].name + ')'
+                           changeState(successFulTransition.toState)
+            		    }
+            	    }
+                } catch (error) {
+                    errorInSchedule = true
+                    errorLogInfo = errorLogInfo + ': ' + error
+                    log(errorLogInfo)
+                }
+
+                if (errorInSchedule && errorState != null && errorState != currentState) {
+                    changeState(errorState)
+                }
             }
 
             function changeState(state) {
