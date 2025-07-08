@@ -54,7 +54,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             //get the parameter mappings
             //we need the current state of the parent state machine
             var parentEngine = _engines[indexOfEngine - 1];
-            var parentStateId = JsValueToString(parentEngine.Engine.Evaluate("stateInfo[currentState].externalId"));
+            var parentStateId = parentEngine.Engine.Evaluate("stateInfo[currentState].externalId").JsValueToString();
             var parentState = parentEngine.StateMachine.States.FirstOrDefault(s => s.Id.ToString() == parentStateId);
             if (parentState != null)
             {
@@ -65,7 +65,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                     if (!string.IsNullOrWhiteSpace(subScriptVariableName) && !string.IsNullOrWhiteSpace(parentScriptVariableName))
                     {
                         var jsValue = _engines[indexOfEngine].Engine.Evaluate(parentScriptVariableName);
-                        var srcVariableValue = JsValueToString(jsValue, true);
+                        var srcVariableValue = jsValue.JsValueToString(true);
                         parentEngine.Engine.Evaluate($"{subScriptVariableName} = {srcVariableValue}");
                     }
                 }
@@ -125,7 +125,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             {
                 var scriptVariableName = stateState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
                 var jsValue = scriptVariableName == null ? null : _engines[indexOfEngine].Engine.Evaluate(scriptVariableName);
-                var srcVariableValue = JsValueToString(jsValue, true);
+                var srcVariableValue = jsValue.JsValueToString(true);
                 machineStateParameters.Add((variableName: parameter.ScriptVariableName, variableValue: srcVariableValue));
             }
             else
@@ -349,7 +349,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                     try
                     {
                         var jsValue = _engines[0].Engine.Evaluate(script);
-                        result = JsValueToString(jsValue);
+                        result = jsValue.JsValueToString();
                     }
                     catch (Exception e)
                     {
@@ -362,43 +362,6 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             autoResetEvent.Dispose();
         }
         return result;
-    }
-
-    private string JsValueToString(JsValue? jsValue, bool autoStringQuotes = false)
-    {
-        string result;
-        if (jsValue == null)
-        {
-            result = "null";
-        }
-        else
-        {
-            var obj = jsValue.ToObject();
-            if (obj == null)
-            {
-                result = "null";
-            }
-            else if (obj is string s)
-            {
-                if (autoStringQuotes)
-                {
-                    result = $"'{s}'";
-                }
-                else
-                {
-                    result = s;
-                }
-            }
-            else if (obj.GetType().IsValueType)
-            {
-                result = obj.ToString()!;
-            }
-            else
-            {
-                result = System.Text.Json.JsonSerializer.Serialize(obj, logJsonOptions);
-            }
-        }
-        return result!;
     }
 
     public async Task AddLogAsync(string instanceId, object? logObject)

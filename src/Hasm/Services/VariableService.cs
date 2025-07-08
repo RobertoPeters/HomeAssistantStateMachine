@@ -122,7 +122,8 @@ public class VariableService(DataService _dataService, MessageBusService _messag
 
         if (variableInfo != null
             && string.Compare(data, variableInfo.Variable.Data) == 0
-            && persistant == variableInfo.Variable.Persistant)
+            && persistant == variableInfo.Variable.Persistant
+            && variableInfo.Variable.MockingValues.ContainsSameElements(mockingOptions))
         {
             return variableInfo.Variable.Id;
         }

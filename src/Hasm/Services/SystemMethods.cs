@@ -26,7 +26,16 @@ public class SystemMethods
 
     public int createVariable(string name, int clientId, bool isStateMachineVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
     {
-        return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data?.ToString(), null).Result ?? -1;
+        List<string>? stringMockingOptions = null;
+        if (mockingOptions?.Any() == true)
+        {
+            stringMockingOptions = [];
+            foreach (var mockingOption in mockingOptions)
+            {
+                stringMockingOptions.Add(mockingOption.JsValueToString(true));
+            }
+        }
+        return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data?.ToString(), stringMockingOptions).Result ?? -1;
     }
 
     public int? getVariableIdByName(string name, int clientId, bool isStateMachineVariable)
