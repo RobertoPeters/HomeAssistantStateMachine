@@ -845,6 +845,7 @@ else
         if (args.Button == 0)
         {
             //check if link is added
+            var transitionEdited = false;
             foreach (var link in Diagram.Links.ToList())
             {
                 if (link.Target.Model == null)
@@ -867,6 +868,33 @@ else
                     };
                     StateMachine.Transitions.Add(transition);
                     await EditTransitionAsync(link);
+                    transitionEdited = true;
+                }
+            }
+
+            if (!transitionEdited)
+            {
+                //maybe two to the same state? not allowed
+                HashSet<string> existingTransitions = [];
+                foreach (var link in Diagram.Links.ToList())
+                {
+                    var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                    var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                    var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
+                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                    var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    if (transition != null)
+                    {
+                        var key = $"{sourceState.Name}.{targetState.Name}";
+                        if (existingTransitions.Contains(key))
+                        {
+                            Diagram.Links.Remove(link);
+                        }
+                        else
+                        {
+                            existingTransitions.Add(key);
+                        }
+                    }
                 }
             }
         }
