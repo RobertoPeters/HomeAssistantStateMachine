@@ -72,7 +72,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
 
     public async Task<bool> ExecuteAsync(int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
     {
-        var existingVariable = variableId== null ? null : _variables.Values.SelectMany(x => x)
+        var existingVariable = variableId == null ? null : _variables.Values.SelectMany(x => x)
              .Where(x => x.Variable.Id == variableId)
              .Select(x => x)
              .FirstOrDefault();
@@ -247,29 +247,34 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         }
     }
 
-    public Task DeleteVariableInfoAsync(List<VariableService.VariableInfo> variables)
+    public async Task DeleteVariableInfoAsync(List<VariableService.VariableInfo> variables)
     {
         foreach (var variable in variables)
         {
-            if (!string.IsNullOrWhiteSpace(variable.Variable.Data) && _variables.TryGetValue(variable.Variable.Data, out var variableList))
+            await DeleteVariableInfoAsync(variable, variable.Variable.Data);
+        }
+    }
+
+    public Task DeleteVariableInfoAsync(VariableService.VariableInfo variable, string? entityId)
+    {
+        if (!string.IsNullOrWhiteSpace(entityId) && _variables.TryGetValue(entityId, out var variableList))
+        {
+            var variableInList = variableList.FirstOrDefault(x => x.Variable.Id == Math.Abs(variable.Variable.Id));
+            if (variableInList != null)
             {
-                var variableInList = variableList.FirstOrDefault(x => x.Variable.Id == Math.Abs(variable.Variable.Id));
-                if (variableInList != null)
+                variableList.Remove(variableInList);
+                if (!variableList.Any())
                 {
-                    variableList.Remove(variableInList);
-                    if (!variableList.Any())
+                    _variables.TryRemove(entityId, out _);
+                    if (_wsApi != null)
                     {
-                        _variables.TryRemove(variable.Variable.Data, out _);
-                        if (_wsApi != null)
+                        try
                         {
-                            try
-                            {
-                                _wsApi.StateChagedEventListener.UnsubscribeEntityStatusChanged(variable.Variable.Data, EventHandlerEventStateChanged);
-                            }
-                            catch
-                            {
-                                //nothing
-                            }
+                            _wsApi.StateChagedEventListener.UnsubscribeEntityStatusChanged(entityId, EventHandlerEventStateChanged);
+                        }
+                        catch
+                        {
+                            //nothing
                         }
                     }
                 }
@@ -289,7 +294,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
 
             if (existingVariable != null)
             {
-                await UpdateVariableInfoAsync(existingVariable, variable);
+                await UpdateVariableInfoAsync(variable);
             }
             else if (!string.IsNullOrWhiteSpace(variable.Variable.Data))
             {
@@ -298,7 +303,7 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
         }
     }
 
-    private Task AddVariableInfoAsync(VariableService.VariableInfo variable)
+    private async Task AddVariableInfoAsync(VariableService.VariableInfo variable)
     {
         if (!_variables.TryGetValue(variable.Variable.Data!, out var variableList))
         {
@@ -313,6 +318,16 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
                 try
                 {
                     _wsApi!.StateChagedEventListener.SubscribeEntityStatusChanged(variable.Variable.Data, EventHandlerEventStateChanged);
+                    var states = await _wsApi!.GetStatesAsync();
+                    var state = states.FirstOrDefault(x => x.EntityId == variable.Variable.Data);
+                    if (state != null)
+                    {
+                        await UpdateVariableValue(state.EntityId, state.State);
+                    }
+                    else
+                    {
+                        await UpdateVariableValue(variable.Variable.Data!, null);
+                    }
                 }
                 catch
                 {
@@ -320,18 +335,16 @@ public class HAClientHandler(Client _client, VariableService _variableService, M
                 }
             }
         }
-
-        return Task.CompletedTask;
     }
 
-    private async Task UpdateVariableInfoAsync(VariableService.VariableInfo orgVariable, VariableService.VariableInfo variable)
+    private async Task UpdateVariableInfoAsync(VariableService.VariableInfo variable)
     {
-        if (orgVariable.Variable.Data != variable.Variable.Data)
+        if (variable.Variable.PreviousData != variable.Variable.Data)
         {
-            await DeleteVariableInfoAsync([orgVariable]);
+            await DeleteVariableInfoAsync(variable, variable.Variable.PreviousData);
             if (!string.IsNullOrWhiteSpace(variable.Variable.Data))
             {
-                await AddVariableInfoAsync(orgVariable);
+                await AddVariableInfoAsync(variable);
             }
         }
     }

@@ -9,7 +9,7 @@
         <RadzenStack>
             <RadzenFormField Text="Type *" Variant="@Variant.Outlined">
                 <ChildContent>
-                    <RadzenDropDown Data="(Models.ClientType[])Enum.GetValues(typeof(Models.ClientType))" @bind-Value="@Model!.ClientType" Name="ClientType" Disabled=@(Id != null) />
+                    <RadzenDropDown Data="(Models.ClientType[])Enum.GetValues(typeof(Models.ClientType))" @bind-Value="@Model!.ClientType" Name="ClientType" Disabled=@((Id ?? 0) != 0) />
                 </ChildContent>
                 <Helper>
                     <RadzenRequiredValidator Component="ClientType" Text="This field is required" />
