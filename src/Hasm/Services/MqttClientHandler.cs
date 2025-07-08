@@ -220,7 +220,7 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
                 if (!await _mqttClient.TryPingAsync())
                 {
                     //try connect
-                    var parts = _clientProperties.Host.Split(':', 2);
+                    var parts = _clientProperties.Host!.Split(':', 2);
                     var mqttClientOptionsPreBuild = new MqttClientOptionsBuilder();
 
                     if (parts.Length == 1)

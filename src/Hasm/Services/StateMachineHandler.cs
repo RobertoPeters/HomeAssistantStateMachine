@@ -327,7 +327,12 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
     public Task UpdateAsync(StateMachine stateMachine)
     {
+        Stop();
         StateMachine = stateMachine;
+        if (!StateMachine.IsSubStateMachine)
+        {
+            Start();
+        }
         return Task.CompletedTask;
     }
 

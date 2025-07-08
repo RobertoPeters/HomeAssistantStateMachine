@@ -253,7 +253,7 @@ else
         {
             var result = executeCommand;
             result = result + "\r\n";
-            if (StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running 
+            if (StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running
                 || StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Finished)
             {
                 result = result + StateMachineHandler.ExecuteScript(executeCommand);
@@ -420,6 +420,7 @@ else
                 <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
                 <RadzenMenuItem Text="Copy" Value="3" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
                 <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
+                <RadzenMenuItem Text="Edit Sub State Machine" Value="4" Disabled="@(!IsSubState())"></RadzenMenuItem>
             </RadzenMenu>);
         }
         else if (modelOnPointerUp is LinkModel link)
@@ -765,6 +766,9 @@ else
             case 3:
                 CopySelectionToClipboard();
                 break;
+            case 4:
+                EditSubStateMachine(node!);
+                break;
         }
     }
 
@@ -897,6 +901,26 @@ else
         }
     }
 
+    bool IsSubState()
+    {
+        var node = modelOnPointerUp as NodeModel;
+        if (node != null)
+        {
+            var state = StateMachine.States.First(x => x.Name == node.Title);
+            return state.IsSubState;
+        }
+        return false;
+    }
+
+    void EditSubStateMachine(NodeModel node)
+    {
+        var state = StateMachine.States.First(x => x.Name == node.Title);
+        if (state.IsSubState && state.SubStateMachineId != null)
+        {
+            JS.InvokeVoidAsync("navigateToTarget", $"/editstatemachine/{state.SubStateMachineId}", "_blank");
+        }
+    }
+
     async Task EditStateAsync(NodeModel node)
     {
         var state = StateMachine.States.First(x => x.Name == node.Title);
@@ -963,7 +987,6 @@ else
             StateMachine.PreStartAction = result.PreStartAction;
             StateMachine.IsSubStateMachine = result.IsSubStateMachine;
             StateMachine.SubStateMachineParameters = result.SubStateMachineParameters;
-            //await StateMachineService.UpdateMachineStatePropertiesAsync(StateMachine);
         }
     }
 
@@ -1022,8 +1045,8 @@ else
             StateMachine.States.Remove(state);
         }
         AddUIDataToStatesAndTransitions();
+        _unsavedChanges = false;
         await DataService.AddOrUpdateStateMachineAsync(StateMachine);
-        //await ReloadDiagramAsync();
     }
 
     private Stream GetFileStream()

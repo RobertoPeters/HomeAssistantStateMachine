@@ -33,31 +33,33 @@
                                 Data="@SubStateMachines" />
             </RadzenFormField>
             <RadzenFormField Text="Sub state machine" Variant="@Variant.Outlined">
-                <RadzenDataGrid Data="@SubStateMachineVariables"
-                                TItem="StateMachineVariable"
-                                RowUpdate="@OnUpdateRow"
-                                @ref=parametersGrid
-                                EditMode="DataGridEditMode.Multiple">
-                    <Columns>
-                        <RadzenDataGridColumn Property="SubStateMachineParameter.Name" Title="Name">
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn Property="SubStateParameter.ScriptVariableName" Title="Script variable name">
-                            <EditTemplate Context="parameter">
-                                <RadzenTextBox Style="width:200px; display: block" @bind-Value="parameter.SubStateParameter.ScriptVariableName" Name="ScriptVariableName" />
-                                <RadzenRequiredValidator Text="Script variable name is required" Component="ScriptVariableName" Popup="true" />
-                            </EditTemplate>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn Context="parameter" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Frozen="true" FrozenPosition="FrozenColumnPosition.Right">
-                            <Template Context="parameter">
-                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="rz-my-1 rz-ms-1" Click="@(args => EditRowAsync(parameter))" @onclick:stopPropagation="true" />
-                            </Template>
-                            <EditTemplate Context="parameter">
-                                <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@((args) => SaveRowAsync(parameter))" aria-label="Save" />
-                                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="rz-my-1 rz-ms-1" Click="@((args) => CancelEdit(parameter))" aria-label="Cancel" />
-                            </EditTemplate>
-                        </RadzenDataGridColumn>
-                    </Columns>
-                </RadzenDataGrid>
+                <div class="row" style="padding:5px;">
+                    <RadzenDataGrid Data="@SubStateMachineVariables"
+                                    TItem="StateMachineVariable"
+                                    RowUpdate="@OnUpdateRow"
+                                    @ref=parametersGrid
+                                    EditMode="DataGridEditMode.Multiple">
+                        <Columns>
+                            <RadzenDataGridColumn Property="SubStateMachineParameter.Name" Title="Name">
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="SubStateParameter.ScriptVariableName" Title="Script variable name">
+                                <EditTemplate Context="parameter">
+                                    <RadzenTextBox Style="width:200px; display: block" @bind-Value="parameter.SubStateParameter.ScriptVariableName" Name="ScriptVariableName" />
+                                    <RadzenRequiredValidator Text="Script variable name is required" Component="ScriptVariableName" Popup="true" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Context="parameter" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Frozen="true" FrozenPosition="FrozenColumnPosition.Right">
+                                <Template Context="parameter">
+                                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="rz-my-1 rz-ms-1" Click="@(args => EditRowAsync(parameter))" @onclick:stopPropagation="true" />
+                                </Template>
+                                <EditTemplate Context="parameter">
+                                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@((args) => SaveRowAsync(parameter))" aria-label="Save" />
+                                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="rz-my-1 rz-ms-1" Click="@((args) => CancelEdit(parameter))" aria-label="Cancel" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </div>
             </RadzenFormField>
         }
         <RadzenFormField Text="Description" Variant="@Variant.Outlined">
@@ -68,7 +70,7 @@
                 <RadzenTextArea @bind-Value="@Model!.EntryAction" Name="EntryAction" Rows="10" Style="width: 100%;" spellcheck="false" />
                 <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditEntryActionAsync"></RadzenIcon>
             </div>
-         </RadzenFormField>
+        </RadzenFormField>
     </RadzenStack>
     <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
     <RadzenButton ButtonType="ButtonType.Button" Text="Script" Click="@(() => ShowStateMachineScript.InvokeAsync())" />
@@ -201,7 +203,7 @@
 
     void Reset(StateMachineVariable parameter)
     {
-         parametersToUpdate.Remove(parameter);
+        parametersToUpdate.Remove(parameter);
     }
 
     void OnUpdateRow(StateMachineVariable parameter)
