@@ -78,12 +78,13 @@
 
             <RadzenDataGridColumn TItem="VariableService.VariableInfo"
                                   Property="Variable.StateMachineId"
-                                  FilterValue="@filterStateMachine"
+                                  FilterValue="@filterStateMachine"                                  
                                   Title="State Machine">
                 <FilterTemplate>
                     <RadzenDropDown Data="@statemachines.Values"
                                     AllowClear="true"
                                     TextProperty="Name"
+                                    Disabled="@(StateMachine != null)"
                                     ValueProperty="Id"
                                     Change="@grid!.Reload"
                                     @bind-Value=@filterStateMachine />
@@ -131,6 +132,9 @@
     [Parameter]
     public Client? Client { get; set; }
 
+    [Parameter]
+    public StateMachine? StateMachine { get; set; }
+
     private ConcurrentDictionary<int, VariableService.VariableInfo> variables = [];
     private ConcurrentDictionary<int, Client> clients = [];
     private ConcurrentDictionary<int, StateMachine> statemachines = [];
@@ -153,6 +157,10 @@
         if (Client != null)
         {
             filterClient = Client.Id;
+        }
+        if (StateMachine != null)
+        {
+            filterStateMachine = StateMachine.Id;
         }
         base.OnInitialized();
     }

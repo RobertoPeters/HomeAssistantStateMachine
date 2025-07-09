@@ -50,31 +50,46 @@
                 <RadzenPanelMenuItem Text="Properties" Icon="settings" Click="@EditStateMachineAsync" />
             </RadzenPanelMenu>
         </RadzenSplitterPane>
-        <RadzenSplitterPane Size="80%" Min="30px" Max="100%">
-            <div class="diagram-container" style="width: 100%;height: 800px;border: 1px solid black;" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="true">
-                <CascadingValue Value="Diagram" IsFixed="true">
-                    <DiagramCanvas>
-                        <Widgets>
-                            <SelectionBoxWidget />
-                        </Widgets>
-                    </DiagramCanvas>
-                </CascadingValue>
-            </div>
-            <div>
-                <div style="float:left;">
-                    <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
-                </div>
-                <div style="float:right;">
-                    <RadzenButton Size="ButtonSize.Small" Text="+" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 1.25))" />
-                    <RadzenButton Size="ButtonSize.Small" Text="-" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 0.75))" />
-                    <RadzenButton Size="ButtonSize.Small" Text="Reset" Click="@(() => Diagram.SetZoom(1.0))" />
-                    <RadzenButton Size="ButtonSize.Small" Text="Fit" Click="@(() => Diagram.ZoomToFit())" />
-                </div>
-            </div>
-            <div>
-                <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
-                <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string, object>() { { "aria-label", "Import" } })" />
-            </div>
+        <RadzenSplitterPane Size="80%" Min="30px">
+            <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
+                <RadzenSplitterPane Size="800px" Min="300px" Max="90%">
+                    <div>
+                        <div style="float:right;">
+                            <RadzenButton Size="ButtonSize.Small" Text="+" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 1.25))" />
+                            <RadzenButton Size="ButtonSize.Small" Text="-" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 0.75))" />
+                            <RadzenButton Size="ButtonSize.Small" Text="Reset" Click="@(() => Diagram.SetZoom(1.0))" />
+                            <RadzenButton Size="ButtonSize.Small" Text="Fit" Click="@(() => Diagram.ZoomToFit())" />
+                        </div>
+                    </div>
+                    <div class="diagram-container" style="width: 100%;height: 100%;border: 1px solid black;" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="true">
+                        <CascadingValue Value="Diagram" IsFixed="true">
+                            <DiagramCanvas>
+                                <Widgets>
+                                    <SelectionBoxWidget />
+                                </Widgets>
+                            </DiagramCanvas>
+                        </CascadingValue>
+                    </div>
+                 </RadzenSplitterPane>
+                <RadzenSplitterPane Min="10px">
+                    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+                        <RadzenSplitterPane Size="80%" Min="10px">
+                            <VariablesControl StateMachine="StateMachine" />
+                        </RadzenSplitterPane>
+                        <RadzenSplitterPane Min="10px">
+                            <div>
+                                <div style="float:left;">
+                                    <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
+                                </div>
+                            </div>
+                            <div>
+                                <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="5" Placeholder="interactive javascript execution" />
+                                <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string, object>() { { "aria-label", "Import" } })" />
+                            </div>
+                        </RadzenSplitterPane>
+                    </RadzenSplitter>
+                </RadzenSplitterPane>
+            </RadzenSplitter>
         </RadzenSplitterPane>
         <RadzenSplitterPane Min="50px">
             <RadzenPanel Text="Log" AllowCollapse="true" Collapsed="false">

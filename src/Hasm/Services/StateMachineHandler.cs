@@ -207,13 +207,13 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
     public void Restart()
     {
-        ErrorMessage = null;
         Stop();
         Start();
     }
 
     public void Start()
     {
+        ErrorMessage = null;
         _readyForTriggers = false;
         if (StateMachine.Enabled || StateMachine.IsSubStateMachine)
         {
