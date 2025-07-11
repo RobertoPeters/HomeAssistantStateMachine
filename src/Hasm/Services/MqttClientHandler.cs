@@ -1,8 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using Hasm.Models;
-using HassClient.WS;
 using MQTTnet;
-using MQTTnet.Client;
 
 namespace Hasm.Services;
 
@@ -201,7 +199,7 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
 
     private async Task CreateMqttClientAsync()
     {
-        var mqttFactory = new MQTTnet.MqttFactory();
+        var mqttFactory = new MQTTnet.MqttClientFactory();
         _mqttClient = mqttFactory.CreateMqttClient();
         _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceived;
         if (_client.Enabled && !string.IsNullOrWhiteSpace(_clientProperties.Host))
