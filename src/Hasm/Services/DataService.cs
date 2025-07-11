@@ -192,7 +192,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
 
     public async Task DeleteStateMachineAsync(StateMachine stateMachine)
     {
-        if (_stateMachines.TryRemove(-stateMachine.Id, out var orgStateMachine))
+        if (_stateMachines.TryRemove(Math.Abs(stateMachine.Id), out var orgStateMachine))
         {
             var variableIds = _variables.Values.Where(v => v.StateMachineId == orgStateMachine.Id)
                 .Select(x => x.Id)

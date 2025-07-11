@@ -184,40 +184,18 @@
         }
     }
 
-    private Task CopyStateMachineAsync(StateMachineInfo mi)
+    private async Task CopyStateMachineAsync(StateMachineInfo mi)
     {
-        return Task.CompletedTask;
-        // var newStateMachine = new StateMachine();
-        // newStateMachine.PreStartAction = mi.StateMachineHandler.StateMachine.PreStartAction;
-        // newStateMachine.PreScheduleAction = mi.StateMachineHandler.StateMachine.PreScheduleAction;
-        // newStateMachine.Enabled = false;
-        // var index = 1;
-        // newStateMachine.Name = $"{mi.Name}({index})";
-        // while (statemachines.Values.Any(x => x.Name == newStateMachine.Name))
-        // {
-        //     index++;
-        //     newStateMachine.Name = $"{mi.Name}({index})";
-        // }
-        // var handler = await CreateStateMachineAsync(newStateMachine);
-        // if (handler != null)
-        // {
-        //     newStateMachine = await StateMachineService.GetStateMachineDataAsync(handler.StateMachine.Id);
-        //     var srcStatemachine = await StateMachineService.GetStateMachineDataAsync(mi.Id);
-        //     foreach (var state in srcStatemachine.States)
-        //     {
-        //         state.StateMachineId = newStateMachine.Id;
-        //         state.StateMachine = null;
-        //         newStateMachine.States.Add(state);
-        //     }
-        //     foreach (var transition in srcStatemachine.Transitions)
-        //     {
-        //         transition.StateMachineId = newStateMachine.Id;
-        //         transition.StateMachine = null;
-        //         transition.FromState = null;
-        //         transition.ToState = null;
-        //         newStateMachine.Transitions.Add(transition);
-        //     }
-        //     await StateMachineService.UpdateMachineStateAsync(newStateMachine);
-        // }
+        var newStateMachine = mi.StateMachineHandler.StateMachine.CopyObject()!;
+        newStateMachine.Id = 0;
+        newStateMachine.Enabled = false;
+        var index = 1;
+        newStateMachine.Name = $"{mi.Name}({index})";
+        while (statemachines.Values.Any(x => x.Name == newStateMachine.Name))
+        {
+            index++;
+            newStateMachine.Name = $"{mi.Name}({index})";
+        }
+        await DataService.AddOrUpdateStateMachineAsync(newStateMachine);
     }
 }
