@@ -15,11 +15,11 @@ public class UndoRedo<T> where T : IEquatable<T>
     {
     }
 
-    public void Add(T item)
+    public bool Add(T item)
     {
         if (_undoStack.Any() && PeekUndo().Equals(item))
         {
-            return;
+            return false;
         }
 
         PushUndo(item);
@@ -28,6 +28,7 @@ public class UndoRedo<T> where T : IEquatable<T>
             _undoStack.RemoveAt(0);
         }
         _redoStack.Clear();
+        return true;
     }
 
     public bool CanUndo() => _undoStack.Any();

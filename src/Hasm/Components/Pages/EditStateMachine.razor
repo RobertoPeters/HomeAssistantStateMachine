@@ -123,7 +123,7 @@ else
     private bool _draggingElement;
     private EventCallback ShowStateMachineScriptEventCallback;
     private UndoRedo<string> _undoRedo = new();
-    private bool _unsavedChanges = false;
+    private string? _unsavedData = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -190,7 +190,7 @@ else
 
     private async Task OnBeforeInternalNavigation(LocationChangingContext context)
     {
-        if (_unsavedChanges)
+        if (_unsavedData != GetUndoData())
         {
             var isConfirmed = await JS.InvokeAsync<bool>("confirm", "Changes are not saved. Are you sure you want to leave the page without saving changes?");
 
@@ -300,7 +300,7 @@ else
     async Task ReloadDiagramAsync()
     {
         await ReloadDiagramAsync(null);
-        _unsavedChanges = false;
+        _unsavedData = GetUndoData();
     }
 
     Task ReloadDiagramAsync(StateMachine? useStateMachine)
@@ -350,7 +350,6 @@ else
     {
         InvokeAsync(async () =>
         {
-            _unsavedChanges = false;
             if (stateMachine.StateMachine.Id < 0)
             {
                 NavigationManager.NavigateTo("\\");
@@ -1065,7 +1064,7 @@ else
             StateMachine.States.Remove(state);
         }
         AddUIDataToStatesAndTransitions();
-        _unsavedChanges = false;
+         _unsavedData = GetUndoData();
         await DataService.AddOrUpdateStateMachineAsync(StateMachine);
     }
 
@@ -1093,6 +1092,10 @@ else
     async Task OnImport(UploadChangeEventArgs args)
     {
         AddUndo();
+        if (!args.Files.Any())
+        {
+            return;
+        }
         var file = args.Files.First();
         var stream = file.OpenReadStream();
         var stateMachine = await System.Text.Json.JsonSerializer.DeserializeAsync<StateMachine>(stream);
@@ -1119,11 +1122,15 @@ else
         await ReloadDiagramAsync(StateMachine);
     }
 
+    private string? GetUndoData()
+    {
+        AddUIDataToStatesAndTransitions();
+        return System.Text.Json.JsonSerializer.Serialize(StateMachine);
+    }
+
     private void AddUndo()
     {
-        _unsavedChanges = true;
-        AddUIDataToStatesAndTransitions();
-        var data = System.Text.Json.JsonSerializer.Serialize(StateMachine);
+        var data = GetUndoData();
         if (data != null)
         {
             _undoRedo.Add(data);
