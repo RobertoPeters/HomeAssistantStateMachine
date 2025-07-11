@@ -17,7 +17,11 @@ public static class DataRepositoryUpgrades
 
         if (userVersion is long version)
         {
-            if (version == targetVersion)
+            if (version == 0)
+            {
+                await CheckUpgradeTo2Async(connection);
+            }
+            else if (version == targetVersion)
             {
                 return;
             }
