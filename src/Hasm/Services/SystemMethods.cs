@@ -10,6 +10,8 @@ public class SystemMethods
     private readonly ClientService _clientService;
     private readonly ConcurrentDictionary<int, Models.Client> _clients;
 
+    public record DateTimeInfo(int year, int month, int day, int hour, int minute, int second, int dayOfWeek);
+
     public SystemMethods(ClientService clientService, DataService dataService, VariableService variableService, StateMachineHandler stateMachineHandler)
     {
 
@@ -22,6 +24,12 @@ public class SystemMethods
     public void log(string instanceId, object? message)
     {
         _stateMachineHandler.AddLogAsync(instanceId, message).Wait();
+    }
+
+    public DateTimeInfo getCurrentDateTime()
+    {
+        var now = DateTime.Now;
+        return new DateTimeInfo(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, (int)now.DayOfWeek);
     }
 
     public int createVariable(string name, int clientId, bool isStateMachineVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
@@ -105,6 +113,11 @@ public class SystemMethods
 
     log = function(message) {
         system.log(instanceId, message)
+    }
+
+    //returns the current (local) date and time as an object with year, month, day, hour, minute, second and dayOfWeek properties
+    getCurrentDateTime = function() {
+        return system.getCurrentDateTime()
     }
     
     //check if sub statemachine is running
