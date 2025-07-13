@@ -65,7 +65,10 @@
                             <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
                                 <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) && StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running)" />
                             </div>
-                            <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="4" Placeholder="interactive javascript execution" />
+                            <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="2" Placeholder="interactive javascript execution" />
+                            <div>
+                                <pre>@executeCommandResult</pre>
+                            </div>
                         </div>
                     </RadzenTabsItem>
                     <RadzenTabsItem Text="Log">
@@ -119,6 +122,7 @@ else
     private StateMachineHandler StateMachineHandler = null!;
     private List<LogData> logLines = [];
     private string? executeCommand;
+    private string? executeCommandResult;
     private bool _pauseLog;
     private bool _draggingElement;
     private EventCallback ShowStateMachineScriptEventCallback;
@@ -243,18 +247,16 @@ else
     {
         if (!string.IsNullOrWhiteSpace(executeCommand))
         {
-            var result = executeCommand;
-            result = result + "\r\n";
+            executeCommandResult = null;
             if (StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Running
                 || StateMachineHandler?.RunningState == StateMachineHandler.StateMachineRunningState.Finished)
             {
-                result = result + StateMachineHandler.ExecuteScript(executeCommand);
+                executeCommandResult = StateMachineHandler.ExecuteScript(executeCommand);
             }
             else
             {
-                result = result + "error: state machine not running";
+                executeCommandResult = "error: state machine not running";
             }
-            executeCommand = result;
             InvokeAsync(StateHasChanged);
         }
     }
