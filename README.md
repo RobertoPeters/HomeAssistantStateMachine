@@ -20,6 +20,4 @@ Radzen.Blazor is used for UI
 
 Z.Blazor.Diagrams for state machine modulation
 
-Entity Framework with SQlite is used for storage and ORM
-
 Jint is used for scripts in states and transitiions (javascript for user)
