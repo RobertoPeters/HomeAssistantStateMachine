@@ -40,7 +40,7 @@ public class SystemMethods
             stringMockingOptions = [];
             foreach (var mockingOption in mockingOptions)
             {
-                stringMockingOptions.Add(mockingOption.JsValueToString(true));
+                stringMockingOptions.Add(mockingOption.JsValueToString(false));
             }
         }
         return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data?.ToString(), stringMockingOptions).Result ?? -1;
