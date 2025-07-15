@@ -176,7 +176,7 @@ else
         };
 
         Diagram = new BlazorDiagram(options);
-        Diagram.RegisterComponent<StateMachineStateNodeModel, NodeWidget>();
+        Diagram.RegisterComponent<StateMachineStateNodeModel, StateMachineStateNodeWidget>();
 
         var keyboardBehavior = Diagram.GetBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
         keyboardBehavior!.RemoveShortcut("g", ctrl: true, shift: false, alt: true);
@@ -315,7 +315,7 @@ else
         foreach (var state in StateMachine.States)
         {
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
-            var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state.Id, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
+            var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
             {
                 Title = state.Name
             });
@@ -392,7 +392,7 @@ else
         state.Id = Guid.NewGuid();
         StateMachine.States.Add(state);
 
-        var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state.Id, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
+        var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
         {
             Title = state.Name
         });
