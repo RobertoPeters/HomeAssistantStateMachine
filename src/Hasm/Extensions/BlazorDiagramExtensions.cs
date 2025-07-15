@@ -1,5 +1,6 @@
 ﻿using Blazor.Diagrams;
 using Blazor.Diagrams.Core.Models;
+using Hasm.Components;
 using Hasm.Models;
 using Hasm.Services;
 
@@ -18,17 +19,17 @@ public static class BlazorDiagramExtensions
         {
             return null;
         }
-        return diagram.Nodes.FirstOrDefault(x => x.Title == state.Name);
+        return diagram.Nodes.FirstOrDefault(x => ((StateMachineStateNodeModel)x).StateId == state.Id);
     }
 
     public static State? GetState(this NodeModel node, StateMachine stateMachine)
     {
-        return stateMachine.States.First(x => x.Name == node.Title);
+        return stateMachine.States.First(x => x.Id == ((StateMachineStateNodeModel)node).StateId);
     }
 
     public static State? GetState(this NodeModel node, ClipboardService.ClipboardContent content)
     {
-        return content.States.First(x => x.Name == node.Title);
+        return content.States.First(x => x.Id == ((StateMachineStateNodeModel)node).StateId);
     }
     
 }
