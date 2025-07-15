@@ -335,9 +335,8 @@ else
 
     private void AddLink(Transition transition, PortAlignment sourcePortAllignment, PortAlignment targetPortAllignment)
     {
-        var source = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.FromStateId)!.Name);
-        var target = Diagram.Nodes.First(x => x.Title == StateMachine.States.First(y => y.Id == transition.ToStateId)!.Name);
-        var link = Diagram.Links.Add(new LinkModel(source.Ports.First(x => x.Alignment == sourcePortAllignment), target.Ports.First(x => x.Alignment == targetPortAllignment)));
+        (var source, var target) = Diagram.GetNodes(transition, StateMachine);
+        var link = Diagram.Links.Add(new LinkModel(source!.Ports.First(x => x.Alignment == sourcePortAllignment), target!.Ports.First(x => x.Alignment == targetPortAllignment)));
         link.TargetMarker = LinkMarker.Arrow;
         //link.Segmentable = true;
         link.AddLabel(transition.Description ?? transition.Condition ?? "true");
@@ -420,8 +419,8 @@ else
         {
             var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
             var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-            var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-            var targetState = StateMachine.States.First(x => x.Name == target.Title);
+            var sourceState = source.GetState(StateMachine)!;
+            var targetState = target.GetState(StateMachine)!;
 
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnLinkContextMenuItemClick">
@@ -565,7 +564,7 @@ else
             NodeModel? node = sm as NodeModel;
             if (node != null)
             {
-                var state = StateMachine.States.First(x => x.Name == node.Title);
+                var state = node.GetState(StateMachine)!;
                 content.States.Add(state);
             }
         }
@@ -576,8 +575,8 @@ else
             {
                 var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                 var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                var sourceState = content.States.FirstOrDefault(x => x.Name == source.Title);
-                var targetState = content.States.FirstOrDefault(x => x.Name == target.Title);
+                var sourceState = source.GetState(content);
+                var targetState = target.GetState(content);
                 if (sourceState != null && targetState != null)
                 {
                     var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
@@ -652,7 +651,7 @@ else
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
             var newState = AddNewState(state, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
             oldStateIdToNewId.Add(oldId, newState.Id);
-            Diagram.SelectModel(Diagram.Nodes.Where(x => x.Title == state.Name).First(), false);
+            Diagram.SelectModel(Diagram.GetNode(state)!, false);
         }
 
         foreach (var transition in transitions)
@@ -709,8 +708,8 @@ else
                     //current situation
                     var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
                     var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                    var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                    var sourceState = source.GetState(StateMachine)!;
+                    var targetState = target.GetState(StateMachine)!;
                     var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                     var sourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
                     var targetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
@@ -769,8 +768,8 @@ else
     {
         var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
         var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-        var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-        var targetState = StateMachine.States.First(x => x.Name == target.Title);
+        var sourceState = source.GetState(StateMachine)!;
+        var targetState = target.GetState(StateMachine)!;
         var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
         StateMachine.Transitions.Remove(transition);
         Diagram.Links.Remove(link!);
@@ -779,7 +778,7 @@ else
     void RemoveNode(NodeModel node)
     {
         //should remove transitions as well
-        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var state = node.GetState(StateMachine)!;
         var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
         foreach (var transition in transitions)
         {
@@ -848,8 +847,8 @@ else
                 }
                 var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                 var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
-                var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                var sourceState = source3.GetState(StateMachine)!;
+                var targetState = target.GetState(StateMachine)!;
                 var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                 if (transition == null)
                 {
@@ -873,8 +872,8 @@ else
                 {
                     var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                     var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                    var sourceState = StateMachine.States.First(x => x.Name == source3.Title);
-                    var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                    var sourceState = source3.GetState(StateMachine)!;
+                    var targetState = target.GetState(StateMachine)!;
                     var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                     if (transition != null)
                     {
@@ -901,8 +900,8 @@ else
     {
         var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
         var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-        var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-        var targetState = StateMachine.States.First(x => x.Name == target.Title);
+        var sourceState = source.GetState(StateMachine)!;
+        var targetState = target.GetState(StateMachine)!;
         var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
         var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
         {
@@ -927,7 +926,7 @@ else
         var node = modelOnPointerUp as NodeModel;
         if (node != null)
         {
-            var state = StateMachine.States.First(x => x.Name == node.Title);
+            var state = node.GetState(StateMachine)!;
             return state.IsSubState;
         }
         return false;
@@ -935,7 +934,7 @@ else
 
     void EditSubStateMachine(NodeModel node)
     {
-        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var state = node.GetState(StateMachine)!;
         if (state.IsSubState && state.SubStateMachineId != null)
         {
             JS.InvokeVoidAsync("navigateToTarget", $"/editstatemachine/{state.SubStateMachineId}", "_blank");
@@ -944,7 +943,7 @@ else
 
     async Task EditStateAsync(NodeModel node)
     {
-        var state = StateMachine.States.First(x => x.Name == node.Title);
+        var state = node.GetState(StateMachine)!;
         var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>($"Edit State: {state.Name}", dialog =>
         {
             dialog.State = state;
@@ -1014,7 +1013,7 @@ else
     async Task ShowStateMachineAsync()
     {
         var copy = StateMachine.CopyObject();
-        var removedStates = copy!.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
+        var removedStates = copy!.States.Where(x => Diagram.GetNode(x) == null).ToList();
         foreach (var state in removedStates)
         {
             copy.States.Remove(state);
@@ -1031,7 +1030,7 @@ else
         foreach (var state in StateMachine.States)
         {
             var uiData = new NodeUIData();
-            var node = Diagram.Nodes.First(x => x.Title == state.Name);
+            var node = Diagram.GetNode(state)!;
             uiData.X = (int)node.Position.X;
             uiData.Y = (int)node.Position.Y;
             state.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
@@ -1042,8 +1041,8 @@ else
             {
                 var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                 var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                var sourceState = StateMachine.States.First(x => x.Name == source.Title);
-                var targetState = StateMachine.States.First(x => x.Name == target.Title);
+                var sourceState = source.GetState(StateMachine)!;
+                var targetState = target.GetState(StateMachine)!;
                 var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                 var uiData = new LinkUIData();
                 uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
@@ -1055,7 +1054,7 @@ else
 
     async Task SaveAsync()
     {
-        var removedStates = StateMachine.States.Where(x => !Diagram.Nodes.Any(y => y.Title == x.Name)).ToList();
+        var removedStates = StateMachine.States.Where(x => Diagram.GetNode(x) == null).ToList();
         foreach (var state in removedStates)
         {
             var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
