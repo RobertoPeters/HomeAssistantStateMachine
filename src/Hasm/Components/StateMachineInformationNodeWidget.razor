@@ -1,0 +1,22 @@
+﻿@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Models
+@inject DialogService DialogService
+@inherits ComponentBase
+<div style="position: relative;@(Node.Selected ? "border:solid" : "border:none");">
+    @(Information.Description ?? Information.Evaluation ?? "")<strong>@(Information.EvaluationResult ?? "")</strong>
+ </div>
+
+@code {
+
+    [Parameter]
+    public StateMachineInformationNodeModel Node { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        Information = Node.StateMachine.Informations.First(x => x.Id == Node.InformationId);
+    }
+
+    Models.Information Information = null!;
+}

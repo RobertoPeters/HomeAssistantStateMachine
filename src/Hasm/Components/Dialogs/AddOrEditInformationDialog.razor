@@ -1,0 +1,74 @@
+﻿@using Hasm.Models
+@inherits ResultDialogBase<Information>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="Information">
+    <RadzenStack>
+        <RadzenFormField Text="Description" Variant="@Variant.Outlined">
+            <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" spellcheck="false" />
+        </RadzenFormField>
+        <RadzenFormField Text="Evaluation" Variant="@Variant.Outlined">
+            <div class="textarea-wrapper">
+                <RadzenTextArea @bind-Value="@Model!.Evaluation" Name="Evaluation" Rows="10" Style="width: 100%;" spellcheck="false" />
+                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditEvaluationAsync"></RadzenIcon>
+            </div>
+        </RadzenFormField>
+    </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    <RadzenButton ButtonType="ButtonType.Button" Text="Script" Click="@(() => ShowStateMachineScript.InvokeAsync())" />
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    [Parameter]
+    public Information? Information { get; set; }
+
+    [Parameter]
+    public EventCallback ShowStateMachineScript { get; set; }
+
+    [Parameter]
+    public StateMachine? StateMachine { get; set; }
+
+    private Information? Model;
+    private RadzenTemplateForm<Information>? Form;
+
+    protected override void OnInitialized()
+    {
+        if (Information == null)
+        {
+            Information = new Information();
+        }
+        Model = Information.CopyObject();
+        base.OnInitialized();
+    }
+
+    async Task EditEvaluationAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Transition Condition", dialog =>
+        {
+            dialog.Script = Model!.Evaluation;
+            if (StateMachine != null)
+            {
+                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+            }
+        });
+        if (result != null)
+        {
+            Model!.Evaluation = result;
+        }
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            Close(Model);
+        };
+    }
+
+}

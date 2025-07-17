@@ -8,6 +8,7 @@ public class ClipboardService
     {
         public List<State> States { get; set; } = [];
         public List<Transition> Transitions { get; set; } = [];
+        public List<Information> Informations { get; set; } = [];
         public StateMachine? StateMachine { get; set; }
     }
 
@@ -19,7 +20,7 @@ public class ClipboardService
 
     public void Copy(ClipboardContent content)
     {
-        if (!content.States.Any() && content.StateMachine == null)
+        if (!content.States.Any() && !content.Informations.Any() && content.StateMachine == null)
         {
             _clipboardContent = null;
         }

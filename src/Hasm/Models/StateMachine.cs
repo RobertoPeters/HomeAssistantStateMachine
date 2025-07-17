@@ -10,4 +10,5 @@ public class StateMachine: ModelBase
     public List<State> States { get; set; } = [];
     public List<Transition> Transitions { get; set; } = [];
     public List<SubStateMachineParameter> SubStateMachineParameters { get; set; } = [];
+    public List<Information> Informations { get; set; } = [];
 }

@@ -19,17 +19,43 @@ public static class BlazorDiagramExtensions
         {
             return null;
         }
-        return diagram.Nodes.FirstOrDefault(x => ((StateMachineStateNodeModel)x).StateId == state.Id);
+        return diagram.Nodes.FirstOrDefault(x => (x is StateMachineStateNodeModel) && ((StateMachineStateNodeModel)x).StateId == state.Id);
+    }
+
+    public static NodeModel? GetNode(this BlazorDiagram diagram, Information? information)
+    {
+        if (information == null)
+        {
+            return null;
+        }
+        return diagram.Nodes.FirstOrDefault(x => (x is StateMachineInformationNodeModel) && ((StateMachineInformationNodeModel)x).InformationId == information.Id);
     }
 
     public static State? GetState(this NodeModel node, StateMachine stateMachine)
     {
-        return stateMachine.States.First(x => x.Id == ((StateMachineStateNodeModel)node).StateId);
+        if (node is StateMachineStateNodeModel smNode)
+        {
+            return stateMachine.States.First(x => x.Id == smNode.StateId);
+        }
+        return null;
+    }
+
+    public static Information? GetInformation(this NodeModel node, StateMachine stateMachine)
+    {
+        if (node is StateMachineInformationNodeModel infNode)
+        {
+            return stateMachine.Informations.First(x => x.Id == infNode.InformationId);
+        }
+        return null;
     }
 
     public static State? GetState(this NodeModel node, ClipboardService.ClipboardContent content)
     {
-        return content.States.First(x => x.Id == ((StateMachineStateNodeModel)node).StateId);
+        if (node is StateMachineStateNodeModel smNode)
+        {
+            return content.States.First(x => x.Id == smNode.StateId);
+        }
+        return null;
     }
     
 }

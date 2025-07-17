@@ -323,6 +323,11 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
                 }
             }
         }
+
+        _messageBusService.PublishAsync(new StateMachineScheduledInfo
+        {
+            StateMachineId = StateMachine.Id
+        });
     }
 
     public Task UpdateAsync(StateMachine stateMachine)
@@ -334,6 +339,35 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             Start();
         }
         return Task.CompletedTask;
+    }
+
+    public void ExecuteScript(List<Information> informations)
+    {
+        if (_engines.Any())
+        {
+            var autoResetEvent = new AutoResetEvent(false);
+            Task.Run(() =>
+            {
+                lock (_lockEngineObject)
+                {
+                    foreach (var information in informations)
+                    {
+                        try
+                        {
+                            var jsValue = _engines[0].Engine.Evaluate(information.Evaluation!);
+                            information.EvaluationResult = jsValue.JsValueToString();
+                        }
+                        catch (Exception e)
+                        {
+                            information.EvaluationResult = $"Error: {e.Message}";
+                        }
+                    }
+                }
+                autoResetEvent.Set();
+            });
+            autoResetEvent.WaitOne();
+            autoResetEvent.Dispose();
+        }
     }
 
     public string? ExecuteScript(string script)

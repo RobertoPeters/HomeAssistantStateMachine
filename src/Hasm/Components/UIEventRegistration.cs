@@ -10,7 +10,8 @@ public class UIEventRegistration
     public event EventHandler<StateMachineHandler.StateMachineHandlerInfo>? StateMachineHandlerInfoChanged;
     public event EventHandler<List<VariableService.VariableInfo>>? VariablesChanged;
     public event EventHandler<List<VariableService.VariableValueInfo>>? VariableValuesChanged;
-    public event EventHandler<ClientConnectionInfo>? ClientConnectionInfoChanged;    
+    public event EventHandler<ClientConnectionInfo>? ClientConnectionInfoChanged;
+    public event EventHandler<StateMachineScheduledInfo>? StateMachineScheduledInfoChanged;
 
     public void Handle(IClientHandler clientHandler)
     {
@@ -45,6 +46,11 @@ public class UIEventRegistration
     public void Handle(ClientConnectionInfo clientConnectionInfo)
     {
         ClientConnectionInfoChanged?.Invoke(this, clientConnectionInfo);
+    }
+
+    public void Handle(StateMachineScheduledInfo stateMachineScheduledInfo)
+    {
+        StateMachineScheduledInfoChanged?.Invoke(this, stateMachineScheduledInfo);
     }
 }
 
@@ -89,6 +95,9 @@ public class UIEventRegistrationMessageHandler
     {
         uiEventRegistration.Handle(clientConnectionInfo);
     }
-    
 
+    public void Handle(StateMachineScheduledInfo stateMachineScheduledInfo, UIEventRegistration uiEventRegistration)
+    {
+        uiEventRegistration.Handle(stateMachineScheduledInfo);
+    }    
 }

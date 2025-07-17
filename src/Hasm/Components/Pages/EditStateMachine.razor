@@ -138,6 +138,7 @@ else
         UIEventRegistration.LogEntryAdded += LogEvent;
         UIEventRegistration.StateMachineHandlerInfoChanged += StateMachineHandlerInfoChanged;
         UIEventRegistration.StateMachineHandlerChanged += StateMachineHandlerChanged;
+        UIEventRegistration.StateMachineScheduledInfoChanged += StateMachineScheduledInfoChanged;
         ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
         StateMachineHandler = StateMachineService.GetStateMachine(Id);
         var options = new BlazorDiagramOptions
@@ -181,6 +182,7 @@ else
 
         Diagram = new BlazorDiagram(options);
         Diagram.RegisterComponent<StateMachineStateNodeModel, StateMachineStateNodeWidget>();
+        Diagram.RegisterComponent<StateMachineInformationNodeModel, StateMachineInformationNodeWidget>();
 
         var keyboardBehavior = Diagram.GetBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
         keyboardBehavior!.RemoveShortcut("g", ctrl: true, shift: false, alt: true);
@@ -195,6 +197,7 @@ else
         Diagram.PointerDown += DiagramPointerDown;
 
         await ReloadDiagramAsync();
+        RefreshInformations();
         await base.OnInitializedAsync();
     }
 
@@ -348,7 +351,16 @@ else
             var uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
             AddLink(transition, uiData!.SourcePort, uiData!.TargetPort);
         }
+        foreach (var information in StateMachine.Informations)
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
+            var node = Diagram.Nodes.Add(new StateMachineInformationNodeModel(information.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
+            {
+                Title = information.Description ?? information.Evaluation ?? ""
+            });
+        }
         StateChanged(null, null);
+        RefreshInformations();
         Diagram.Refresh();
         return Task.CompletedTask;
     }
@@ -382,10 +394,47 @@ else
         });
     }
 
+    private void StateMachineScheduledInfoChanged(object? sender, StateMachineScheduledInfo stateMachineScheduledInfo)
+    {
+        if (stateMachineScheduledInfo.StateMachineId != StateMachine.Id)
+        {
+            return;
+        }
+        RefreshInformations();
+    }
+
+    private void RefreshInformations()
+    {
+        if (StateMachineHandler?.RunningState != StateMachineHandler.StateMachineRunningState.Running
+            && StateMachineHandler?.RunningState != StateMachineHandler.StateMachineRunningState.Finished)
+        {
+            return;
+        }
+
+
+        var allEvaluations = StateMachine.Informations.Where(x => !string.IsNullOrWhiteSpace(x.Evaluation)).ToList();
+        if (!allEvaluations.Any())
+        {
+            return;
+        }
+
+        StateMachineHandler.ExecuteScript(allEvaluations);
+
+        foreach(var information in allEvaluations)
+        {
+            var node = Diagram.GetNode(information);
+            if (node is StateMachineInformationNodeModel infNode)
+            {
+                infNode.Refresh();
+            }
+        }
+    }
+
     public void Dispose()
     {
+        UIEventRegistration.StateMachineScheduledInfoChanged -= StateMachineScheduledInfoChanged;
         UIEventRegistration.StateMachineHandlerChanged -= StateMachineHandlerChanged;
-        UIEventRegistration.LogEntryAdded += LogEvent;
+        UIEventRegistration.LogEntryAdded -= LogEvent;
         UIEventRegistration.StateMachineHandlerInfoChanged -= StateMachineHandlerInfoChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
         Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
@@ -405,6 +454,19 @@ else
         }
     }
 
+    async Task AddInformationAsync(int x, int y)
+    {
+        var information = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, Information>("Add Information", dialog =>
+        {
+            dialog.StateMachine = StateMachine;
+        });
+        if (information != null)
+        {
+            AddNewInformation(information, x, y);
+            Diagram.Refresh();
+        }
+    }
+
     State AddNewState(State state, int x, int y)
     {
         state.Id = Guid.NewGuid();
@@ -420,6 +482,19 @@ else
         node.AddPort(PortAlignment.Left);
         node.AddPort(PortAlignment.Right);
         return state;
+    }
+
+    Information AddNewInformation(Information information, int x, int y)
+    {
+        information.Id = Guid.NewGuid();
+        StateMachine.Informations.Add(information);
+
+        var node = Diagram.Nodes.Add(new StateMachineInformationNodeModel(information.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
+        {
+            Title = information.Description ?? information.Evaluation ?? ""
+        });
+
+        return information;
     }
 
     Model? modelOnPointerUp = null;
@@ -477,6 +552,7 @@ else
     @<RadzenMenu Click="OnContextMenuItemClick">
     <RadzenMenuItem Text="Edit properties" Value="5"></RadzenMenuItem>
     <RadzenMenuItem Text="Add state" Value="1"></RadzenMenuItem>
+    <RadzenMenuItem Text="Add information" Value="20"></RadzenMenuItem>
     <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
     <RadzenMenuItem Text="Copy" Value="8">
         <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
@@ -501,9 +577,11 @@ else
         switch (args.Value)
         {
             case 1:
-                AddUndo();
-                var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
-                await AddStateAsync((int)p.X, (int)p.Y);
+                {
+                    AddUndo();
+                    var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+                    await AddStateAsync((int)p.X, (int)p.Y);
+                }
                 break;
             case 2:
                 await SaveAsync();
@@ -547,6 +625,13 @@ else
             case 15:
                 await RedoAsync(Diagram);
                 break;
+            case 20:
+                {
+                    AddUndo();
+                    var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+                    await AddInformationAsync((int)p.X, (int)p.Y);
+                }
+                break;
         }
         ContextMenuService.Close();
     }
@@ -581,11 +666,15 @@ else
         var selectedModels = Diagram.GetSelectedModels().ToList();
         foreach (var sm in selectedModels)
         {
-            NodeModel? node = sm as NodeModel;
-            if (node != null)
+            if (sm is StateMachineStateNodeModel node)
             {
                 var state = node.GetState(StateMachine)!;
                 content.States.Add(state);
+            }
+            else if (sm is StateMachineInformationNodeModel infnode)
+            {
+                var information = infnode.GetInformation(StateMachine)!;
+                content.Informations.Add(information);
             }
         }
         foreach (var sm in selectedModels)
@@ -619,6 +708,7 @@ else
         AddUndo();
         List<Transition> transitions = content.Transitions;
         List<State> states = content.States;
+        List<Information> informations = content.Informations;
 
         if (content.StateMachine != null)
         {
@@ -627,6 +717,7 @@ else
             StateMachine.Enabled = content.StateMachine.Enabled;
             transitions = content.StateMachine.Transitions.ToList();
             states = content.StateMachine.States.ToList();
+            informations = content.StateMachine.Informations.ToList();
         }
 
         int? minX = null;
@@ -637,6 +728,21 @@ else
             if (!string.IsNullOrWhiteSpace(state.UIData))
             {
                 var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
+                if (uiData != null && (minX == null || uiData.X < minX))
+                {
+                    minX = uiData.X;
+                }
+                if (uiData != null && (minY == null || uiData.Y < minY))
+                {
+                    minY = uiData.Y;
+                }
+            }
+        }
+        foreach (var information in informations)
+        {
+            if (!string.IsNullOrWhiteSpace(information.UIData))
+            {
+                var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
                 if (uiData != null && (minX == null || uiData.X < minX))
                 {
                     minX = uiData.X;
@@ -688,6 +794,13 @@ else
             transition.Id = Guid.NewGuid();
             StateMachine.Transitions.Add(transition);
             AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
+        }
+
+        foreach (var information in informations)
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
+            var newState = AddNewInformation(information, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            Diagram.SelectModel(Diagram.GetNode(information)!, false);
         }
 
         Diagram.Refresh();
@@ -797,15 +910,24 @@ else
 
     void RemoveNode(NodeModel node)
     {
-        //should remove transitions as well
-        var state = node.GetState(StateMachine)!;
-        var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
-        foreach (var transition in transitions)
+        if (node is StateMachineStateNodeModel smNode)
         {
-            StateMachine.Transitions.Remove(transition);
+            //should remove transitions as well
+            var state = smNode.GetState(StateMachine)!;
+            var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+            foreach (var transition in transitions)
+            {
+                StateMachine.Transitions.Remove(transition);
+            }
+            StateMachine.States.Remove(state);
+            Diagram.Nodes.Remove(node!);
         }
-        StateMachine.States.Remove(state);
-        Diagram.Nodes.Remove(node!);
+        else if (node is StateMachineInformationNodeModel infNode)
+        {
+            var information = infNode.GetInformation(StateMachine)!;
+            StateMachine.Informations.Remove(information);
+            Diagram.Nodes.Remove(node!);
+        }
     }
 
     void DiagramPointerMove(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
@@ -988,13 +1110,39 @@ else
         }
     }
 
+    async Task EditInformationAsync(NodeModel node)
+    {
+        var information = node.GetInformation(StateMachine)!;
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, Information>($"Edit Information", dialog =>
+        {
+            dialog.Information = information;
+            dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
+            dialog.StateMachine = StateMachine;
+        });
+        if (result != null)
+        {
+            AddUndo();
+            information.Description = result.Description;
+            information.Evaluation = result.Evaluation;
+            information.EvaluationResult = "";
+
+            node.Title = information.Description ?? information.Evaluation ?? "";
+            RefreshInformations();
+            node.Refresh();
+        }
+    }
+
     async void DiagramPointerDoubleClickAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
     {
         if (args.Button != 0) return;
 
-        if (model is NodeModel node)
+        if (model is StateMachineStateNodeModel node)
         {
             await EditStateAsync(node);
+        }
+        else if (model is StateMachineInformationNodeModel infnode)
+        {
+            await EditInformationAsync(infnode);
         }
         else if (model is LinkModel link)
         {
@@ -1070,6 +1218,14 @@ else
                 transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
             }
         }
+        foreach (var information in StateMachine.Informations)
+        {
+            var uiData = new NodeUIData();
+            var node = Diagram.GetNode(information)!;
+            uiData.X = (int)node.Position.X;
+            uiData.Y = (int)node.Position.Y;
+            information.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
     }
 
     async Task SaveAsync()
@@ -1083,6 +1239,11 @@ else
                 StateMachine.Transitions.Remove(transition);
             }
             StateMachine.States.Remove(state);
+        }
+        var removedInformations = StateMachine.Informations.Where(x => Diagram.GetNode(x) == null).ToList();
+        foreach (var information in removedInformations)
+        {
+            StateMachine.Informations.Remove(information);
         }
         AddUIDataToStatesAndTransitions();
          _unsavedData = GetUndoData();
@@ -1130,6 +1291,7 @@ else
     {
         StateMachine.States.Clear();
         StateMachine.Transitions.Clear();
+        StateMachine.Informations.Clear();
         foreach (var state in stateMachine!.States)
         {
             StateMachine.States.Add(state);
@@ -1137,6 +1299,10 @@ else
         foreach (var transition in stateMachine!.Transitions)
         {
             StateMachine.Transitions.Add(transition);
+        }
+        foreach (var information in stateMachine!.Informations)
+        {
+            StateMachine.Informations.Add(information);
         }
         StateMachine.PreScheduleAction = stateMachine.PreScheduleAction;
         StateMachine.PreStartAction = stateMachine.PreStartAction;
