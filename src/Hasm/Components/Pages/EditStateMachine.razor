@@ -37,6 +37,10 @@
         <RadzenSplitterPane Size="75%" Min="300px">
             <div class="diagram-container" style="width: 100%; height: 70vh; border: 1px solid black; position: relative;" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="true">
 
+                <div style="position: absolute; top: 10px; left: 10px; z-index: 10;" @oncontextmenu:preventDefault="false">
+                    <RadzenButton Size="ButtonSize.Small" Text="Pre Start Action " Click="EditPreStartActionAsync" />
+                </div>
+
                 <div style="position: absolute; top: 10px; right: 10px; z-index: 10;" @oncontextmenu:preventDefault="false">
                     <RadzenUpload Icon="upload" ChooseText="Import" Auto=true Multiple=false Accept="text/json" Change=@(args => OnImport(args)) InputAttributes="@(new Dictionary<string, object>() { { "aria-label", "Import" } })" />
                     <RadzenButton Size="ButtonSize.Small" Text="+" Click="@(() => Diagram.SetZoom(Diagram.Zoom * 1.25))" />
@@ -205,6 +209,20 @@ else
                 context.PreventNavigation();
             }
         }
+    }
+
+    async Task EditPreStartActionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
+        {
+            dialog.Script = StateMachine.PreStartAction;
+            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+        });
+        if (result != null)
+        {
+            StateMachine.PreStartAction = result;
+        }
+
     }
 
     private ValueTask SelectAll(Blazor.Diagrams.Core.Diagram diagram)
