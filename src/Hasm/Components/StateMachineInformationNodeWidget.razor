@@ -3,7 +3,8 @@
 @inject DialogService DialogService
 @inherits ComponentBase
 <div style="position: relative;@(Node.Selected ? "border:solid" : "border:none");">
-    @(Information.Description ?? Information.Evaluation ?? "")<strong>@(Information.EvaluationResult ?? "")</strong>
+    <pre style="margin:0px;padding:0px;">@(Information.Description ?? Information.Evaluation ?? "")</pre>
+    <pre style ="margin:0px;padding:0px;"><strong>@(Information.EvaluationResult ?? "")</strong></pre>
  </div>
 
 @code {

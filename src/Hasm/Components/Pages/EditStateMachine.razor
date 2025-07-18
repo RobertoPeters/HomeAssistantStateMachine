@@ -803,6 +803,7 @@ else
             Diagram.SelectModel(Diagram.GetNode(information)!, false);
         }
 
+        RefreshInformations();
         Diagram.Refresh();
     }
 
@@ -1065,8 +1066,7 @@ else
 
     bool IsSubState()
     {
-        var node = modelOnPointerUp as NodeModel;
-        if (node != null)
+         if (modelOnPointerUp is StateMachineStateNodeModel node)
         {
             var state = node.GetState(StateMachine)!;
             return state.IsSubState;
