@@ -5,7 +5,7 @@ services:
     environment:
       - TZ=Europe/Amsterdam
     ports:
-      - "3020:80"
+      - "3020:3020"
     volumes:
       - ./Docker:/app/Settings
 
