@@ -9,6 +9,7 @@ namespace Hasm.Services;
 public class StateMachineService(DataService _dataService, ClientService _clientService, VariableService _variableService, MessageBusService _messageBusService)
 {
     private ConcurrentDictionary<int, StateMachineHandler> _handlers = [];
+    private Timer? _slowTriggerTimer;
 
     public Task StartAsync()
     {
@@ -17,6 +18,22 @@ public class StateMachineService(DataService _dataService, ClientService _client
         {
             AddStateMachine(stateMachine);
         }
+        _slowTriggerTimer = new Timer((state) =>
+        {
+            foreach (var item in _handlers)
+            {
+                try
+                {
+                    item.Value.TriggerProcess();
+                }
+                catch 
+                {
+                    //nothing
+                }
+            }
+            _slowTriggerTimer?.Change(3000, Timeout.Infinite);
+        }, null, 5000, Timeout.Infinite);
+
         return Task.CompletedTask;
     }
 
