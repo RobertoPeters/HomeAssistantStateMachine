@@ -1,16 +1,21 @@
 ﻿using System.Text;
 using Hasm.Models;
+using Hasm.Services.Automations;
 
 namespace Hasm.Services;
 
 public static class EngineScriptBuilder
 {
-    public static string BuildEngineScriptForEditor(StateMachine stateMachine)
+    public static string BuildEngineScriptForEditor(Automation automation)
     {
-        return BuildEngineScript(stateMachine, true, Guid.Empty, null);
+        if (automation.AutomationType == AutomationType.StateMachine)
+        {
+            return BuildEngineScript(StateMachineHandler.GetAutomationProperties(automation.Data), true, Guid.Empty, null);
+        }
+        return "";
     }
 
-    public static string BuildEngineScript(StateMachine stateMachine, bool asMainStateMachine, Guid instanceId, List<(string variableName, string? variableValue)>? machineStateParameters)
+    public static string BuildEngineScript(StateMachineHandler.AutomationProperties properties, bool asMainStateMachine, Guid instanceId, List<(string variableName, string? variableValue)>? machineStateParameters)
     {
         var script = new StringBuilder();
         script.AppendLine("var global = this");
@@ -20,7 +25,7 @@ public static class EngineScriptBuilder
 
         if (machineStateParameters == null)
         {
-            foreach (var parameter in stateMachine.SubStateMachineParameters.ToList())
+            foreach (var parameter in properties.SubStateMachineParameters.ToList())
             {
                 script.AppendLine($"var {parameter.ScriptVariableName} = {(string.IsNullOrWhiteSpace(parameter.DefaultValue) ? "null" : parameter.DefaultValue)}");
             }
@@ -41,7 +46,7 @@ public static class EngineScriptBuilder
         script.AppendLine(SystemMethods.SystemScript);
         script.AppendLine();
 
-        foreach (var state in stateMachine.States)
+        foreach (var state in properties.States)
         {
             script.AppendLine();
             script.AppendLine($"//State Entry [{state.Name}]");
@@ -57,11 +62,11 @@ public static class EngineScriptBuilder
             script.AppendLine($"}}");
         }
 
-        foreach (var transition in stateMachine.Transitions)
+        foreach (var transition in properties.Transitions)
         {
             script.AppendLine();
-            var fromState = stateMachine.States.First(s => s.Id == transition.FromStateId);
-            var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
+            var fromState = properties.States.First(s => s.Id == transition.FromStateId);
+            var toState = properties.States.First(s => s.Id == transition.ToStateId);
             script.AppendLine($"//Transition from [{fromState.Name}] to [{toState.Name}]");
             script.AppendLine($"function {TransitionMethodName(transition)}() {{ ");
             script.AppendLine($"  return {transition.Condition ?? "true"} ;");
@@ -71,9 +76,9 @@ public static class EngineScriptBuilder
         script.AppendLine();
         script.AppendLine($"//Pre schedule action");
         script.AppendLine($"function preScheduleAction() {{ ");
-        if (stateMachine.PreScheduleAction != null)
+        if (properties.PreScheduleAction != null)
         {
-            var allLines = stateMachine.PreScheduleAction.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            var allLines = properties.PreScheduleAction.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in allLines)
             {
                 script.AppendLine($"  {line}");
@@ -83,7 +88,7 @@ public static class EngineScriptBuilder
 
         script.AppendLine();
         script.AppendLine("var stateInfo = []");
-        foreach (var state in stateMachine.States)
+        foreach (var state in properties.States)
         {
             script.AppendLine($"stateInfo['{state.Id.ToString("N")}'] = {{");
             script.AppendLine($"'name': '{state.Name.Replace('\'', ' ')}',");
@@ -92,8 +97,8 @@ public static class EngineScriptBuilder
             script.AppendLine($"}}");
         }
         script.AppendLine("var currentState = null");
-        script.AppendLine($"var startState = '{GetStartState(stateMachine)?.Id.ToString("N")}'");
-        var errorState = stateMachine.States.FirstOrDefault(s => s.IsErrorState);
+        script.AppendLine($"var startState = '{GetStartState(properties)?.Id.ToString("N")}'");
+        var errorState = properties.States.FirstOrDefault(s => s.IsErrorState);
         if (errorState == null)
         {
             script.AppendLine($"var errorState = null");
@@ -104,10 +109,10 @@ public static class EngineScriptBuilder
         }
 
         script.AppendLine("var stateTransitionMap = []");
-        foreach (var transition in stateMachine.Transitions)
+        foreach (var transition in properties.Transitions)
         {
-            var fromState = stateMachine.States.First(s => s.Id == transition.FromStateId);
-            var toState = stateMachine.States.First(s => s.Id == transition.ToStateId);
+            var fromState = properties.States.First(s => s.Id == transition.FromStateId);
+            var toState = properties.States.First(s => s.Id == transition.ToStateId);
             script.AppendLine($"stateTransitionMap.push({{'fromState': '{fromState.Id.ToString("N")}', 'transition': '{transition.Id.ToString("N")}', 'toState': '{toState.Id.ToString("N")}'}})");
         }
         script.AppendLine();
@@ -169,24 +174,24 @@ public static class EngineScriptBuilder
 
         script.AppendLine();
         script.AppendLine("// Pre-start statemachine action");
-        script.AppendLine($"{stateMachine.PreStartAction ?? ""}");
+        script.AppendLine($"{properties.PreStartAction ?? ""}");
 
         return script.ToString();
     }
 
-    private static string TransitionMethodName(Transition transition)
+    private static string TransitionMethodName(StateMachineHandler.Transition transition)
     {
         return $"transitionResult{transition.Id.ToString("N")}";
     }
 
-    private static string StateEntryMethodName(State state)
+    private static string StateEntryMethodName(StateMachineHandler.State state)
     {
         return $"stateEntryAction{state.Id.ToString("N")}";
     }
 
-    private static State? GetStartState(StateMachine stateMachine)
+    private static StateMachineHandler.State? GetStartState(StateMachineHandler.AutomationProperties properties)
     {
-        var states = stateMachine.States.Where(x => x.IsStartState).ToList();
+        var states = properties.States.Where(x => x.IsStartState).ToList();
         if (states.Count == 1)
         {
             return states[0];
@@ -196,12 +201,9 @@ public static class EngineScriptBuilder
             return null;
         }
 
-        foreach (var state in stateMachine.States)
+        foreach (var state in properties.States.Where(x => properties.Transitions.Any(x => x.ToStateId == x.Id)).ToList())
         {
-            if (!stateMachine.Transitions.Any(x => x.ToStateId == state.Id))
-            {
-                states.Add(state);
-            }
+            states.Add(state);
         }
 
         if (states.Count == 1)
@@ -212,16 +214,16 @@ public static class EngineScriptBuilder
         return null;
     }
 
-    public static bool ValidateModel(StateMachine stateMachine)
+    public static bool ValidateModel(StateMachineHandler.AutomationProperties properties)
     {
         //do we have one start state?
-        if (GetStartState(stateMachine) == null)
+        if (GetStartState(properties) == null)
         {
             return false;
         }
 
         //one rror state
-        var states = stateMachine.States.Where(x => x.IsErrorState).ToList();
+        var states = properties.States.Where(x => x.IsErrorState).ToList();
         if (states.Count > 1)
         {
             return false;

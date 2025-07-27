@@ -1,8 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Hasm.Models;
+using Hasm.Services.Interfaces;
 
-namespace Hasm.Services;
+namespace Hasm.Services.Clients;
 
 public class TimerClientHandler(Client _client, VariableService _variableService) : IClientHandler
 {

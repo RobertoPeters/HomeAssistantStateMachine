@@ -1,4 +1,5 @@
 ﻿using Hasm.Models;
+using Hasm.Services.Automations;
 
 namespace Hasm.Services;
 
@@ -6,10 +7,10 @@ public class ClipboardService
 {
     public class ClipboardContent
     {
-        public List<State> States { get; set; } = [];
-        public List<Transition> Transitions { get; set; } = [];
-        public List<Information> Informations { get; set; } = [];
-        public StateMachine? StateMachine { get; set; }
+        public List<StateMachineHandler.State> States { get; set; } = [];
+        public List<StateMachineHandler.Transition> Transitions { get; set; } = [];
+        public List<StateMachineHandler.Information> Informations { get; set; } = [];
+        public Automation? Automation { get; set; }
     }
 
     private ClipboardContent? _clipboardContent;
@@ -20,7 +21,7 @@ public class ClipboardService
 
     public void Copy(ClipboardContent content)
     {
-        if (!content.States.Any() && !content.Informations.Any() && content.StateMachine == null)
+        if (!content.States.Any() && !content.Informations.Any() && content.Automation == null)
         {
             _clipboardContent = null;
         }

@@ -1,17 +1,18 @@
 ﻿using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using Hasm.Models;
+using Hasm.Services.Automations;
 
 namespace Hasm.Components;
 
 public class StateMachineInformationNodeModel : NodeModel
 {
-    public StateMachineInformationNodeModel(Guid informationId, StateMachine stateMachine, Point? position = null) : base(position) 
+    public StateMachineInformationNodeModel(StateMachineHandler.Information information, Automation automation, Point? position = null) : base(position) 
     {
-        InformationId = informationId;
-        StateMachine = stateMachine;
+        Information = information;
+        Automation = automation;
     }
 
-    public Guid InformationId { get; set; }
-    public StateMachine StateMachine { get; set; }
+    public StateMachineHandler.Information Information { get; set; }
+    public Automation Automation { get; set; }
 }

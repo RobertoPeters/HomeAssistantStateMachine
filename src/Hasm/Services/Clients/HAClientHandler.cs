@@ -1,10 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using Hasm.Models;
+using Hasm.Services.Interfaces;
 using HassClient.Models;
 using HassClient.WS;
 using Wolverine;
 
-namespace Hasm.Services;
+namespace Hasm.Services.Clients;
 
 public class HAClientHandler(Client _client, VariableService _variableService, MessageBusService _messageBusService) : IClientHandler, IClientConnected
 {

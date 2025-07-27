@@ -1,7 +1,8 @@
 ﻿using Hasm.Models;
+using Hasm.Services.Interfaces;
 using System.Collections.Concurrent;
 
-namespace Hasm.Services;
+namespace Hasm.Services.Clients;
 
 public class GenericClientHandler(Client _client) : IClientHandler
 {

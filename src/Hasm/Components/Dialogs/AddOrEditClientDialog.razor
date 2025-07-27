@@ -1,5 +1,6 @@
 ﻿@using Hasm.Models
 @using Hasm.Services
+@using Hasm.Services.Clients
 @inject DataService DataService
 @inherits DialogBase
 
@@ -140,7 +141,5 @@
             await DataService.AddOrUpdateClientAsync(Model);
             Close();
         }
-        ;
     }
-
 }

@@ -1,6 +1,7 @@
-﻿@using Hasm.Services
+﻿@using System.Collections.Concurrent
 @using Hasm.Models
-@using System.Collections.Concurrent
+@using Hasm.Services
+@using Hasm.Services.Interfaces
 @inject DialogService DialogService
 @inject VariableService VariableService
 @inject DataService DataService
@@ -78,19 +79,19 @@
 
             <RadzenDataGridColumn TItem="VariableService.VariableInfo"
                                   Property="Variable.StateMachineId"
-                                  FilterValue="@filterStateMachine"                                  
-                                  Title="State Machine">
+                                  FilterValue="@filterAutomation"                                  
+                                  Title="Automation">
                 <FilterTemplate>
-                    <RadzenDropDown Data="@statemachines.Values"
+                    <RadzenDropDown Data="@automations.Values"
                                     AllowClear="true"
                                     TextProperty="Name"
-                                    Disabled="@(StateMachine != null)"
+                                    Disabled="@(Automation != null)"
                                     ValueProperty="Id"
                                     Change="@grid!.Reload"
-                                    @bind-Value=@filterStateMachine />
+                                    @bind-Value=@filterAutomation />
                 </FilterTemplate>
                 <Template Context="variable">
-                    @($"{(variable.Variable.StateMachineId == null ? "" : statemachines[variable.Variable.StateMachineId.Value].Name)}")
+                    @($"{(variable.Variable.AutomationId == null ? "" : automations[variable.Variable.AutomationId.Value].Name)}")
                 </Template>
             </RadzenDataGridColumn>
 
@@ -133,37 +134,37 @@
     public Client? Client { get; set; }
 
     [Parameter]
-    public StateMachine? StateMachine { get; set; }
+    public Automation? Automation { get; set; }
 
     [Parameter]
     public bool AllowColumnPicking { get; set; } = true;
 
     private ConcurrentDictionary<int, VariableService.VariableInfo> variables = [];
     private ConcurrentDictionary<int, Client> clients = [];
-    private ConcurrentDictionary<int, StateMachine> statemachines = [];
+    private ConcurrentDictionary<int, Automation> automations = [];
 
     private RadzenDataGrid<VariableService.VariableInfo>? grid;
     private List<VariableService.VariableInfo>? gridData;
     private int? filterClient = null;
-    private int? filterStateMachine = null;
+    private int? filterAutomation = null;
 
     protected override void OnInitialized()
     {
         clients = new ConcurrentDictionary<int, Client>(DataService.GetClients().ToDictionary(x => x.Id, x => x));
-        statemachines = new ConcurrentDictionary<int, StateMachine>(DataService.GetStateMachines().ToDictionary(x => x.Id, x => x));
+        automations = new ConcurrentDictionary<int, Automation>(DataService.GetAutomations().ToDictionary(x => x.Id, x => x));
         variables = new ConcurrentDictionary<int, VariableService.VariableInfo>(VariableService.GetVariables().ToDictionary(x => x.Variable.Id, x => x));
         gridData = variables.Values.ToList();
         UIEventRegistration.VariablesChanged += VariablesChanged;
         UIEventRegistration.VariableValuesChanged += VariableValuesChanged;
         UIEventRegistration.ClientHandlerChanged += ClientHandlerChanged;
-        UIEventRegistration.StateMachineHandlerChanged += StateMachineHandlerChanged;
+        UIEventRegistration.AutomationHandlerChanged += AutomationHandlerChanged;
         if (Client != null)
         {
             filterClient = Client.Id;
         }
-        if (StateMachine != null)
+        if (Automation != null)
         {
-            filterStateMachine = StateMachine.Id;
+            filterAutomation = Automation.Id;
         }
         base.OnInitialized();
     }
@@ -245,15 +246,15 @@
         }
     }
 
-    private void StateMachineHandlerChanged(object? sender, StateMachineHandler statemachine)
+    private void AutomationHandlerChanged(object? sender, IAutomationHandler automationHandler)
     {
-        if (statemachine.StateMachine.Id < 0)
+        if (automationHandler.Automation.Id < 0)
         {
-            statemachines.TryRemove(-statemachine.StateMachine.Id, out _);
+            automations.TryRemove(-automationHandler.Automation.Id, out _);
         }
         else
         {
-            statemachines.AddOrUpdate(statemachine.StateMachine.Id, statemachine.StateMachine, (_, _) => statemachine.StateMachine);
+            automations.AddOrUpdate(automationHandler.Automation.Id, automationHandler.Automation, (_, _) => automationHandler.Automation);
         }
         if (grid != null)
         {
@@ -269,7 +270,7 @@
     public void Dispose()
     {
         UIEventRegistration.VariableValuesChanged -= VariableValuesChanged;
-        UIEventRegistration.StateMachineHandlerChanged -= StateMachineHandlerChanged;
+        UIEventRegistration.AutomationHandlerChanged -= AutomationHandlerChanged;
         UIEventRegistration.ClientHandlerChanged -= ClientHandlerChanged;
         UIEventRegistration.VariablesChanged += VariablesChanged;
     }

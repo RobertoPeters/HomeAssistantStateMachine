@@ -1,4 +1,4 @@
-﻿namespace Hasm.Services;
+﻿namespace Hasm.Services.Interfaces;
 
 public interface IClientConnected
 {

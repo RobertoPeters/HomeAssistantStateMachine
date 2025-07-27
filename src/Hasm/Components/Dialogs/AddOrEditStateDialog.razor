@@ -1,8 +1,10 @@
 ﻿@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
 @inject Services.DataService DataService
-@inherits ResultDialogBase<State>
+@inherits ResultDialogBase<StateMachineHandler.State>
 
-<RadzenTemplateForm @ref="Form" Data="@Model" TItem="State">
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachineHandler.State">
     <RadzenStack>
         <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
             <ChildContent>
@@ -28,8 +30,8 @@
             <RadzenFormField Text="Sub state machine" Variant="@Variant.Outlined">
                 <RadzenDropDown @bind-Value="@Model!.SubStateMachineId"
                                 Change="@OnSubStateMachineChanged"
-                                TextProperty="@nameof(StateMachine.Name)"
-                                ValueProperty="@nameof(StateMachine.Id)"
+                                TextProperty="@nameof(Automation.Name)"
+                                ValueProperty="@nameof(Automation.Id)"
                                 Data="@SubStateMachines" />
             </RadzenFormField>
             <RadzenFormField Text="Sub state machine" Variant="@Variant.Outlined">
@@ -84,7 +86,7 @@
     protected override int? WidthInPixels => 1400;
 
     [Parameter]
-    public State? State { get; set; }
+    public StateMachineHandler.State? State { get; set; }
 
     [Parameter]
     public HashSet<string> ExistingStateNames { get; set; } = [];
@@ -93,30 +95,30 @@
     public EventCallback ShowStateMachineScript { get; set; }
 
     [Parameter]
-    public StateMachine? StateMachine { get; set; }
+    public Automation? Automation { get; set; }
 
-    public class StateMachineVariable(SubStateMachineParameter subStateMachineParameter, SubStateParameter subStateParameter)
+    public class StateMachineVariable(StateMachineHandler.SubStateMachineParameter subStateMachineParameter, StateMachineHandler.SubStateParameter subStateParameter)
     {
-        public SubStateMachineParameter SubStateMachineParameter { get; private set; } = subStateMachineParameter;
-        public SubStateParameter SubStateParameter { get; private set; } = subStateParameter;
+        public StateMachineHandler.SubStateMachineParameter SubStateMachineParameter { get; private set; } = subStateMachineParameter;
+        public StateMachineHandler.SubStateParameter SubStateParameter { get; private set; } = subStateParameter;
     }
 
-    private State? Model;
-    private RadzenTemplateForm<State>? Form;
+    private StateMachineHandler.State? Model;
+    private RadzenTemplateForm<StateMachineHandler.State>? Form;
     private RadzenDataGrid<StateMachineVariable>? parametersGrid;
     private int TypeOfState = 0;
-    private List<StateMachine> SubStateMachines { get; set; } = [];
-    private List<StateMachineVariable> SubStateMachineVariables = [];
-    private List<StateMachineVariable> parametersToUpdate = [];
+    private List<Automation> SubStateMachines { get; set; } = [];
+    private readonly List<StateMachineVariable> SubStateMachineVariables = [];
+    private readonly List<StateMachineVariable> parametersToUpdate = [];
 
     protected override void OnInitialized()
     {
         if (State == null)
         {
-            State = new State();
+            State = new StateMachineHandler.State();
         }
-        SubStateMachines = DataService.GetStateMachines()
-            .Where(sm => sm.IsSubStateMachine)
+        SubStateMachines = DataService.GetAutomations()
+            .Where(sm => sm.AutomationType == AutomationType.StateMachine && sm.IsSubAutomation)
             .ToList();
         Model = State.CopyObject();
         if (Model!.IsStartState) TypeOfState = 1;
@@ -127,20 +129,21 @@
         if (Model.SubStateMachineId != null)
         {
             var stateMachine = SubStateMachines.FirstOrDefault(x => x.Id == Model.SubStateMachineId);
-            if (stateMachine == null)
+            if (stateMachine == null || string.IsNullOrWhiteSpace(stateMachine.Data))
             {
                 Model.SubStateMachineId = null;
                 Model.SubStateParameters.Clear();
             }
             else
             {
-                foreach (var parameter in stateMachine.SubStateMachineParameters)
+                var stateMachineProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(stateMachine.Data)!;
+                foreach (var parameter in stateMachineProperties.SubStateMachineParameters)
                 {
                     if (!Model.SubStateParameters.Any(x => x.Id == parameter.Id))
                     {
-                        Model.SubStateParameters.Add(new SubStateParameter() { Id = parameter.Id });
+                        Model.SubStateParameters.Add(new StateMachineHandler.SubStateParameter() { Id = parameter.Id });
                     }
-                    SubStateMachineVariables.Add(new StateMachineVariable(parameter, Model.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id) ?? new SubStateParameter() { Id = parameter.Id }));
+                    SubStateMachineVariables.Add(new StateMachineVariable(parameter, Model.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id) ?? new StateMachineHandler.SubStateParameter() { Id = parameter.Id }));
                 }
             }
         }
@@ -152,9 +155,9 @@
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Entry Action", dialog =>
         {
             dialog.Script = Model!.EntryAction;
-            if (StateMachine != null)
+            if (Automation != null)
             {
-                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
             }
         });
         if (result != null)
@@ -170,10 +173,14 @@
         if (Model.SubStateMachineId != null)
         {
             var stateMachine = SubStateMachines.First(x => x.Id == Model.SubStateMachineId);
-            foreach (var parameter in stateMachine.SubStateMachineParameters)
+            if (!string.IsNullOrWhiteSpace(stateMachine.Data))
             {
-                Model.SubStateParameters.Add(new SubStateParameter() { Id = parameter.Id });
-                SubStateMachineVariables.Add(new StateMachineVariable(parameter, Model.SubStateParameters[Model.SubStateParameters.Count - 1]));
+                var stateMachineProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(stateMachine.Data)!;
+                foreach (var parameter in stateMachineProperties.SubStateMachineParameters)
+                {
+                    Model.SubStateParameters.Add(new StateMachineHandler.SubStateParameter() { Id = parameter.Id });
+                    SubStateMachineVariables.Add(new StateMachineVariable(parameter, Model.SubStateParameters[Model.SubStateParameters.Count - 1]));
+                }
             }
         }
         parametersGrid!.Reload();

@@ -1,8 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using Hasm.Models;
+using Hasm.Services.Interfaces;
 using MQTTnet;
 
-namespace Hasm.Services;
+namespace Hasm.Services.Clients;
 
 public class MqttClientHandler(Client _client, VariableService _variableService, MessageBusService _messageBusService) : IClientHandler, IClientConnected
 {
@@ -199,7 +200,7 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
 
     private async Task CreateMqttClientAsync()
     {
-        var mqttFactory = new MQTTnet.MqttClientFactory();
+        var mqttFactory = new MqttClientFactory();
         _mqttClient = mqttFactory.CreateMqttClient();
         _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceived;
         if (_client.Enabled && !string.IsNullOrWhiteSpace(_clientProperties.Host))
@@ -349,7 +350,7 @@ public class MqttClientHandler(Client _client, VariableService _variableService,
             return false;
         }
 
-        var msgBuilder = new MQTTnet.MqttApplicationMessageBuilder()
+        var msgBuilder = new MqttApplicationMessageBuilder()
             .WithTopic(topic);
 
         //in future more options than string?

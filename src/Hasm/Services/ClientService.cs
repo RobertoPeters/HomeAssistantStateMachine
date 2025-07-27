@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Hasm.Models;
+using Hasm.Services.Clients;
+using Hasm.Services.Interfaces;
 
 namespace Hasm.Services;
 
@@ -10,14 +12,14 @@ public class ClientService(DataService _dataService, VariableService _variableSe
     public async Task StartAsync()
     {
         var clients = _dataService.GetClients();
-        foreach(var client in clients)
+        foreach (var client in clients)
         {
             await AddClientAsync(client);
         }
     }
 
     public List<IClientHandler> GetClients()
-    {     
+    {
         return _handlers.Values.ToList();
     }
 
@@ -29,34 +31,22 @@ public class ClientService(DataService _dataService, VariableService _variableSe
     public async Task Handle(List<VariableService.VariableInfo> variables)
     {
         var variablesToHandle = variables.ToLookup(x => x.Variable.ClientId, x => x);
-        foreach(var variableGroup in variablesToHandle)
+        foreach (var variableGroup in variablesToHandle)
         {
-            if (_handlers.TryGetValue(variableGroup.Key, out var clientHandler))
+            if (_handlers.TryGetValue(variableGroup.Key, out var clientHandler) && clientHandler.Client.Enabled)
             {
-                if (clientHandler.Client.Enabled)
+                var deletedGroup = variableGroup.Where(x => x.Variable.Id < 0).ToList();
+                var addOrUpdatedGroup = variableGroup.Where(x => x.Variable.Id >= 0).ToList();
+                if (deletedGroup.Any())
                 {
-                    var deletedGroup = variableGroup.Where(x => x.Variable.Id < 0).ToList();
-                    var addOrUpdatedGroup = variableGroup.Where(x => x.Variable.Id >= 0).ToList();
-                    if (deletedGroup.Any())
-                    {
-                        await clientHandler.DeleteVariableInfoAsync(deletedGroup);
-                    }
-                    else if (addOrUpdatedGroup.Any())
-                    {
-                        await clientHandler.AddOrUpdateVariableInfoAsync(addOrUpdatedGroup);
-                    }
+                    await clientHandler.DeleteVariableInfoAsync(deletedGroup);
+                }
+                else if (addOrUpdatedGroup.Any())
+                {
+                    await clientHandler.AddOrUpdateVariableInfoAsync(addOrUpdatedGroup);
                 }
             }
         }
-    }
-
-    public async Task<bool> ExecuteAsync(int clientId, int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
-    {
-        if (_handlers.TryGetValue(clientId, out var clientHandler))
-        {
-            return await clientHandler.ExecuteAsync(variableId, command, parameter1, parameter2, parameter3);
-        }
-        return false;
     }
 
     public async Task Handle(Client client)
@@ -65,7 +55,7 @@ public class ClientService(DataService _dataService, VariableService _variableSe
         if (client.Id < 0)
         {
             clientHandler = await RemoveClientAsync(-client.Id);
-            if ( (clientHandler != null))
+            if ((clientHandler != null))
             {
                 clientHandler.Client.Id = client.Id;
             }
@@ -83,6 +73,15 @@ public class ClientService(DataService _dataService, VariableService _variableSe
         {
             await _messageBusService.PublishAsync(clientHandler!);
         }
+    }
+
+    public async Task<bool> ExecuteAsync(int clientId, int? variableId, string command, object? parameter1, object? parameter2, object? parameter3)
+    {
+        if (_handlers.TryGetValue(clientId, out var clientHandler))
+        {
+            return await clientHandler.ExecuteAsync(variableId, command, parameter1, parameter2, parameter3);
+        }
+        return false;
     }
 
     private async Task<IClientHandler?> RemoveClientAsync(int id)
@@ -128,19 +127,19 @@ public class ClientService(DataService _dataService, VariableService _variableSe
     }
 }
 
-public class ClientServiceMessageHandler
+public static class ClientServiceMessageHandler
 {
-    public async Task Handle(Client client, ClientService clientService)
+    public static async Task Handle(Client client, ClientService clientService)
     {
         await clientService.Handle(client);
     }
 
-    public async Task Handle(VariableService.VariableInfo variable, ClientService clientService)
+    public static async Task Handle(VariableService.VariableInfo variable, ClientService clientService)
     {
         await clientService.Handle([variable]);
     }
 
-    public async Task Handle(List<VariableService.VariableInfo> variables, ClientService clientService)
+    public static async Task Handle(List<VariableService.VariableInfo> variables, ClientService clientService)
     {
         await clientService.Handle(variables);
     }
