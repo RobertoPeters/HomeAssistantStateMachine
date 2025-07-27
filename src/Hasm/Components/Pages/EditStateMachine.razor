@@ -11,7 +11,7 @@
 @using Blazor.Diagrams.Core.Geometry;
 @using Blazor.Diagrams.Components
 @using Blazor.Diagrams.Components.Widgets;
-@inject StateMachineService StateMachineService
+@inject AutomationService AutomationService
 @inject DialogService DialogService
 @inject DataService DataService
 @inject ContextMenuService ContextMenuService
@@ -26,9 +26,9 @@
 <NavigationLock ConfirmExternalNavigation="true"
                 OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
-@if (StateMachine != null)
+@if (Automation != null)
 {
-    <span>Edit State Machine: @StateMachine.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState ?? "-"))</span>
+    <span>Edit State Machine: @Automation.Name (@(StateMachineHandler?.RunningState.ToString() ?? "-"): @(StateMachineHandler?.CurrentState ?? "-"))</span>
     @if (!string.IsNullOrWhiteSpace(StateMachineHandler?.ErrorMessage))
     {
         <p>@StateMachineHandler.ErrorMessage</p>
@@ -62,7 +62,7 @@
             <RadzenTabs>
                 <Tabs>
                     <RadzenTabsItem Text="Variables">
-                        <VariablesControl StateMachine="StateMachine" AllowColumnPicking=false />
+                        <VariablesControl Automation="Automation" AllowColumnPicking=false />
                     </RadzenTabsItem>
                     <RadzenTabsItem Text="Intermediate">
                         <div style="position: relative;">
@@ -122,7 +122,8 @@ else
     }
 
     private BlazorDiagram Diagram { get; set; } = null!;
-    private StateMachine StateMachine = null!;
+    private Automation Automation = null!;
+    private StateMachineHandler.AutomationProperties AutomationProperties = new();
     private StateMachineHandler StateMachineHandler = null!;
     private List<LogData> logLines = [];
     private string? executeCommand;
@@ -137,10 +138,10 @@ else
     {
         UIEventRegistration.LogEntryAdded += LogEvent;
         UIEventRegistration.StateMachineHandlerInfoChanged += StateMachineHandlerInfoChanged;
-        UIEventRegistration.StateMachineHandlerChanged += StateMachineHandlerChanged;
-        UIEventRegistration.StateMachineScheduledInfoChanged += StateMachineScheduledInfoChanged;
+        UIEventRegistration.AutomationHandlerChanged += AutomationHandlerChanged;
+        UIEventRegistration.AutomationInfoChanged += AutomationInfoChanged;
         ShowStateMachineScriptEventCallback = new EventCallbackFactory().Create(this, ShowStateMachineAsync);
-        StateMachineHandler = StateMachineService.GetStateMachine(Id);
+        StateMachineHandler = (StateMachineHandler)AutomationService.GetAutomation(Id);
         var options = new BlazorDiagramOptions
         {
             AllowMultiSelection = true,
@@ -218,12 +219,12 @@ else
     {
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
         {
-            dialog.Script = StateMachine.PreStartAction;
-            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+            dialog.Script = AutomationProperties.PreStartAction;
+            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
         });
         if (result != null)
         {
-            StateMachine.PreStartAction = result;
+            AutomationProperties.PreStartAction = result;
         }
 
     }
@@ -298,9 +299,9 @@ else
         _pauseLog = !_pauseLog;
     }
 
-    void LogEvent(object? sender, StateMachineHandler.LogEntry logEntry)
+    void LogEvent(object? sender, LogEntry logEntry)
     {
-        if (_pauseLog || logEntry.StateMachineId != StateMachine?.Id) return;
+        if (_pauseLog || logEntry.AutomationId != Automation?.Id) return;
 
         InvokeAsync(() =>
         {
@@ -313,7 +314,7 @@ else
         });
     }
 
-    void StateChanged(object? sender, State? state)
+    void StateChanged(object? sender, StateMachineHandler.State? state)
     {
         InvokeAsync(() =>
     {
@@ -328,15 +329,23 @@ else
         _unsavedData = GetUndoData();
     }
 
-    Task ReloadDiagramAsync(StateMachine? useStateMachine)
+    Task ReloadDiagramAsync(Automation? useAutomation)
     {
         Diagram.Links.Clear();
         Diagram.Nodes.Clear();
-        StateMachine = useStateMachine ?? StateMachineHandler.StateMachine;
-        foreach (var state in StateMachine.States)
+        Automation = useAutomation ?? StateMachineHandler.Automation;
+        if (!string.IsNullOrWhiteSpace(Automation.Data))
+        {
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(Automation.Data) ?? new();
+        }
+        else
+        {
+            AutomationProperties = new();
+        }
+        foreach (var state in AutomationProperties.States)
         {
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(state.UIData!);
-            var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
+            var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state, Automation, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
             {
                 Title = state.Name
             });
@@ -346,15 +355,15 @@ else
             node.AddPort(PortAlignment.Left);
             node.AddPort(PortAlignment.Right);
         }
-        foreach (var transition in StateMachine.Transitions)
+        foreach (var transition in AutomationProperties.Transitions)
         {
             var uiData = System.Text.Json.JsonSerializer.Deserialize<LinkUIData>(transition.UIData!);
             AddLink(transition, uiData!.SourcePort, uiData!.TargetPort);
         }
-        foreach (var information in StateMachine.Informations)
+        foreach (var information in AutomationProperties.Informations)
         {
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
-            var node = Diagram.Nodes.Add(new StateMachineInformationNodeModel(information.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
+            var node = Diagram.Nodes.Add(new StateMachineInformationNodeModel(information, Automation, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
             {
                 Title = information.Description ?? information.Evaluation ?? ""
             });
@@ -365,9 +374,9 @@ else
         return Task.CompletedTask;
     }
 
-    private void AddLink(Transition transition, PortAlignment sourcePortAllignment, PortAlignment targetPortAllignment)
+    private void AddLink(StateMachineHandler.Transition transition, PortAlignment sourcePortAllignment, PortAlignment targetPortAllignment)
     {
-        (var source, var target) = Diagram.GetNodes(transition, StateMachine);
+        (var source, var target) = Diagram.GetNodes(transition, AutomationProperties);
         var link = Diagram.Links.Add(new LinkModel(source!.Ports.First(x => x.Alignment == sourcePortAllignment), target!.Ports.First(x => x.Alignment == targetPortAllignment)));
         link.TargetMarker = LinkMarker.Arrow;
         //link.Segmentable = true;
@@ -379,11 +388,11 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    private void StateMachineHandlerChanged(object? sender, StateMachineHandler stateMachine)
+    private void AutomationHandlerChanged(object? sender, IAutomationHandler automationHandler)
     {
         InvokeAsync(async () =>
         {
-            if (stateMachine.StateMachine.Id < 0)
+            if (automationHandler.Automation.Id < 0)
             {
                 NavigationManager.NavigateTo("\\");
             }
@@ -394,9 +403,9 @@ else
         });
     }
 
-    private void StateMachineScheduledInfoChanged(object? sender, StateMachineScheduledInfo stateMachineScheduledInfo)
+    private void AutomationInfoChanged(object? sender, AutomationInfo stateMachineScheduledInfo)
     {
-        if (stateMachineScheduledInfo.StateMachineId != StateMachine.Id)
+        if (stateMachineScheduledInfo.AutomationId != Automation.Id)
         {
             return;
         }
@@ -412,7 +421,7 @@ else
         }
 
 
-        var allEvaluations = StateMachine.Informations.Where(x => !string.IsNullOrWhiteSpace(x.Evaluation)).ToList();
+        var allEvaluations = AutomationProperties.Informations.Where(x => !string.IsNullOrWhiteSpace(x.Evaluation)).ToList();
         if (!allEvaluations.Any())
         {
             return;
@@ -432,8 +441,8 @@ else
 
     public void Dispose()
     {
-        UIEventRegistration.StateMachineScheduledInfoChanged -= StateMachineScheduledInfoChanged;
-        UIEventRegistration.StateMachineHandlerChanged -= StateMachineHandlerChanged;
+        UIEventRegistration.AutomationInfoChanged -= AutomationInfoChanged;
+        UIEventRegistration.AutomationHandlerChanged -= AutomationHandlerChanged;
         UIEventRegistration.LogEntryAdded -= LogEvent;
         UIEventRegistration.StateMachineHandlerInfoChanged -= StateMachineHandlerInfoChanged;
         Diagram.PointerUp -= DiagramPointerUpAsync;
@@ -442,10 +451,10 @@ else
 
     async Task AddStateAsync(int x, int y)
     {
-        var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>("Add State", dialog =>
+        var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, StateMachineHandler.State>("Add State", dialog =>
         {
-            dialog.ExistingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
-            dialog.StateMachine = StateMachine;
+            dialog.ExistingStateNames = AutomationProperties.States.Select(x => x.Name).Distinct().ToHashSet();
+            dialog.Automation = Automation;
         });
         if (state != null)
         {
@@ -456,9 +465,9 @@ else
 
     async Task AddInformationAsync(int x, int y)
     {
-        var information = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, Information>("Add Information", dialog =>
+        var information = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, StateMachineHandler.Information>("Add Information", dialog =>
         {
-            dialog.StateMachine = StateMachine;
+            dialog.Automation = Automation;
         });
         if (information != null)
         {
@@ -468,12 +477,12 @@ else
         }
     }
 
-    State AddNewState(State state, int x, int y)
+    StateMachineHandler.State AddNewState(StateMachineHandler.State state, int x, int y)
     {
         state.Id = Guid.NewGuid();
-        StateMachine.States.Add(state);
+        AutomationProperties.States.Add(state);
 
-        var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
+        var node = Diagram.Nodes.Add(new StateMachineStateNodeModel(state, Automation, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
         {
             Title = state.Name
         });
@@ -485,12 +494,12 @@ else
         return state;
     }
 
-    Information AddNewInformation(Information information, int x, int y)
+    StateMachineHandler.Information AddNewInformation(StateMachineHandler.Information information, int x, int y)
     {
         information.Id = Guid.NewGuid();
-        StateMachine.Informations.Add(information);
+        AutomationProperties.Informations.Add(information);
 
-        var node = Diagram.Nodes.Add(new StateMachineInformationNodeModel(information.Id, StateMachine, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
+        var node = Diagram.Nodes.Add(new StateMachineInformationNodeModel(information, Automation, position: new Blazor.Diagrams.Core.Geometry.Point(x, y))
         {
             Title = information.Description ?? information.Evaluation ?? ""
         });
@@ -515,15 +524,15 @@ else
         {
             var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
             var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-            var sourceState = source.GetState(StateMachine)!;
-            var targetState = target.GetState(StateMachine)!;
+            var sourceState = source.GetState(AutomationProperties)!;
+            var targetState = target.GetState(AutomationProperties)!;
 
             ContextMenuService.Open(args, ds =>
     @<RadzenMenu Click="OnLinkContextMenuItemClick">
                 <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
                 <RadzenMenuItem Text="Delete" Value="4"></RadzenMenuItem>
                 <RadzenMenuItem Text="Move Start To" Value="3">
-                    @foreach (var state in StateMachine.States.Where(x => x.Id != targetState.Id).ToList())
+                    @foreach (var state in AutomationProperties.States.Where(x => x.Id != targetState.Id).ToList())
                     {
                         <RadzenMenuItem Text="@(state.Name)" Value="21">
                             <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
@@ -534,7 +543,7 @@ else
                     }
                 </RadzenMenuItem>
                 <RadzenMenuItem Text="Move End To" Value="2">
-                    @foreach (var state in StateMachine.States.Where(x => x.Id != sourceState.Id).ToList())
+                    @foreach (var state in AutomationProperties.States.Where(x => x.Id != sourceState.Id).ToList())
                     {
                         <RadzenMenuItem Text="@(state.Name)" Value="21">
                             <RadzenMenuItem Text="@(PortAlignment.Top.ToString())" Value="@((int)(30 + PortAlignment.Top))"></RadzenMenuItem>
@@ -557,13 +566,13 @@ else
     <RadzenMenuItem Text="Save" Value="2"></RadzenMenuItem>
     <RadzenMenuItem Text="Copy" Value="8">
         <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
-        <RadzenMenuItem Text="All states and transitions" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())" Value="10"></RadzenMenuItem>
+        <RadzenMenuItem Text="All states and transitions" Disabled="@(!AutomationProperties.Transitions.Any() && !AutomationProperties.States.Any())" Value="10"></RadzenMenuItem>
         <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
     </RadzenMenuItem>
     <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
     <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
     <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
-    <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!StateMachine.Transitions.Any() && !StateMachine.States.Any())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!AutomationProperties.Transitions.Any() && !AutomationProperties.States.Any())"></RadzenMenuItem>
     <RadzenMenuItem Text="Restart" Value="3"></RadzenMenuItem>
     <RadzenMenuItem Text="Reload" Value="4"></RadzenMenuItem>
     <RadzenMenuItem Text="Script" Value="6"></RadzenMenuItem>
@@ -642,7 +651,7 @@ else
         var content = new ClipboardService.ClipboardContent();
 
         AddUIDataToStatesAndTransitions();
-        content.StateMachine = StateMachine;
+        content.Automation = Automation;
 
         ClipboardService.Copy(content);
     }
@@ -653,8 +662,8 @@ else
 
         AddUIDataToStatesAndTransitions();
         var selectedModels = Diagram.GetSelectedModels().ToList();
-        content.States.AddRange(StateMachine.States.ToList());
-        content.Transitions.AddRange(StateMachine.Transitions.ToList());
+        content.States.AddRange(AutomationProperties.States.ToList());
+        content.Transitions.AddRange(AutomationProperties.Transitions.ToList());
 
         ClipboardService.Copy(content);
     }
@@ -669,12 +678,12 @@ else
         {
             if (sm is StateMachineStateNodeModel node)
             {
-                var state = node.GetState(StateMachine)!;
+                var state = node.GetState(AutomationProperties)!;
                 content.States.Add(state);
             }
             else if (sm is StateMachineInformationNodeModel infnode)
             {
-                var information = infnode.GetInformation(StateMachine)!;
+                var information = infnode.GetInformation(AutomationProperties)!;
                 content.Informations.Add(information);
             }
         }
@@ -689,7 +698,7 @@ else
                 var targetState = target.GetState(content);
                 if (sourceState != null && targetState != null)
                 {
-                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                     content.Transitions.Add(transition);
                 }
             }
@@ -707,18 +716,24 @@ else
         }
 
         AddUndo();
-        List<Transition> transitions = content.Transitions;
-        List<State> states = content.States;
-        List<Information> informations = content.Informations;
+        List<StateMachineHandler.Transition> transitions = content.Transitions;
+        List<StateMachineHandler.State> states = content.States;
+        List<StateMachineHandler.Information> informations = content.Informations;
 
-        if (content.StateMachine != null)
+        if (content.Automation != null)
         {
-            StateMachine.PreStartAction = content.StateMachine.PreStartAction;
-            StateMachine.PreScheduleAction = content.StateMachine.PreScheduleAction;
-            StateMachine.Enabled = content.StateMachine.Enabled;
-            transitions = content.StateMachine.Transitions.ToList();
-            states = content.StateMachine.States.ToList();
-            informations = content.StateMachine.Informations.ToList();
+            Automation.IsSubAutomation = content.Automation.IsSubAutomation;
+            Automation.Enabled = content.Automation.Enabled;
+            StateMachineHandler.AutomationProperties properties = new();
+            if (!string.IsNullOrWhiteSpace(content.Automation.Data))
+            {
+                properties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(content.Automation.Data) ?? new();
+            }
+            AutomationProperties.PreStartAction = properties.PreStartAction;
+            AutomationProperties.PreScheduleAction = properties.PreScheduleAction;
+            transitions = properties.Transitions.ToList();
+            states = properties.States.ToList();
+            informations = properties.Informations.ToList();
         }
 
         int? minX = null;
@@ -759,7 +774,7 @@ else
 
         Dictionary<Guid, Guid> oldStateIdToNewId = [];
         var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
-        var existingStateNames = StateMachine.States.Select(x => x.Name).Distinct().ToHashSet();
+        var existingStateNames = AutomationProperties.States.Select(x => x.Name).Distinct().ToHashSet();
         foreach (var state in states)
         {
             var oldId = state.Id;
@@ -793,7 +808,7 @@ else
             transition.FromStateId = oldStateIdToNewId[transition.FromStateId.Value];
             transition.ToStateId = oldStateIdToNewId[transition.ToStateId.Value];
             transition.Id = Guid.NewGuid();
-            StateMachine.Transitions.Add(transition);
+            AutomationProperties.Transitions.Add(transition);
             AddLink(transition, uiData?.SourcePort ?? PortAlignment.Bottom, uiData?.TargetPort ?? PortAlignment.Top);
         }
 
@@ -808,7 +823,7 @@ else
         Diagram.Refresh();
     }
 
-    State? moveToState = null;
+    StateMachineHandler.State? moveToState = null;
     bool changeTarget = false;
     async void OnLinkContextMenuItemClick(MenuItemEventArgs args)
     {
@@ -828,7 +843,7 @@ else
                 changeTarget = false;
                 break;
             case 21:
-                moveToState = StateMachine.States.First(x => x.Name == args.Text);
+                moveToState = AutomationProperties.States.First(x => x.Name == args.Text);
                 break;
             case 30:
             case 31:
@@ -843,9 +858,9 @@ else
                     //current situation
                     var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
                     var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                    var sourceState = source.GetState(StateMachine)!;
-                    var targetState = target.GetState(StateMachine)!;
-                    var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    var sourceState = source.GetState(AutomationProperties)!;
+                    var targetState = target.GetState(AutomationProperties)!;
+                    var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                     var sourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
                     var targetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
 
@@ -903,10 +918,10 @@ else
     {
         var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
         var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-        var sourceState = source.GetState(StateMachine)!;
-        var targetState = target.GetState(StateMachine)!;
-        var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-        StateMachine.Transitions.Remove(transition);
+        var sourceState = source.GetState(AutomationProperties)!;
+        var targetState = target.GetState(AutomationProperties)!;
+        var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+        AutomationProperties.Transitions.Remove(transition);
         Diagram.Links.Remove(link!);
     }
 
@@ -915,19 +930,19 @@ else
         if (node is StateMachineStateNodeModel smNode)
         {
             //should remove transitions as well
-            var state = smNode.GetState(StateMachine)!;
-            var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+            var state = smNode.GetState(AutomationProperties)!;
+            var transitions = AutomationProperties.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
             foreach (var transition in transitions)
             {
-                StateMachine.Transitions.Remove(transition);
+                AutomationProperties.Transitions.Remove(transition);
             }
-            StateMachine.States.Remove(state);
+            AutomationProperties.States.Remove(state);
             Diagram.Nodes.Remove(node!);
         }
         else if (node is StateMachineInformationNodeModel infNode)
         {
-            var information = infNode.GetInformation(StateMachine)!;
-            StateMachine.Informations.Remove(information);
+            var information = infNode.GetInformation(AutomationProperties)!;
+            AutomationProperties.Informations.Remove(information);
             Diagram.Nodes.Remove(node!);
         }
     }
@@ -991,9 +1006,9 @@ else
                 }
                 var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                 var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                var sourceState = source3.GetState(StateMachine)!;
-                var targetState = target.GetState(StateMachine)!;
-                var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                var sourceState = source3.GetState(AutomationProperties)!;
+                var targetState = target.GetState(AutomationProperties)!;
+                var transition = AutomationProperties.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                 if (transition == null)
                 {
                     transition = new()
@@ -1002,7 +1017,7 @@ else
                         ToStateId = targetState.Id,
                         Id = Guid.NewGuid(),
                     };
-                    StateMachine.Transitions.Add(transition);
+                    AutomationProperties.Transitions.Add(transition);
                     await EditTransitionAsync(link);
                     transitionEdited = true;
                 }
@@ -1016,9 +1031,9 @@ else
                 {
                     var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                     var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                    var sourceState = source3.GetState(StateMachine)!;
-                    var targetState = target.GetState(StateMachine)!;
-                    var transition = StateMachine.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                    var sourceState = source3.GetState(AutomationProperties)!;
+                    var targetState = target.GetState(AutomationProperties)!;
+                    var transition = AutomationProperties.Transitions.FirstOrDefault(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                     if (transition != null)
                     {
                         var key = $"{sourceState.Name}.{targetState.Name}";
@@ -1044,14 +1059,14 @@ else
     {
         var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
         var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-        var sourceState = source.GetState(StateMachine)!;
-        var targetState = target.GetState(StateMachine)!;
-        var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
+        var sourceState = source.GetState(AutomationProperties)!;
+        var targetState = target.GetState(AutomationProperties)!;
+        var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, StateMachineHandler.Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
         {
             dialog.Transition = transition;
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
-            dialog.StateMachine = StateMachine;
+            dialog.Automation = Automation;
         });
         if (result != null)
         {
@@ -1067,9 +1082,9 @@ else
 
     bool IsSubState()
     {
-         if (modelOnPointerUp is StateMachineStateNodeModel node)
+        if (modelOnPointerUp is StateMachineStateNodeModel node)
         {
-            var state = node.GetState(StateMachine)!;
+            var state = node.GetState(AutomationProperties)!;
             return state.IsSubState;
         }
         return false;
@@ -1077,7 +1092,7 @@ else
 
     void EditSubStateMachine(NodeModel node)
     {
-        var state = node.GetState(StateMachine)!;
+        var state = node.GetState(AutomationProperties)!;
         if (state.IsSubState && state.SubStateMachineId != null)
         {
             JS.InvokeVoidAsync("navigateToTarget", $"/editstatemachine/{state.SubStateMachineId}", "_blank");
@@ -1086,13 +1101,13 @@ else
 
     async Task EditStateAsync(NodeModel node)
     {
-        var state = node.GetState(StateMachine)!;
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, State>($"Edit State: {state.Name}", dialog =>
+        var state = node.GetState(AutomationProperties)!;
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, StateMachineHandler.State>($"Edit State: {state.Name}", dialog =>
         {
             dialog.State = state;
-            dialog.ExistingStateNames = StateMachine.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
+            dialog.ExistingStateNames = AutomationProperties.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
-            dialog.StateMachine = StateMachine;
+            dialog.Automation = Automation;
         });
         if (result != null)
         {
@@ -1113,12 +1128,12 @@ else
 
     async Task EditInformationAsync(NodeModel node)
     {
-        var information = node.GetInformation(StateMachine)!;
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, Information>($"Edit Information", dialog =>
+        var information = node.GetInformation(AutomationProperties)!;
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, StateMachineHandler.Information>($"Edit Information", dialog =>
         {
             dialog.Information = information;
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
-            dialog.StateMachine = StateMachine;
+            dialog.Automation = Automation;
         });
         if (result != null)
         {
@@ -1163,30 +1178,31 @@ else
 
     async Task EditStateMachineAsync()
     {
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateMachineDialog, StateMachine>("Edit State Machine", dialog =>
+        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditAutomationDialog, Automation>("Edit Automation", dialog =>
         {
-            dialog.StateMachine = StateMachine;
+            dialog.Automation = Automation;
         });
         if (result != null)
         {
             AddUndo();
-            StateMachine.Enabled = result.Enabled;
-            StateMachine.Name = result.Name;
-            StateMachine.PreScheduleAction = result.PreScheduleAction;
-            StateMachine.PreStartAction = result.PreStartAction;
-            StateMachine.IsSubStateMachine = result.IsSubStateMachine;
-            StateMachine.SubStateMachineParameters = result.SubStateMachineParameters;
+            Automation.Enabled = result.Enabled;
+            Automation.Name = result.Name;
+            Automation.IsSubAutomation = result.IsSubAutomation;
+            Automation.Data = result.Data;
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(result.Data) ?? new StateMachineHandler.AutomationProperties();
         }
     }
 
     async Task ShowStateMachineAsync()
     {
-        var copy = StateMachine.CopyObject();
-        var removedStates = copy!.States.Where(x => Diagram.GetNode(x) == null).ToList();
+        var copy = Automation.CopyObject();
+        var cpyProperties = AutomationProperties.CopyObject();
+        var removedStates = cpyProperties!.States.Where(x => Diagram.GetNode(x) == null).ToList();
         foreach (var state in removedStates)
         {
-            copy.States.Remove(state);
+            cpyProperties.States.Remove(state);
         }
+        copy.Data = System.Text.Json.JsonSerializer.Serialize(cpyProperties);
         await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Machine Script", dialog =>
          {
              dialog.Script = EngineScriptBuilder.BuildEngineScriptForEditor(copy);
@@ -1196,7 +1212,7 @@ else
 
     private void AddUIDataToStatesAndTransitions()
     {
-        foreach (var state in StateMachine.States)
+        foreach (var state in AutomationProperties.States)
         {
             var uiData = new NodeUIData();
             var node = Diagram.GetNode(state)!;
@@ -1210,16 +1226,16 @@ else
             {
                 var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
                 var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
-                var sourceState = source.GetState(StateMachine)!;
-                var targetState = target.GetState(StateMachine)!;
-                var transition = StateMachine.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
+                var sourceState = source.GetState(AutomationProperties)!;
+                var targetState = target.GetState(AutomationProperties)!;
+                var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
                 var uiData = new LinkUIData();
                 uiData.SourcePort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Alignment;
                 uiData.TargetPort = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Alignment;
                 transition.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
             }
         }
-        foreach (var information in StateMachine.Informations)
+        foreach (var information in AutomationProperties.Informations)
         {
             var uiData = new NodeUIData();
             var node = Diagram.GetNode(information)!;
@@ -1229,26 +1245,31 @@ else
         }
     }
 
+    void SaveAutomationPropertiesToAutomation()
+    {
+        Automation.Data = System.Text.Json.JsonSerializer.Serialize(AutomationProperties);
+    }
+
     async Task SaveAsync()
     {
-        var removedStates = StateMachine.States.Where(x => Diagram.GetNode(x) == null).ToList();
+        var removedStates = AutomationProperties.States.Where(x => Diagram.GetNode(x) == null).ToList();
         foreach (var state in removedStates)
         {
-            var transitions = StateMachine.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
+            var transitions = AutomationProperties.Transitions.Where(x => x.FromStateId == state.Id || x.ToStateId == state.Id).ToList();
             foreach (var transition in transitions)
             {
-                StateMachine.Transitions.Remove(transition);
+                AutomationProperties.Transitions.Remove(transition);
             }
-            StateMachine.States.Remove(state);
+            AutomationProperties.States.Remove(state);
         }
-        var removedInformations = StateMachine.Informations.Where(x => Diagram.GetNode(x) == null).ToList();
+        var removedInformations = AutomationProperties.Informations.Where(x => Diagram.GetNode(x) == null).ToList();
         foreach (var information in removedInformations)
         {
-            StateMachine.Informations.Remove(information);
+            AutomationProperties.Informations.Remove(information);
         }
         AddUIDataToStatesAndTransitions();
-         _unsavedData = GetUndoData();
-        await DataService.AddOrUpdateStateMachineAsync(StateMachine);
+        _unsavedData = GetUndoData();
+        await DataService.AddOrUpdateAutomationAsync(Automation);
     }
 
     private Stream GetFileStream()
@@ -1256,7 +1277,7 @@ else
         var fileStream = new MemoryStream();
 
         AddUIDataToStatesAndTransitions();
-        System.Text.Json.JsonSerializer.Serialize(fileStream, StateMachine);
+        System.Text.Json.JsonSerializer.Serialize(fileStream, Automation);
         fileStream.Position = 0;
 
         return fileStream;
@@ -1281,39 +1302,32 @@ else
         }
         var file = args.Files.First();
         var stream = file.OpenReadStream();
-        var stateMachine = await System.Text.Json.JsonSerializer.DeserializeAsync<StateMachine>(stream);
+        var stateMachine = await System.Text.Json.JsonSerializer.DeserializeAsync<Automation>(stream);
         if (stateMachine != null)
         {
             await OnImport(stateMachine);
         }
     }
 
-    async Task OnImport(StateMachine stateMachine)
+    async Task OnImport(Automation automation)
     {
-        StateMachine.States.Clear();
-        StateMachine.Transitions.Clear();
-        StateMachine.Informations.Clear();
-        foreach (var state in stateMachine!.States)
+        if (!string.IsNullOrWhiteSpace(automation.Data))
         {
-            StateMachine.States.Add(state);
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(automation.Data) ?? new StateMachineHandler.AutomationProperties();
         }
-        foreach (var transition in stateMachine!.Transitions)
+        else
         {
-            StateMachine.Transitions.Add(transition);
+            AutomationProperties = new();
         }
-        foreach (var information in stateMachine!.Informations)
-        {
-            StateMachine.Informations.Add(information);
-        }
-        StateMachine.PreScheduleAction = stateMachine.PreScheduleAction;
-        StateMachine.PreStartAction = stateMachine.PreStartAction;
-        await ReloadDiagramAsync(StateMachine);
+        SaveAutomationPropertiesToAutomation();
+        await ReloadDiagramAsync(Automation);
     }
 
     private string? GetUndoData()
     {
         AddUIDataToStatesAndTransitions();
-        return System.Text.Json.JsonSerializer.Serialize(StateMachine);
+        SaveAutomationPropertiesToAutomation();
+        return System.Text.Json.JsonSerializer.Serialize(Automation);
     }
 
     private void AddUndo()
@@ -1332,10 +1346,10 @@ else
             var data = _undoRedo.Undo();
             if (data != null)
             {
-                var stateMachine = System.Text.Json.JsonSerializer.Deserialize<StateMachine>(data);
-                if (stateMachine != null)
+                var automation = System.Text.Json.JsonSerializer.Deserialize<Automation>(data);
+                if (automation != null)
                 {
-                    await OnImport(stateMachine);
+                    await OnImport(automation);
                 }
             }
         }
@@ -1348,10 +1362,10 @@ else
             var data = _undoRedo.Redo();
             if (data != null)
             {
-                var stateMachine = System.Text.Json.JsonSerializer.Deserialize<StateMachine>(data);
-                if (stateMachine != null)
+                var automation = System.Text.Json.JsonSerializer.Deserialize<Automation>(data);
+                if (automation != null)
                 {
-                    await OnImport(stateMachine);
+                    await OnImport(automation);
                 }
             }
         }

@@ -11,7 +11,7 @@ public class DataRepository(IConfiguration _configuration)
     const string ClientTableName = "Client";
     const string VariableTableName = "Variable";
     const string VariableValueTableName = "VariableValue";
-    const string StateMachineTableName = "StateMachine";
+    const string AutomationTableName = "Automation";
 
     public async Task SetupAsync()
     {
@@ -41,7 +41,7 @@ public class DataRepository(IConfiguration _configuration)
         command.CommandText =
 @$"CREATE TABLE IF NOT EXISTS {ClientTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
 CREATE TABLE IF NOT EXISTS {VariableTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
-CREATE TABLE IF NOT EXISTS {StateMachineTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
+CREATE TABLE IF NOT EXISTS {AutomationTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
 CREATE TABLE IF NOT EXISTS {VariableValueTableName}(Id INTEGER PRIMARY KEY AUTOINCREMENT, Data blob);
 
 insert or ignore into {ClientTableName} (Id, Data) values (1, @genericClientData);
@@ -66,9 +66,9 @@ insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
         return await GetItemsAsync<Variable>(VariableTableName);
     }
 
-    public async Task<List<StateMachine>> GetStateMachinesAsync()
+    public async Task<List<Automation>> GetAutomationsAsync()
     {
-        return await GetItemsAsync<StateMachine>(StateMachineTableName);
+        return await GetItemsAsync<Automation>(AutomationTableName);
     }
 
     public async Task<List<VariableValue>> GetVariableValuesAsync()
@@ -86,9 +86,9 @@ insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
         await AddItemAsync(VariableTableName, variable);
     }
 
-    public async Task AddStateMachineAsync(StateMachine stateMachine)
+    public async Task AddAutomationAsync(Automation automation)
     {
-        await AddItemAsync(StateMachineTableName, stateMachine);
+        await AddItemAsync(AutomationTableName, automation);
     }
 
     public async Task AddVariableValueAsync(VariableValue variableValue)
@@ -106,9 +106,9 @@ insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
         await UpdateItemAsync(VariableTableName, variable);
     }
 
-    public async Task UpdateStateMachineAsync(StateMachine stateMachine)
+    public async Task UpdateAutomationAsync(Automation automation)
     {
-        await UpdateItemAsync(StateMachineTableName, stateMachine);
+        await UpdateItemAsync(AutomationTableName, automation);
     }
 
     public async Task UpdateVariableValueAsync(VariableValue variableValue)
@@ -126,9 +126,9 @@ insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
         await DeleteItemAsync(VariableTableName, variable);
     }
 
-    public async Task DeleteStateMachineAsync(StateMachine stateMachine)
+    public async Task DeleteAutomationAsync(Automation automation)
     {
-        await DeleteItemAsync(StateMachineTableName, stateMachine);
+        await DeleteItemAsync(AutomationTableName, automation);
     }
 
     public async Task DeleteVariableValueAsync(VariableValue variableValue)
@@ -208,7 +208,6 @@ insert or ignore into {ClientTableName} (Id, Data) values (2, @timerClientData);
             var dataLength = reader.GetBytes(1, 0, dataBuffer, 0, dataBuffer.Length);
             if (dataLength > 0)
             {
-                var data = new byte[dataLength];
                 record = Client.FromData<T>(id, dataBuffer, (int)dataLength);
             }
             else

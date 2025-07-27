@@ -9,7 +9,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
     private readonly ConcurrentDictionary<int, Client> _clients = [];
     private readonly ConcurrentDictionary<int, Variable> _variables = [];
     private readonly ConcurrentDictionary<int, VariableValue> _variableValues = [];
-    private readonly ConcurrentDictionary<int, StateMachine> _stateMachines = [];
+    private readonly ConcurrentDictionary<int, Automation> _automations = [];
 
     private int _lastUsedNonPersistentVariableValueId = int.MaxValue;
 
@@ -42,10 +42,10 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             }
         }
 
-        var stateMachines = await _dataRepository.GetStateMachinesAsync();
-        foreach (var stateMachine in stateMachines)
+        var automations = await _dataRepository.GetAutomationsAsync();
+        foreach (var automation in automations)
         {
-            _stateMachines.TryAdd(stateMachine.Id, stateMachine);
+            _automations.TryAdd(automation.Id, automation);
         }
     }
 
@@ -64,9 +64,9 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         return _variableValues.Values.ToList();
     }
 
-    public List<StateMachine> GetStateMachines()
+    public List<Automation> GetAutomations()
     {
-        return _stateMachines.Values.ToList();
+        return _automations.Values.ToList();
     }
 
     public async Task AddOrUpdateClientAsync(Client client)
@@ -176,25 +176,25 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
         }
     }
 
-    public async Task AddOrUpdateStateMachineAsync(StateMachine stateMachine)
+    public async Task AddOrUpdateAutomationAsync(Automation automation)
     {
-        if (stateMachine.Id == 0)
+        if (automation.Id == 0)
         {
-            await _dataRepository.AddStateMachineAsync(stateMachine);
+            await _dataRepository.AddAutomationAsync(automation);
         }
         else
         {
-            await _dataRepository.UpdateStateMachineAsync(stateMachine);
+            await _dataRepository.UpdateAutomationAsync(automation);
         }
-        _stateMachines.AddOrUpdate(stateMachine.Id, stateMachine, (_, _) => stateMachine);
-        await _messageBusService.PublishAsync(stateMachine);
+        _automations.AddOrUpdate(automation.Id, automation, (_, _) => automation);
+        await _messageBusService.PublishAsync(automation);
     }
 
-    public async Task DeleteStateMachineAsync(StateMachine stateMachine)
+    public async Task DeleteAutomationAsync(Automation automation)
     {
-        if (_stateMachines.TryRemove(Math.Abs(stateMachine.Id), out var orgStateMachine))
+        if (_automations.TryRemove(Math.Abs(automation.Id), out var orgAutomation))
         {
-            var variableIds = _variables.Values.Where(v => v.StateMachineId == orgStateMachine.Id)
+            var variableIds = _variables.Values.Where(v => v.AutomationId == orgAutomation.Id)
                 .Select(x => x.Id)
                 .ToList();
 
@@ -204,7 +204,7 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
 
             await _dataRepository.DeleteVariableValuesAsync(variableValueIds);
             await _dataRepository.DeleteVariablesAsync(variableIds);
-            await _dataRepository.DeleteStateMachineAsync(orgStateMachine);
+            await _dataRepository.DeleteAutomationAsync(orgAutomation);
             foreach (var variableValue in _variableValues.Values.Where(v => variableValueIds.Contains(v.Id)).ToList())
             {
                 _variableValues.TryRemove(variableValue.Id, out _);
@@ -213,8 +213,8 @@ public class DataService(Repository.DataRepository _dataRepository, MessageBusSe
             {
                 _variables.TryRemove(variable.Id, out _);
             }
-            orgStateMachine.Id = -Math.Abs(orgStateMachine.Id);
-            await _messageBusService.PublishAsync(orgStateMachine);
+            orgAutomation.Id = -Math.Abs(orgAutomation.Id);
+            await _messageBusService.PublishAsync(orgAutomation);
         }
     }
 

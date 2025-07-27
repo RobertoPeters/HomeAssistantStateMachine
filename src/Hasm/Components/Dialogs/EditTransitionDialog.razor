@@ -1,7 +1,8 @@
 ﻿@using Hasm.Models
-@inherits ResultDialogBase<Transition>
+@using Hasm.Services
+@inherits ResultDialogBase<StateMachineHandler.Transition>
 
-<RadzenTemplateForm @ref="Form" Data="@Model" TItem="Transition">
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachineHandler.Transition">
     <RadzenStack>
         <RadzenFormField Text="Description" Variant="@Variant.Outlined">
             <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" spellcheck="false" />
@@ -25,22 +26,22 @@
     protected override int? WidthInPixels => 1400;
 
     [Parameter]
-    public Transition? Transition { get; set; }
+    public StateMachineHandler.Transition? Transition { get; set; }
 
     [Parameter]
     public EventCallback ShowStateMachineScript { get; set; }
 
     [Parameter]
-    public StateMachine? StateMachine { get; set; }
+    public Automation? Automation { get; set; }
 
-    private Transition? Model;
-    private RadzenTemplateForm<Transition>? Form;
+    private StateMachineHandler.Transition? Model;
+    private RadzenTemplateForm<StateMachineHandler.Transition>? Form;
 
     protected override void OnInitialized()
     {
         if (Transition == null)
         {
-            Transition = new Transition();
+            Transition = new StateMachineHandler.Transition();
         }
         Model = Transition.CopyObject();
         base.OnInitialized();
@@ -51,9 +52,9 @@
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Transition Condition", dialog =>
         {
             dialog.Script = Model!.Condition;
-            if (StateMachine != null)
+            if (Automation != null)
             {
-                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(StateMachine);
+                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
             }
         });
         if (result != null)

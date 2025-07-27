@@ -116,7 +116,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
             return null;
         }
         var variableInfo = _variables.Values.FirstOrDefault(x => x.Variable.Name == name
-        && x.Variable.StateMachineId == stateMachineId
+        && x.Variable.AutomationId == stateMachineId
         && clientId == x.Variable.ClientId
         );
 
@@ -137,7 +137,7 @@ public class VariableService(DataService _dataService, MessageBusService _messag
             {
                 ClientId = clientId,
                 Name = name,
-                StateMachineId = stateMachineId,
+                AutomationId = stateMachineId,
                 Persistant = persistant
             };
         }
@@ -162,11 +162,11 @@ public class VariableService(DataService _dataService, MessageBusService _messag
         }
     }
 
-    public async Task Handle(StateMachine stateMachine)
+    public async Task Handle(Automation automation)
     {
-        if (stateMachine.Id < 0)
+        if (automation.Id < 0)
         {
-            await DeleteVariablesAsync(_variables.Values.Where(x => x.Variable.StateMachineId == -stateMachine.Id).Select(x => x.Variable.Id).ToList(), false);
+            await DeleteVariablesAsync(_variables.Values.Where(x => x.Variable.AutomationId == -automation.Id).Select(x => x.Variable.Id).ToList(), false);
         }
     }
 
@@ -219,8 +219,8 @@ public class VariableServiceMessageHandler
     {
         await variableService.Handle(client);
     }
-    public async Task Handle(StateMachine stateMachine, VariableService variableService)
+    public async Task Handle(Automation automation, VariableService variableService)
     {
-        await variableService.Handle(stateMachine);
+        await variableService.Handle(automation);
     }
 }

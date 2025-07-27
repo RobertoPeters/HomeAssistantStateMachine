@@ -1,5 +1,6 @@
 ﻿@using Blazor.Diagrams.Components.Renderers
 @using Blazor.Diagrams.Core.Models
+@using Hasm.Services
 @inject DialogService DialogService
 @inherits ComponentBase
 <div class="default-node @(Node.Group != null ? "grouped" : "") @(Node.Selected ? "selected" : "")" style="position: relative;">
@@ -10,7 +11,7 @@
     }
     <RadzenButton 
         Size=ButtonSize.ExtraSmall
-                  ButtonStyle="@(string.IsNullOrWhiteSpace(State.EntryAction) ? ButtonStyle.Light : ButtonStyle.Dark)"
+                  ButtonStyle="@(string.IsNullOrWhiteSpace(Node.State.EntryAction) ? ButtonStyle.Light : ButtonStyle.Dark)"
         Text="Action" 
         Click="@OnEditEntryActionAsync"
         style="position: absolute; right: 8px; bottom: 8px; z-index: 1;" />
@@ -21,25 +22,16 @@
     [Parameter]
     public StateMachineStateNodeModel Node { get; set; } = null!;
 
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-
-        State = Node.StateMachine.States.First(x => x.Id == Node.StateId);
-    }
-
-    Models.State State = null!;
-
     async Task OnEditEntryActionAsync()
     {
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("State Entry Action", dialog =>
         {
-            dialog.Script = State.EntryAction;
-            dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Node.StateMachine);
+            dialog.Script = Node.State.EntryAction;
+            dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Node.Automation);
         });
         if (result != null)
         {
-            State.EntryAction = result;
+            Node.State.EntryAction = result;
         }
 
     }

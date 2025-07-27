@@ -1,0 +1,289 @@
+﻿@using Hasm.Models
+@using Hasm.Services
+@inherits ResultDialogBase<Automation>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="Automation">
+    <RadzenStack>
+        <RadzenFormField Text="Type *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown Data="(Models.AutomationType[])Enum.GetValues(typeof(Models.AutomationType))" @bind-Value="@Model!.AutomationType" Name="AutomationType" Disabled=@(Model!.Id != 0) />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="AutomationType" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Name *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@Model!.Name" Name="Name" spellcheck="false" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="Name" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Sub State Machine" Variant="@Variant.Outlined">
+            <RadzenRadioButtonList @bind-Value="@Model!.IsSubAutomation" TValue="bool" class="rz-m-4 rz-mt-8">
+                <Items>
+                    <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                    <RadzenRadioButtonListItem Text="No" Value="false" />
+                </Items>
+            </RadzenRadioButtonList>
+        </RadzenFormField>
+        @if (!Model!.IsSubAutomation)
+        {
+            <RadzenFormField Text="Enabled" Variant="@Variant.Outlined">
+                <RadzenRadioButtonList @bind-Value="@Model.Enabled" TValue="bool" class="rz-m-4 rz-mt-8">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                        <RadzenRadioButtonListItem Text="No" Value="false" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </RadzenFormField>
+        }
+        @if (Model!.AutomationType == AutomationType.StateMachine)
+        {
+            @if (Model.IsSubAutomation)
+            {
+                <RadzenFormField Text="Sub State Machine Variables" Variant="@Variant.Outlined">
+                    <RadzenDataGrid Data="@StateMachineAutomationProperties.SubStateMachineParameters"
+                                    TItem="StateMachineHandler.SubStateMachineParameter"
+                                    RowCreate="@OnCreateRow"
+                                    RowUpdate="@OnUpdateRow"
+                                    @ref=parametersGrid
+                                    EditMode="DataGridEditMode.Multiple">
+                        <HeaderTemplate>
+                            <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle" Text="Add Parameter" Click="@InsertRow" />
+                        </HeaderTemplate>
+                        <Columns>
+                            <RadzenDataGridColumn Context="parameter" Width="150px" Resizable="false" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Frozen="true" FrozenPosition="FrozenColumnPosition.Left">
+                                <Template Context="parameter">
+                                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="rz-my-1 rz-ms-1" Click="@(args => EditRowAsync(parameter))" @onclick:stopPropagation="true" />
+                                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Size="ButtonSize.Medium" Shade="Shade.Lighter" class="rz-my-1 rz-ms-1" Click="@(args => DeleteRowAsync(parameter))" @onclick:stopPropagation="true" />
+                                </Template>
+                                <EditTemplate Context="parameter">
+                                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@((args) => SaveRowAsync(parameter))" aria-label="Save" />
+                                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="rz-my-1 rz-ms-1" Click="@((args) => CancelEdit(parameter))" aria-label="Cancel" />
+                                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Size="ButtonSize.Medium" Shade="Shade.Lighter" class="rz-my-1 rz-ms-1" Click="@(args => DeleteRowAsync(parameter))" aria-label="Delete" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="Name" Title="Name">
+                                <EditTemplate Context="parameter">
+                                    <RadzenTextBox Style="width:200px; display: block; border:solid;" @bind-Value="parameter.Name" Name="ParameterName" />
+                                    <RadzenRequiredValidator Text="Name is required" Component="ParameterName" Popup="true" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="ScriptVariableName" Title="Script Variable Name">
+                                <EditTemplate Context="parameter">
+                                    <RadzenTextBox Style="width:200px; display: block; border:solid;" @bind-Value="parameter.ScriptVariableName" Name="ScriptVariableName" />
+                                    <RadzenRequiredValidator Text="Script variable name is required" Component="ScriptVariableName" Popup="true" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="DefaultValue" Title="Default Value">
+                                <EditTemplate Context="parameter">
+                                    <RadzenTextBox Style="width:200px; display: block; border:solid;" @bind-Value="parameter.DefaultValue" Name="DefaultValue" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="SubStateMachineParameter" Title="Is input">
+                                <Template Context="parameter">
+                                    @(parameter.IsInput ? "Yes" : "No")
+                                </Template>
+                                <EditTemplate Context="parameter">
+                                    <RadzenRadioButtonList @bind-Value="@parameter.IsInput" TValue="bool" class="rz-m-4 rz-mt-8">
+                                        <Items>
+                                            <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                                            <RadzenRadioButtonListItem Text="No" Value="false" />
+                                        </Items>
+                                    </RadzenRadioButtonList>
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn Property="IsOutput" Title="Is output">
+                                <Template Context="parameter">
+                                    @(parameter.IsOutput ? "Yes" : "No")
+                                </Template>
+                                <EditTemplate Context="parameter">
+                                    <RadzenRadioButtonList @bind-Value="@parameter.IsOutput" TValue="bool" class="rz-m-4 rz-mt-8">
+                                        <Items>
+                                            <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                                            <RadzenRadioButtonListItem Text="No" Value="false" />
+                                        </Items>
+                                    </RadzenRadioButtonList>
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenFormField>
+            }
+            <RadzenFormField Text="Pre Start Action" Variant="@Variant.Outlined">
+                <div class="textarea-wrapper">
+                    <RadzenTextArea @bind-Value="@StateMachineAutomationProperties.PreStartAction" Name="PreStartAction" Rows="10" Style="width: 100%;" spellcheck="false" />
+                    <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPreStartActionAsync"></RadzenIcon>
+                </div>
+            </RadzenFormField>
+            <RadzenFormField Text="Pre Schedule Action" Variant="@Variant.Outlined">
+                <div class="textarea-wrapper">
+                    <RadzenTextArea @bind-Value="@StateMachineAutomationProperties.PreScheduleAction" Name="PreScheduleAction" Rows="3" Style="width: 100%;" spellcheck="false" />
+                    <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPreScheduleActionAsync"></RadzenIcon>
+                </div>
+            </RadzenFormField>
+        }
+    </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+    <RadzenButton ButtonType="ButtonType.Button" Text="System script" Click="@OnSystemScriptAsync" />
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    [Parameter]
+    public Automation? Automation { get; set; }
+
+    private Automation? Model;
+    private StateMachineHandler.AutomationProperties StateMachineAutomationProperties = new();
+    private RadzenTemplateForm<Automation>? Form;
+
+    private RadzenDataGrid<StateMachineHandler.SubStateMachineParameter>? parametersGrid;
+    private List<StateMachineHandler.SubStateMachineParameter> parametersToInsert = [];
+    private List<StateMachineHandler.SubStateMachineParameter> parametersToUpdate = [];
+
+    protected override void OnInitialized()
+    {
+        if (Automation == null)
+        {
+            Automation = new Automation();
+            Automation.Enabled = false;
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(Automation!.Data) && Automation.AutomationType == AutomationType.StateMachine)
+            {
+                StateMachineAutomationProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(Automation.Data) ?? new();
+            }
+        }
+        Model = Automation.CopyObject()!;
+        Model.Id = Automation.Id;
+        base.OnInitialized();
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            if (Model!.AutomationType == AutomationType.StateMachine)
+            {
+                Model.Data = System.Text.Json.JsonSerializer.Serialize(StateMachineAutomationProperties);
+            }
+            Close(Model!);
+        }
+    }
+
+    async Task OnSystemScriptAsync()
+    {
+        await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("System Script", dialog =>
+        {
+            dialog.Script = Services.StateMachineHandler.SystemScript;
+            dialog.ReadOnly = true;
+        });
+    }
+
+    async Task EditPreStartActionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
+        {
+            dialog.Script = StateMachineAutomationProperties.PreStartAction;
+            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Model);
+        });
+        if (result != null)
+        {
+            StateMachineAutomationProperties.PreStartAction = result;
+        }
+    }
+
+    async Task EditPreScheduleActionAsync()
+    {
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Schedule Action", dialog =>
+        {
+            dialog.Script = StateMachineAutomationProperties.PreScheduleAction;
+            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Model);
+        });
+        if (result != null)
+        {
+            StateMachineAutomationProperties.PreScheduleAction = result;
+        }
+    }
+
+    void Reset()
+    {
+        parametersToInsert.Clear();
+        parametersToUpdate.Clear();
+    }
+
+    void Reset(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        parametersToInsert.Remove(parameter);
+        parametersToUpdate.Remove(parameter);
+    }
+
+    async Task InsertRow()
+    {
+        if (!parametersGrid!.IsValid) return;
+
+        var parameter = new StateMachineHandler.SubStateMachineParameter();
+        parametersToInsert.Add(parameter);
+        await parametersGrid.InsertRow(parameter);
+    }
+
+    void OnCreateRow(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        StateMachineAutomationProperties.SubStateMachineParameters.Add(parameter);
+        parametersToInsert.Remove(parameter);
+    }
+
+    void OnUpdateRow(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        Reset(parameter);
+        var index = StateMachineAutomationProperties.SubStateMachineParameters.FindIndex(x => x.Id == parameter.Id);
+        if (index >= 0)
+        {
+            StateMachineAutomationProperties.SubStateMachineParameters[index] = parameter;
+        }
+    }
+
+    async Task EditRowAsync(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        if (!parametersGrid!.IsValid) return;
+
+        parametersToUpdate.Add(parameter);
+        await parametersGrid.EditRow(parameter);
+    }
+
+    async Task SaveRowAsync(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        await parametersGrid!.UpdateRow(parameter);
+    }
+
+    void CancelEdit(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        Reset(parameter);
+
+        parametersGrid!.CancelEditRow(parameter);
+    }
+
+    async Task DeleteRowAsync(StateMachineHandler.SubStateMachineParameter parameter)
+    {
+        Reset(parameter);
+
+        if (StateMachineAutomationProperties.SubStateMachineParameters.Contains(parameter))
+        {
+            StateMachineAutomationProperties.SubStateMachineParameters.Remove(parameter);
+        }
+        else
+        {
+            parametersGrid!.CancelEditRow(parameter);
+        }
+        await parametersGrid!.Reload();
+    }
+}

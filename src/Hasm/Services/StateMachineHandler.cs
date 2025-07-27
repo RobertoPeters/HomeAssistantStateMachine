@@ -1,11 +1,73 @@
 ﻿using System.Text;
+using System.Text.Json.Serialization;
 using Hasm.Models;
 using Jint.Native;
 
 namespace Hasm.Services;
 
-public class StateMachineHandler(StateMachine _stateMachine, ClientService _clientService, DataService _dataService, VariableService _variableService, MessageBusService _messageBusService) : IDisposable
+public class StateMachineHandler : IAutomationHandler
 {
+    public class State
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = null!;
+        public bool IsErrorState { get; set; }
+        public bool IsStartState { get; set; }
+        public bool IsSubState { get; set; }
+        public string? Description { get; set; }
+        public string? EntryAction { get; set; }
+        public string? UIData { get; set; }
+        public int? SubStateMachineId { get; set; }
+        public List<SubStateParameter> SubStateParameters { get; set; } = [];
+    }
+
+    public class SubStateMachineParameter
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Name { get; set; } = null!;
+        public string ScriptVariableName { get; set; } = null!;
+        public string? DefaultValue { get; set; }
+        public bool IsOutput { get; set; }
+        public bool IsInput { get; set; }
+    }
+
+    public class SubStateParameter
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string? ScriptVariableName { get; set; }
+    }
+
+    public class Transition
+    {
+        public Guid Id { get; set; }
+        public string? Description { get; set; }
+        public string? Condition { get; set; }
+        public string? UIData { get; set; }
+        public Guid? FromStateId { get; set; }
+        public Guid? ToStateId { get; set; }
+    }
+
+    public class Information
+    {
+        public Guid Id { get; set; }
+        public string? Description { get; set; }
+        public string? Evaluation { get; set; }
+        public string? UIData { get; set; }
+
+        [JsonIgnore]
+        public string? EvaluationResult { get; set; }
+    }
+
+    public class AutomationProperties
+    {
+        public string? PreStartAction { get; set; }
+        public string? PreScheduleAction { get; set; }
+        public List<State> States { get; set; } = [];
+        public List<Transition> Transitions { get; set; } = [];
+        public List<SubStateMachineParameter> SubStateMachineParameters { get; set; } = [];
+        public List<Information> Informations { get; set; } = [];
+    }
+
     public enum StateMachineRunningState
     {
         NotRunning,
@@ -14,16 +76,9 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         Error
     }
 
-    public class LogEntry
-    {
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-        public int StateMachineId { get; set; }
-        public string Message { get; set; } = null!;
-    }
-
     public class StateMachineHandlerInfo
     {
-        public int StateMachineId { get; set; }
+        public int AutomationId { get; set; }
         public string? CurrentState { get; set; }
         public StateMachineRunningState? RunningState { get; set; }
     }
@@ -31,12 +86,71 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     public class StateMachineEngineInfo
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public StateMachine StateMachine { get; set; } = null!;
+        public Automation Automation { get; set; } = null!;
         public Jint.Engine Engine { get; set; } = null!;
     }
 
-    public StateMachine StateMachine { get; private set; } = _stateMachine;
+    private Automation _automation;
+    private readonly ClientService _clientService;
+    private readonly DataService _dataService;
+    private readonly VariableService _variableService;
+    private readonly MessageBusService _messageBusService;
+
+    private AutomationProperties _automationProperties = new();
+
+    public Automation Automation => _automation;
     public string? ErrorMessage { get; private set; }
+
+    public string? PreStartAction
+    {
+        get => _automationProperties.PreStartAction;
+        set { _automationProperties.PreStartAction = value; }
+    }
+    public string? PreScheduleAction
+    {
+        get => _automationProperties.PreScheduleAction;
+        set { _automationProperties.PreScheduleAction = value; }
+    }
+    public List<State> States
+    {
+        get => _automationProperties.States;
+        set { _automationProperties.States = value; }
+    }
+    public List<Transition> Transitions
+    {
+        get => _automationProperties.Transitions;
+        set { _automationProperties.Transitions = value; }
+    }
+    public List<SubStateMachineParameter> SubStateMachineParameters
+    {
+        get => _automationProperties.SubStateMachineParameters;
+        set { _automationProperties.SubStateMachineParameters = value; }
+    }
+    public List<Information> Informations
+    {
+        get => _automationProperties.Informations;
+        set { _automationProperties.Informations = value; }
+    }
+
+    public StateMachineHandler(Automation automation, ClientService clientService, DataService dataService, VariableService variableService, MessageBusService messageBusService)
+    {
+        _automation = automation;
+        _clientService = clientService;
+        _dataService = dataService;
+        _variableService = variableService;
+        _messageBusService = messageBusService;
+
+        _automationProperties = GetAutomationProperties(automation.Data);
+    }
+
+    public static AutomationProperties GetAutomationProperties(string? data)
+    {
+        if (!string.IsNullOrWhiteSpace(data))
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<AutomationProperties>(data) ?? new();
+        }
+        return new();
+    }
 
     public void SetRunningStateFinished(string instanceId)
     {
@@ -55,10 +169,10 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             //we need the current state of the parent state machine
             var parentEngine = _engines[indexOfEngine - 1];
             var parentStateId = parentEngine.Engine.Evaluate("stateInfo[currentState].externalId").JsValueToString();
-            var parentState = parentEngine.StateMachine.States.FirstOrDefault(s => s.Id.ToString() == parentStateId);
+            var parentState = GetAutomationProperties(parentEngine.Automation.Data).States.FirstOrDefault(s => s.Id.ToString() == parentStateId);
             if (parentState != null)
             {
-                foreach (var parameter in _engines[indexOfEngine].StateMachine.SubStateMachineParameters.Where(x => x.IsOutput).ToList())
+                foreach (var parameter in GetAutomationProperties(_engines[indexOfEngine].Automation.Data).SubStateMachineParameters.Where(x => x.IsOutput).ToList())
                 {
                     var subScriptVariableName = parentState.SubStateParameters.FirstOrDefault(x => x.Id == parameter.Id)?.ScriptVariableName;
                     var parentScriptVariableName = parameter.ScriptVariableName;
@@ -87,24 +201,24 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             return;
         }
 
-        var stateState = _engines[indexOfEngine].StateMachine.States.Where(s => s.Id.ToString() == stateId).FirstOrDefault();
+        var stateState = GetAutomationProperties(_engines[indexOfEngine].Automation.Data).States.Where(s => s.Id.ToString() == stateId).FirstOrDefault();
         if (stateState == null)
         {
             return;
         }
 
-        var stateMachineId = stateState.SubStateMachineId;
-        if (stateMachineId == null)
+        var automationId = stateState.SubStateMachineId;
+        if (automationId == null)
         {
             return;
         }
 
-        if (_engines.Where(x => x.StateMachine.Id == stateMachineId).Any())
+        if (_engines.Where(x => x.Automation.Id == automationId).Any())
         {
             return;
         }
 
-        var subStateMachine = _dataService.GetStateMachines().FirstOrDefault(x => x.Id == stateMachineId);
+        var subStateMachine = _dataService.GetAutomations().FirstOrDefault(x => x.Id == automationId);
         if (subStateMachine == null)
         {
             return;
@@ -113,13 +227,14 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         var engine = new StateMachineEngineInfo()
         {
             Engine = new Jint.Engine(),
-            StateMachine = subStateMachine
+            Automation = subStateMachine
         };
         _engines.Add(engine);
         engine.Engine.SetValue("system", _systemMethods);
 
         List<(string variableName, string? variableValue)> machineStateParameters = [];
-        foreach(var parameter in subStateMachine.SubStateMachineParameters)
+        var subStateMachineParameters = GetAutomationProperties(subStateMachine.Data).SubStateMachineParameters;
+        foreach (var parameter in subStateMachineParameters)
         {
             if (parameter.IsInput)
             {
@@ -134,7 +249,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             }
         }
 
-        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(subStateMachine, false, engine.Id, machineStateParameters));
+        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(GetAutomationProperties(subStateMachine.Data), false, engine.Id, machineStateParameters));
         RequestTriggerStateMachine();
     }
 
@@ -215,17 +330,17 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     {
         ErrorMessage = null;
         _readyForTriggers = false;
-        if (StateMachine.Enabled || StateMachine.IsSubStateMachine)
+        if (Automation.Enabled || Automation.IsSubAutomation)
         {
             lock (_lockEngineObject)
             {
                 _currentState = null;
-                if (EngineScriptBuilder.ValidateModel(StateMachine))
+                if (EngineScriptBuilder.ValidateModel(_automationProperties))
                 {
                     var engine = new StateMachineEngineInfo()
                     {
                         Engine = new Jint.Engine(),
-                        StateMachine = StateMachine
+                        Automation = Automation
                     };
                     _engines.Add(engine);
                     _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
@@ -233,7 +348,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
 
                     try
                     {
-                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(StateMachine, true, engine.Id, null));
+                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(_automationProperties, true, engine.Id, null));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }
@@ -324,17 +439,18 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
             }
         }
 
-        _messageBusService.PublishAsync(new StateMachineScheduledInfo
+        _messageBusService.PublishAsync(new AutomationInfo
         {
-            StateMachineId = StateMachine.Id
+            AutomationId = Automation.Id
         });
     }
 
-    public Task UpdateAsync(StateMachine stateMachine)
+    public Task UpdateAsync(Automation automation)
     {
         Stop();
-        StateMachine = stateMachine;
-        if (!StateMachine.IsSubStateMachine)
+        _automation = automation;
+        _automationProperties = GetAutomationProperties(automation.Data);
+        if (!_automation.IsSubAutomation)
         {
             Start();
         }
@@ -403,11 +519,11 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
         if (logObject != null)
         {
             var indexOfEngine = _engines.FindIndex(_engines => _engines.Id.ToString() == instanceId);
-            var prefix = $"[{string.Join("].[", _engines.Take(indexOfEngine+1).Select(e => e.StateMachine.Name))}]";
+            var prefix = $"[{string.Join("].[", _engines.Take(indexOfEngine+1).Select(e => e.Automation.Name))}]";
             var logEvent = new LogEntry
             {
                 Timestamp = DateTime.UtcNow,
-                StateMachineId = StateMachine.Id,
+                AutomationId = Automation.Id,
             };
 
             if (logObject is string txt)
@@ -428,7 +544,7 @@ public class StateMachineHandler(StateMachine _stateMachine, ClientService _clie
     {
         var info = new StateMachineHandlerInfo
         {
-            StateMachineId = StateMachine.Id,
+            AutomationId = Automation.Id,
             CurrentState = CurrentState,
             RunningState = RunningState
         };

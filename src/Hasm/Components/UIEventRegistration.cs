@@ -5,25 +5,25 @@ namespace Hasm.Components;
 public class UIEventRegistration
 {
     public event EventHandler<IClientHandler>? ClientHandlerChanged;
-    public event EventHandler<StateMachineHandler>? StateMachineHandlerChanged;
-    public event EventHandler<StateMachineHandler.LogEntry>? LogEntryAdded;
+    public event EventHandler<IAutomationHandler>? AutomationHandlerChanged;
+    public event EventHandler<LogEntry>? LogEntryAdded;
     public event EventHandler<StateMachineHandler.StateMachineHandlerInfo>? StateMachineHandlerInfoChanged;
     public event EventHandler<List<VariableService.VariableInfo>>? VariablesChanged;
     public event EventHandler<List<VariableService.VariableValueInfo>>? VariableValuesChanged;
     public event EventHandler<ClientConnectionInfo>? ClientConnectionInfoChanged;
-    public event EventHandler<StateMachineScheduledInfo>? StateMachineScheduledInfoChanged;
+    public event EventHandler<AutomationInfo>? AutomationInfoChanged;
 
     public void Handle(IClientHandler clientHandler)
     {
         ClientHandlerChanged?.Invoke(this, clientHandler);
     }
 
-    public void Handle(StateMachineHandler stateMachineHandler)
+    public void Handle(IAutomationHandler automationHandler)
     {
-        StateMachineHandlerChanged?.Invoke(this, stateMachineHandler);
+        AutomationHandlerChanged?.Invoke(this, automationHandler);
     }
 
-    public void Handle(StateMachineHandler.LogEntry logEntry)
+    public void Handle(LogEntry logEntry)
     {
         LogEntryAdded?.Invoke(this, logEntry);
     }
@@ -48,9 +48,9 @@ public class UIEventRegistration
         ClientConnectionInfoChanged?.Invoke(this, clientConnectionInfo);
     }
 
-    public void Handle(StateMachineScheduledInfo stateMachineScheduledInfo)
+    public void Handle(AutomationInfo automationInfo)
     {
-        StateMachineScheduledInfoChanged?.Invoke(this, stateMachineScheduledInfo);
+        AutomationInfoChanged?.Invoke(this, automationInfo);
     }
 }
 
@@ -66,7 +66,7 @@ public class UIEventRegistrationMessageHandler
         uiEventRegistration.Handle(stateMachineHandler);
     }
 
-    public void Handle(StateMachineHandler.LogEntry logEntry, UIEventRegistration uiEventRegistration)
+    public void Handle(LogEntry logEntry, UIEventRegistration uiEventRegistration)
     {
         uiEventRegistration.Handle(logEntry);
     }
@@ -96,7 +96,7 @@ public class UIEventRegistrationMessageHandler
         uiEventRegistration.Handle(clientConnectionInfo);
     }
 
-    public void Handle(StateMachineScheduledInfo stateMachineScheduledInfo, UIEventRegistration uiEventRegistration)
+    public void Handle(AutomationInfo stateMachineScheduledInfo, UIEventRegistration uiEventRegistration)
     {
         uiEventRegistration.Handle(stateMachineScheduledInfo);
     }    

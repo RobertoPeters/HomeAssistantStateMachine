@@ -43,7 +43,7 @@ public class SystemMethods
                 stringMockingOptions.Add(mockingOption.JsValueToString(false));
             }
         }
-        return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.StateMachine.Id : null, persistant, data?.ToString(), stringMockingOptions).Result ?? -1;
+        return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.Automation.Id : null, persistant, data?.ToString(), stringMockingOptions).Result ?? -1;
     }
 
     public int? getVariableIdByName(string name, int clientId, bool isStateMachineVariable)
@@ -52,7 +52,7 @@ public class SystemMethods
                 .GetVariables()
                 .FirstOrDefault(v => v.Variable.Name == name
                                     && v.Variable.ClientId == clientId
-                                    && ((isStateMachineVariable && v.Variable.StateMachineId == _stateMachineHandler.StateMachine.Id) || (!isStateMachineVariable && v.Variable.StateMachineId == null)));
+                                    && ((isStateMachineVariable && v.Variable.AutomationId == _stateMachineHandler.Automation.Id) || (!isStateMachineVariable && v.Variable.AutomationId == null)));
         return variable?.Variable.Id;
     }
 

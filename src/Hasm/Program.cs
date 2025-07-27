@@ -33,7 +33,7 @@ builder.Services.AddSingleton<MessageBusService>();
 builder.Services.AddSingleton<DataService>();
 builder.Services.AddSingleton<VariableService>();
 builder.Services.AddSingleton<ClientService>();
-builder.Services.AddSingleton<StateMachineService>();
+builder.Services.AddSingleton<AutomationService>();
 builder.Services.AddSingleton<UIEventRegistration>();
 builder.Services.AddScoped<ContextMenuService>();
 builder.Services.AddScoped<NotificationService>();
@@ -85,7 +85,7 @@ var t = new Thread(new ThreadStart(
         await variableService.StartAsync();
         var clientService = app.Services.GetRequiredService<ClientService>();
         await clientService.StartAsync();
-        var stateMachineService = app.Services.GetRequiredService<StateMachineService>();
+        var stateMachineService = app.Services.GetRequiredService<AutomationService>();
         await stateMachineService.StartAsync();
         _pipelineReady = true;
     }));

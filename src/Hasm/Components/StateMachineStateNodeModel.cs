@@ -1,17 +1,18 @@
 ﻿using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using Hasm.Models;
+using Hasm.Services;
 
 namespace Hasm.Components;
 
 public class StateMachineStateNodeModel : NodeModel
 {
-    public StateMachineStateNodeModel(Guid stateId, StateMachine stateMachine, Point? position = null) : base(position) 
+    public StateMachineStateNodeModel(StateMachineHandler.State state, Automation automation, Point? position = null) : base(position) 
     {
-        StateId = stateId;
-        StateMachine = stateMachine;
+        State = state;
+        Automation = automation;
     }
 
-    public Guid StateId { get; set; }
-    public StateMachine StateMachine { get; set; }
+    public StateMachineHandler.State State { get; set; }
+    public Automation Automation { get; set; }
 }

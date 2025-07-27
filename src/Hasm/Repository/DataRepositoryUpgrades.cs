@@ -6,9 +6,22 @@ namespace Hasm.Repository;
 
 public static class DataRepositoryUpgrades
 {
+    public class StateMachineV2 : ModelBase
+    {
+        public string Name { get; set; } = null!;
+        public bool Enabled { get; set; }
+        public bool IsSubStateMachine { get; set; }
+        public string? PreStartAction { get; set; }
+        public string? PreScheduleAction { get; set; }
+        public List<StateMachineHandler.State> States { get; set; } = [];
+        public List<StateMachineHandler.Transition> Transitions { get; set; } = [];
+        public List<StateMachineHandler.SubStateMachineParameter> SubStateMachineParameters { get; set; } = [];
+        public List<StateMachineHandler.Information> Informations { get; set; } = [];
+    }
+
     public static async Task CheckUpgradesAsync(SqliteConnection connection)
     {
-        int targetVersion = 2;
+        int targetVersion = 3;
 
         var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
@@ -20,6 +33,11 @@ public static class DataRepositoryUpgrades
             if (version == 0)
             {
                 await CheckUpgradeTo2Async(connection);
+                await CheckUpgradeTo3Async(connection);
+            }
+            else if (version == 2)
+            {
+                await CheckUpgradeTo3Async(connection);
             }
             else if (version == targetVersion)
             {
@@ -89,14 +107,14 @@ public static class DataRepositoryUpgrades
 
         if (result is long count2 && count2 > 0)
         {
-            Dictionary<int, StateMachine> stateMachines = [];
+            Dictionary<int, StateMachineV2> stateMachines = [];
             command = connection.CreateCommand();
             command.CommandText = $"select Id, Name, Enabled, PreStartAction, PreScheduleAction from StateMachines";
             var reader = await command.ExecuteReaderAsync();
             while (reader.Read())
             {
                 var id = reader.GetInt32(0);
-                var record = new StateMachine()
+                var record = new StateMachineV2()
                 {
                     Name = reader.GetString(1),
                     Enabled = reader.GetBoolean(2),
@@ -108,7 +126,7 @@ public static class DataRepositoryUpgrades
             await command.DisposeAsync();
             await reader.DisposeAsync();
 
-            Dictionary<(int id, int stateMachineId), State> states = [];
+            Dictionary<(int id, int stateMachineId), StateMachineHandler.State> states = [];
             command = connection.CreateCommand();
             command.CommandText = $"select Id, StateMachineId, Name, IsErrorState, IsStartState, Description, EntryAction, UIData from States";
             reader = await command.ExecuteReaderAsync();
@@ -116,7 +134,7 @@ public static class DataRepositoryUpgrades
             {
                 var id = reader.GetInt32(0);
                 var stateMachineId = reader.GetInt32(1);
-                var record = new State()
+                var record = new StateMachineHandler.State()
                 {
                     Id = Guid.NewGuid(),
                     Name = reader.GetString(2),
@@ -131,7 +149,7 @@ public static class DataRepositoryUpgrades
             await command.DisposeAsync();
             await reader.DisposeAsync();
 
-            Dictionary<(int stateMachineId, int fromStateId, int toStateId), Transition> transitions = [];
+            Dictionary<(int stateMachineId, int fromStateId, int toStateId), StateMachineHandler.Transition> transitions = [];
             command = connection.CreateCommand();
             command.CommandText = $"select Id, Description, Condition, UIData, StateMachineId, FromStateId, ToStateId from Transitions";
             reader = await command.ExecuteReaderAsync();
@@ -140,7 +158,7 @@ public static class DataRepositoryUpgrades
                 var stateMachineId = reader.GetInt32(4);
                 var fromStateId = reader.GetInt32(5);
                 var toStateId = reader.GetInt32(6);
-                var record = new Transition()
+                var record = new StateMachineHandler.Transition()
                 {
                     Id = Guid.NewGuid(),
                     Description = reader.IsDBNull(1) ? null : reader.GetString(1),
@@ -181,6 +199,76 @@ public static class DataRepositoryUpgrades
 
         command = connection.CreateCommand();
         command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS HAClients; DROP TABLE IF EXISTS MqttClients; DROP TABLE IF EXISTS States; DROP TABLE IF EXISTS Transitions; DROP TABLE IF EXISTS StateMachines; PRAGMA foreign_keys = ON;";
+        await command.ExecuteNonQueryAsync();
+        await command.DisposeAsync();
+    }
+
+    public static async Task CheckUpgradeTo3Async(SqliteConnection connection)
+    {
+        var dataBuffer = new byte[10_000_000];
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT count(1) FROM sqlite_master WHERE type = 'table' AND name = 'StateMachine'";
+        var result = await command.ExecuteScalarAsync();
+        await command.DisposeAsync();
+
+        if (result is long count && count > 0)
+        {
+            command = connection.CreateCommand();
+            command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS VariableValues; DROP TABLE IF EXISTS Variables; PRAGMA foreign_keys = ON;";
+            await command.ExecuteNonQueryAsync();
+            await command.DisposeAsync();
+
+            List<Automation> automations = [];
+            command = connection.CreateCommand();
+            command.CommandText = $"select Id, Data from StateMachine";
+            using var reader = await command.ExecuteReaderAsync();
+            while (reader.Read())
+            {
+                StateMachineV2 stateMachineV2 = null!;
+                var id = reader.GetInt32(0);
+                var dataLength = reader.GetBytes(1, 0, dataBuffer, 0, dataBuffer.Length);
+                if (dataLength > 0)
+                {
+                    stateMachineV2 = StateMachineV2.FromData<StateMachineV2>(id, dataBuffer, (int)dataLength);
+                }
+                else
+                {
+                    stateMachineV2 = new ();
+                }
+                var record = new Automation()
+                {
+                    Id = id,
+                    Name = stateMachineV2.Name,
+                    Enabled = stateMachineV2.Enabled,
+                    IsSubAutomation = stateMachineV2.IsSubStateMachine,
+                    AutomationType = AutomationType.StateMachine,
+                    Data = System.Text.Json.JsonSerializer.Serialize(new StateMachineHandler.AutomationProperties
+                    {
+                        States = stateMachineV2.States,
+                        Transitions = stateMachineV2.Transitions,
+                        Informations = stateMachineV2.Informations,
+                        SubStateMachineParameters = stateMachineV2.SubStateMachineParameters,
+                        PreScheduleAction = stateMachineV2.PreScheduleAction,
+                        PreStartAction = stateMachineV2.PreStartAction
+                    })
+                };
+                automations.Add(record);
+            }
+            await command.DisposeAsync();
+            foreach (var record in automations)
+            {
+                command = connection.CreateCommand();
+                command.CommandText = $"insert into Automation(Data) values(@data)";
+                command.Parameters.AddWithValue("@data", record.ToData());
+                await command.ExecuteNonQueryAsync();
+                await command.DisposeAsync();
+            }
+
+        }
+
+        command = connection.CreateCommand();
+        command.CommandText = "PRAGMA foreign_keys = OFF; DROP TABLE IF EXISTS StateMachine; PRAGMA foreign_keys = ON;";
         await command.ExecuteNonQueryAsync();
         await command.DisposeAsync();
     }
