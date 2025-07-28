@@ -1,17 +1,18 @@
-﻿@using Hasm.Models
+﻿@using Hasm.Components.Dialogs
+@using Hasm.Models
 @using Hasm.Services
 @using Hasm.Services.Automations
-@inherits ResultDialogBase<StateMachineHandler.Information>
+@inherits ResultDialogBase<StateMachineHandler.Transition>
 
-<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachineHandler.Information">
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachineHandler.Transition">
     <RadzenStack>
         <RadzenFormField Text="Description" Variant="@Variant.Outlined">
             <RadzenTextArea @bind-Value="@Model!.Description" Name="Description" Rows="3" spellcheck="false" />
         </RadzenFormField>
-        <RadzenFormField Text="Evaluation" Variant="@Variant.Outlined">
+        <RadzenFormField Text="Condition" Variant="@Variant.Outlined">
             <div class="textarea-wrapper">
-                <RadzenTextArea @bind-Value="@Model!.Evaluation" Name="Evaluation" Rows="3" Style="width: 100%;" spellcheck="false" />
-                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditEvaluationAsync"></RadzenIcon>
+                <RadzenTextArea @bind-Value="@Model!.Condition" Name="Condition" Rows="3" Style="width: 100%;" spellcheck="false" />
+                <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditConditionAsync"></RadzenIcon>
             </div>
         </RadzenFormField>
     </RadzenStack>
@@ -27,7 +28,7 @@
     protected override int? WidthInPixels => 1400;
 
     [Parameter]
-    public StateMachineHandler.Information? Information { get; set; }
+    public StateMachineHandler.Transition? Transition { get; set; }
 
     [Parameter]
     public EventCallback ShowStateMachineScript { get; set; }
@@ -35,24 +36,24 @@
     [Parameter]
     public Automation? Automation { get; set; }
 
-    private StateMachineHandler.Information? Model;
-    private RadzenTemplateForm<StateMachineHandler.Information>? Form;
+    private StateMachineHandler.Transition? Model;
+    private RadzenTemplateForm<StateMachineHandler.Transition>? Form;
 
     protected override void OnInitialized()
     {
-        if (Information == null)
+        if (Transition == null)
         {
-            Information = new StateMachineHandler.Information();
+            Transition = new StateMachineHandler.Transition();
         }
-        Model = Information.CopyObject();
+        Model = Transition.CopyObject();
         base.OnInitialized();
     }
 
-    async Task EditEvaluationAsync()
+    async Task EditConditionAsync()
     {
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Transition Condition", dialog =>
         {
-            dialog.Script = Model!.Evaluation;
+            dialog.Script = Model!.Condition;
             if (Automation != null)
             {
                 dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
@@ -60,7 +61,7 @@
         });
         if (result != null)
         {
-            Model!.Evaluation = result;
+            Model!.Condition = result;
         }
     }
 

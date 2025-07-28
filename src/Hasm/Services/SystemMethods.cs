@@ -1,30 +1,33 @@
-﻿using Hasm.Services.Automations;
+﻿using Hasm.Models;
+using Hasm.Services.Automations;
+using Hasm.Services.Interfaces;
 using Jint.Native;
 using System.Collections.Concurrent;
+using System.Text;
 
 namespace Hasm.Services;
 
 public class SystemMethods
 {
     private readonly VariableService _variableService;
-    private readonly StateMachineHandler _stateMachineHandler;
+    private readonly IAutomationHandler _automationHandler;
     private readonly ClientService _clientService;
     private readonly ConcurrentDictionary<int, Models.Client> _clients;
 
     public record DateTimeInfo(int year, int month, int day, int hour, int minute, int second, int dayOfWeek);
 
-    public SystemMethods(ClientService clientService, DataService dataService, VariableService variableService, StateMachineHandler stateMachineHandler)
+    public SystemMethods(ClientService clientService, DataService dataService, VariableService variableService, IAutomationHandler automationHandler)
     {
 
         _variableService = variableService;
-        _stateMachineHandler = stateMachineHandler;
+        _automationHandler = automationHandler;
         _clientService = clientService;
         _clients = new ConcurrentDictionary<int, Models.Client>(dataService.GetClients().ToDictionary(c => c.Id));
     }
 
     public void log(string instanceId, object? message)
     {
-        _stateMachineHandler.AddLogAsync(instanceId, message).Wait();
+        _automationHandler.AddLogAsync(instanceId, message).Wait();
     }
 
     public DateTimeInfo getCurrentDateTime()
@@ -33,7 +36,7 @@ public class SystemMethods
         return new DateTimeInfo(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, (int)now.DayOfWeek);
     }
 
-    public int createVariable(string name, int clientId, bool isStateMachineVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
+    public int createVariable(string name, int clientId, bool isAutomationVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
     {
         List<string>? stringMockingOptions = null;
         if (mockingOptions?.Any() == true)
@@ -44,7 +47,7 @@ public class SystemMethods
                 stringMockingOptions.Add(mockingOption.JsValueToString(false));
             }
         }
-        return _variableService.CreateVariableAsync(name, clientId, isStateMachineVariable ? _stateMachineHandler.Automation.Id : null, persistant, data?.ToString(), stringMockingOptions).Result ?? -1;
+        return _variableService.CreateVariableAsync(name, clientId, isAutomationVariable ? _automationHandler.Automation.Id : null, persistant, data?.ToString(), stringMockingOptions).Result ?? -1;
     }
 
     public int? getVariableIdByName(string name, int clientId, bool isStateMachineVariable)
@@ -53,7 +56,7 @@ public class SystemMethods
                 .GetVariables()
                 .FirstOrDefault(v => v.Variable.Name == name
                                     && v.Variable.ClientId == clientId
-                                    && ((isStateMachineVariable && v.Variable.AutomationId == _stateMachineHandler.Automation.Id) || (!isStateMachineVariable && v.Variable.AutomationId == null)));
+                                    && ((isStateMachineVariable && v.Variable.AutomationId == _automationHandler.Automation.Id) || (!isStateMachineVariable && v.Variable.AutomationId == null)));
         return variable?.Variable.Id;
     }
 
@@ -90,25 +93,36 @@ public class SystemMethods
 
     public void setRunningStateToFinished(string instanceId)
     {
-        _stateMachineHandler.SetRunningStateFinished(instanceId);
+        ((StateMachineHandler)_automationHandler).SetRunningStateFinished(instanceId);
     }
 
     public bool isSubStateMachineRunning(string instanceId)
     {
-        return _stateMachineHandler.IsSubStateMachineRunning(instanceId);
+        return ((StateMachineHandler)_automationHandler).IsSubStateMachineRunning(instanceId);
     }
 
     public void setCurrentState(string stateName)
     {
-        _stateMachineHandler.CurrentState = stateName;
+        ((StateMachineHandler)_automationHandler).CurrentState = stateName;
     }
 
     public void startSubStateMachine(string stateId, string instanceId)
     {
-        _stateMachineHandler.StartSubStateMachine(stateId, instanceId);
+        ((StateMachineHandler)_automationHandler).StartSubStateMachine(stateId, instanceId);
     }
 
-    public readonly static string SystemScript = $$""""
+    public static string SystemScript(AutomationType automationType)
+    {
+        var script = new StringBuilder();
+        script.AppendLine(SystemScriptGeneric);
+        if (automationType == AutomationType.StateMachine)
+        {
+            script.AppendLine(SystemScriptStateMachine);
+        }
+        return script.ToString();
+    }
+
+    private readonly static string SystemScriptGeneric = $$""""
 
     var {{string.Join("\r\nvar ", (((Models.ClientType[])Enum.GetValues(typeof(Models.ClientType))).Select(x => $"client_{Enum.GetName(x)} = {(int)x}").ToList()))}}
 
@@ -121,19 +135,6 @@ public class SystemMethods
         return system.getCurrentDateTime()
     }
     
-    //check if sub statemachine is running
-    subStateMachineRunning = function() {
-        return system.isSubStateMachineRunning(instanceId)
-    }
-    subStateMachineFinished = function() {
-        return !subStateMachineRunning()
-    }
-
-    // INTERNAL USE ONLY
-    startSubStateMachine = function(externalStateId, instanceId) {
-        system.startSubStateMachine(externalStateId, instanceId)
-    }
-           
     // returns the client id or -1 if not found
     getClientId = function(name) {
         return system.getClientId(name)
@@ -153,8 +154,8 @@ public class SystemMethods
 
     // creates a variable and returns the variable id (-1 if it fails)
     // e.g. createVariable('test', clientId, true, true, 'initialValue', ['option1', 'option2'])
-    createVariableOnClient = function(name, clientId, isStateMachineVariable, persistant, data, mockingOptions) {
-        return system.createVariable(name, clientId, isStateMachineVariable, persistant, data, mockingOptions)
+    createVariableOnClient = function(name, clientId, isAutomationVariable, persistant, data, mockingOptions) {
+        return system.createVariable(name, clientId, isAutomationVariable, persistant, data, mockingOptions)
     }
 
     // returns the variable value
@@ -168,8 +169,8 @@ public class SystemMethods
     }
 
     //get the variable Id by name
-    getVariableIdByName = function(name, clientId, isStateMachineVariable) {
-        return system.getVariableIdByName(name, clientId, isStateMachineVariable)
+    getVariableIdByName = function(name, clientId, isAutomationVariable) {
+        return system.getVariableIdByName(name, clientId, isAutomationVariable)
     }
 
     isMockingVariableActive = function(variableId) {
@@ -434,5 +435,26 @@ public class SystemMethods
         return null
     }
     
+    """";
+
+    private readonly static string SystemScriptStateMachine = $$""""
+    //====================================================================================
+    // State Machine Automation METHODS
+    //====================================================================================
+
+    //check if sub statemachine is running
+    subStateMachineRunning = function() {
+        return system.isSubStateMachineRunning(instanceId)
+    }
+
+    subStateMachineFinished = function() {
+        return !subStateMachineRunning()
+    }
+    
+    // INTERNAL USE ONLY
+    startSubStateMachine = function(externalStateId, instanceId) {
+        system.startSubStateMachine(externalStateId, instanceId)
+    }
+           
     """";
 }

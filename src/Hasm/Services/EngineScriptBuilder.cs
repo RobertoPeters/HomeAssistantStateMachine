@@ -43,7 +43,7 @@ public static class EngineScriptBuilder
         }
 
         script.AppendLine();
-        script.AppendLine(SystemMethods.SystemScript);
+        script.AppendLine(SystemMethods.SystemScript(AutomationType.StateMachine));
         script.AppendLine();
 
         foreach (var state in properties.States)

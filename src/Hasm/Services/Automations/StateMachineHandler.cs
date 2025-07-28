@@ -299,7 +299,7 @@ public class StateMachineHandler : IAutomationHandler
     private bool _readyForTriggers = false;
 
 
-    public static string SystemScript => SystemMethods.SystemScript;
+    public static string SystemScript => SystemMethods.SystemScript(AutomationType.StateMachine);
 
     private static System.Text.Json.JsonSerializerOptions logJsonOptions = new System.Text.Json.JsonSerializerOptions
     {

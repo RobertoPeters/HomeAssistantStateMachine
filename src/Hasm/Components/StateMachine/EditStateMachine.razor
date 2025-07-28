@@ -453,7 +453,7 @@ else
     async Task AddStateAsync(int x, int y)
     {
         SaveAutomationPropertiesToAutomation();
-        var state = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, StateMachineHandler.State>("Add State", dialog =>
+        var state = await DialogService.ShowDialogAsync<StateMachine.AddOrEditStateDialog, StateMachineHandler.State>("Add State", dialog =>
         {
             dialog.ExistingStateNames = AutomationProperties.States.Select(x => x.Name).Distinct().ToHashSet();
             dialog.Automation = Automation;
@@ -468,7 +468,7 @@ else
     async Task AddInformationAsync(int x, int y)
     {
         SaveAutomationPropertiesToAutomation();
-        var information = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, StateMachineHandler.Information>("Add Information", dialog =>
+        var information = await DialogService.ShowDialogAsync<StateMachine.AddOrEditInformationDialog, StateMachineHandler.Information>("Add Information", dialog =>
         {
             dialog.Automation = Automation;
         });
@@ -1060,7 +1060,7 @@ else
         var sourceState = source.GetState(AutomationProperties)!;
         var targetState = target.GetState(AutomationProperties)!;
         var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-        var result = await DialogService.ShowDialogAsync<Dialogs.EditTransitionDialog, StateMachineHandler.Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
+        var result = await DialogService.ShowDialogAsync<StateMachine.EditTransitionDialog, StateMachineHandler.Transition>($"Edit Transition: {sourceState.Name} to {targetState.Name}", dialog =>
         {
             dialog.Transition = transition;
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
@@ -1101,7 +1101,7 @@ else
     {
         SaveAutomationPropertiesToAutomation();
         var state = node.GetState(AutomationProperties)!;
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditStateDialog, StateMachineHandler.State>($"Edit State: {state.Name}", dialog =>
+        var result = await DialogService.ShowDialogAsync<StateMachine.AddOrEditStateDialog, StateMachineHandler.State>($"Edit State: {state.Name}", dialog =>
         {
             dialog.State = state;
             dialog.ExistingStateNames = AutomationProperties.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
@@ -1129,7 +1129,7 @@ else
     {
         SaveAutomationPropertiesToAutomation();
         var information = node.GetInformation(AutomationProperties)!;
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditInformationDialog, StateMachineHandler.Information>($"Edit Information", dialog =>
+        var result = await DialogService.ShowDialogAsync<StateMachine.AddOrEditInformationDialog, StateMachineHandler.Information>($"Edit Information", dialog =>
         {
             dialog.Information = information;
             dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
