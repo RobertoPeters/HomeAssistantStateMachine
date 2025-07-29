@@ -106,6 +106,9 @@ public class AutomationService(DataService _dataService, ClientService _clientSe
             case Models.AutomationType.StateMachine:
                 automationHandler = new StateMachineHandler(automation, _clientService, _dataService, _variableService, _messageBusService);
                 break;
+            case Models.AutomationType.Flow:
+                automationHandler = new FlowHandler(automation, _clientService, _dataService, _variableService, _messageBusService);
+                break;
         }
         if (automationHandler != null)
         {

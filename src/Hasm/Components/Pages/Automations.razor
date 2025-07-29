@@ -41,13 +41,38 @@
                                   Resizable="false"
                                   Width="96px"
                                   Title="">
-                <Template Context="statemachine">
+                <Template Context="automation">
                     <div @onclick:stopPropagation="true">
-                        <RadzenIcon style="cursor:pointer;" Icon="edit" @onclick="@(() => NavigationManager.NavigateTo($"/editstatemachine/{statemachine.Id}"))" />
-                        <RadzenIcon style="cursor:pointer;" Icon="open_in_new" @onclick="@(() => JSRuntime.InvokeVoidAsync("navigateToTarget", $"/editstatemachine/{statemachine.Id}", "_blank"))" />
-                    </div>
-                </Template>
-            </RadzenDataGridColumn>
+                        <RadzenIcon style="cursor:pointer;"
+                                    Icon="edit"
+                                    @onclick="@(() =>
+                                    {
+                                        if (automation.AutomationType == AutomationType.StateMachine)
+                                        {
+                                            NavigationManager.NavigateTo($"/editstatemachine/{automation.Id}");
+                                        }
+                                        else if (automation.AutomationType == AutomationType.Flow)
+                                        {
+                                            NavigationManager.NavigateTo($"/editflow/{automation.Id}");
+                                        }
+                                    })" />
+                          <RadzenIcon 
+                              style="cursor:pointer;" 
+                              Icon="open_in_new" 
+                              @onclick="@(() => 
+                              {
+                                        if (automation.AutomationType == AutomationType.StateMachine)
+                                        {
+                                            JSRuntime.InvokeVoidAsync("navigateToTarget", $"/editstatemachine/{automation.Id}", "_blank");
+                                        }
+                                        else if (automation.AutomationType == AutomationType.Flow)
+                                        {
+                                            JSRuntime.InvokeVoidAsync("navigateToTarget", $"/editflow/{automation.Id}", "_blank");
+                                        }
+                              })" />
+                      </div>
+                  </Template>
+              </RadzenDataGridColumn>
 
             <RadzenDataGridColumn TItem="AutomationInfo"
                                   Property="@nameof(AutomationInfo.Name)"
@@ -116,7 +141,24 @@
             return Enabled ? "Yes" : "No";
         }
         public bool IsSubAutomation => AutomationHandler.Automation.IsSubAutomation;
-        public string? Mode => AutomationHandler.Automation.AutomationType == AutomationType.StateMachine ? ((StateMachineHandler)AutomationHandler).RunningState.ToString() : "";
+        public string? Mode
+        {
+            get
+            {
+                if (AutomationHandler.Automation.AutomationType == AutomationType.StateMachine)
+                {
+                    return ((StateMachineHandler)AutomationHandler).RunningState.ToString();
+                }
+                else if (AutomationHandler.Automation.AutomationType == AutomationType.Flow)
+                {
+                    return ((FlowHandler)AutomationHandler).RunningState.ToString();
+                }
+                else
+                {
+                    return "";
+                }
+            }
+        }
         public string? State => AutomationHandler.Automation.AutomationType == AutomationType.StateMachine ? ((StateMachineHandler)AutomationHandler).CurrentState?.ToString() : "";
     }
     private readonly ConcurrentDictionary<int, AutomationInfo> automations = [];
@@ -129,17 +171,27 @@
         foreach (var automation in allautomations)
         {
             var v = new AutomationInfo()
-                {
-                    AutomationHandler = automation
-                };
+            {
+                AutomationHandler = automation
+            };
             automations.TryAdd(automation.Automation.Id, v);
         }
         UIEventRegistration.AutomationHandlerChanged += AutomationHandlerChanged;
         UIEventRegistration.StateMachineHandlerInfoChanged += StateMachineHandlerInfoChanged;
+        UIEventRegistration.FlowHandlerInfoChanged += FlowHandlerInfoChanged;
         base.OnInitialized();
     }
 
     private void StateMachineHandlerInfoChanged(object? sender, StateMachineHandler.StateMachineHandlerInfo stateMachineInfo)
+    {
+        if (grid != null)
+        {
+            InvokeAsync(grid!.Reload);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void FlowHandlerInfoChanged(object? sender, FlowHandler.FlowHandlerInfo flowInfo)
     {
         if (grid != null)
         {
@@ -173,6 +225,7 @@
 
     public void Dispose()
     {
+        UIEventRegistration.FlowHandlerInfoChanged -= FlowHandlerInfoChanged;
         UIEventRegistration.StateMachineHandlerInfoChanged -= StateMachineHandlerInfoChanged;
         UIEventRegistration.AutomationHandlerChanged -= AutomationHandlerChanged;
     }
@@ -191,6 +244,10 @@
         if (item.Data.AutomationHandler.Automation.AutomationType != AutomationType.StateMachine)
         {
             NavigationManager.NavigateTo($"/editstatemachine/{item.Data.AutomationHandler.Automation.Id}");
+        }
+        else if (item.Data.AutomationHandler.Automation.AutomationType != AutomationType.Flow)
+        {
+            NavigationManager.NavigateTo($"/editflow/{item.Data.AutomationHandler.Automation.Id}");
         }
     }
 

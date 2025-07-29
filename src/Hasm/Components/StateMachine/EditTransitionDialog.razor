@@ -56,7 +56,7 @@
             dialog.Script = Model!.Condition;
             if (Automation != null)
             {
-                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+                dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
             }
         });
         if (result != null)

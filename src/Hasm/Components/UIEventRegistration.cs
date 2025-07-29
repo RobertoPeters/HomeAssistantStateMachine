@@ -11,6 +11,7 @@ public class UIEventRegistration
     public event EventHandler<IAutomationHandler>? AutomationHandlerChanged;
     public event EventHandler<LogEntry>? LogEntryAdded;
     public event EventHandler<StateMachineHandler.StateMachineHandlerInfo>? StateMachineHandlerInfoChanged;
+    public event EventHandler<FlowHandler.FlowHandlerInfo>? FlowHandlerInfoChanged;
     public event EventHandler<List<VariableService.VariableInfo>>? VariablesChanged;
     public event EventHandler<List<VariableService.VariableValueInfo>>? VariableValuesChanged;
     public event EventHandler<ClientConnectionInfo>? ClientConnectionInfoChanged;
@@ -34,6 +35,11 @@ public class UIEventRegistration
     public void Handle(StateMachineHandler.StateMachineHandlerInfo stateMachineHandlerInfo)
     {
         StateMachineHandlerInfoChanged?.Invoke(this, stateMachineHandlerInfo);
+    }
+
+    public void Handle(FlowHandler.FlowHandlerInfo flowHandlerInfo)
+    {
+        FlowHandlerInfoChanged?.Invoke(this, flowHandlerInfo);
     }
 
     public void Handle(List<VariableService.VariableInfo> variables)
@@ -69,6 +75,11 @@ public static class UIEventRegistrationMessageHandler
         uiEventRegistration.Handle(stateMachineHandler);
     }
 
+    public static void Handle(FlowHandler flowHandler, UIEventRegistration uiEventRegistration)
+    {
+        uiEventRegistration.Handle(flowHandler);
+    }
+
     public static void Handle(LogEntry logEntry, UIEventRegistration uiEventRegistration)
     {
         uiEventRegistration.Handle(logEntry);
@@ -99,8 +110,8 @@ public static class UIEventRegistrationMessageHandler
         uiEventRegistration.Handle(clientConnectionInfo);
     }
 
-    public static void Handle(AutomationInfo stateMachineScheduledInfo, UIEventRegistration uiEventRegistration)
+    public static void Handle(AutomationInfo automationInfo, UIEventRegistration uiEventRegistration)
     {
-        uiEventRegistration.Handle(stateMachineScheduledInfo);
+        uiEventRegistration.Handle(automationInfo);
     }    
 }

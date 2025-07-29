@@ -1,18 +1,17 @@
 ﻿using Hasm.Models;
-using Hasm.Services.Automations;
 using Hasm.Services.Interfaces;
 using Jint.Native;
 using System.Collections.Concurrent;
 using System.Text;
 
-namespace Hasm.Services;
+namespace Hasm.Services.Automations;
 
 public class SystemMethods
 {
     private readonly VariableService _variableService;
     private readonly IAutomationHandler _automationHandler;
     private readonly ClientService _clientService;
-    private readonly ConcurrentDictionary<int, Models.Client> _clients;
+    private readonly ConcurrentDictionary<int, Client> _clients;
 
     public record DateTimeInfo(int year, int month, int day, int hour, int minute, int second, int dayOfWeek);
 
@@ -22,7 +21,7 @@ public class SystemMethods
         _variableService = variableService;
         _automationHandler = automationHandler;
         _clientService = clientService;
-        _clients = new ConcurrentDictionary<int, Models.Client>(dataService.GetClients().ToDictionary(c => c.Id));
+        _clients = new ConcurrentDictionary<int, Client>(dataService.GetClients().ToDictionary(c => c.Id));
     }
 
     public void log(string instanceId, object? message)
@@ -56,7 +55,7 @@ public class SystemMethods
                 .GetVariables()
                 .FirstOrDefault(v => v.Variable.Name == name
                                     && v.Variable.ClientId == clientId
-                                    && ((isStateMachineVariable && v.Variable.AutomationId == _automationHandler.Automation.Id) || (!isStateMachineVariable && v.Variable.AutomationId == null)));
+                                    && (isStateMachineVariable && v.Variable.AutomationId == _automationHandler.Automation.Id || !isStateMachineVariable && v.Variable.AutomationId == null));
         return variable?.Variable.Id;
     }
 
@@ -124,7 +123,7 @@ public class SystemMethods
 
     private readonly static string SystemScriptGeneric = $$""""
 
-    var {{string.Join("\r\nvar ", (((Models.ClientType[])Enum.GetValues(typeof(Models.ClientType))).Select(x => $"client_{Enum.GetName(x)} = {(int)x}").ToList()))}}
+    var {{string.Join("\r\nvar ", ((ClientType[])Enum.GetValues(typeof(ClientType))).Select(x => $"client_{Enum.GetName(x)} = {(int)x}").ToList())}}
 
     log = function(message) {
         system.log(instanceId, message)
