@@ -1,5 +1,5 @@
 ﻿using Hasm.Models;
-using Hasm.Services.Automations;
+using Hasm.Services.Automations.StateMachine;
 using Hasm.Services.Clients;
 using Microsoft.Data.Sqlite;
 

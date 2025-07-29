@@ -4,7 +4,7 @@ using Hasm.Models;
 using Hasm.Services.Interfaces;
 using Jint.Native;
 
-namespace Hasm.Services.Automations;
+namespace Hasm.Services.Automations.StateMachine;
 
 public class StateMachineHandler : IAutomationHandler
 {
@@ -250,7 +250,7 @@ public class StateMachineHandler : IAutomationHandler
             }
         }
 
-        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(GetAutomationProperties(subStateMachine.Data), false, engine.Id, machineStateParameters));
+        engine.Engine.Execute(EngineScriptBuilderStateMachine.BuildEngineScript(GetAutomationProperties(subStateMachine.Data), false, engine.Id, machineStateParameters));
         RequestTriggerStateMachine();
     }
 
@@ -336,7 +336,7 @@ public class StateMachineHandler : IAutomationHandler
             lock (_lockEngineObject)
             {
                 _currentState = null;
-                if (EngineScriptBuilder.ValidateModel(_automationProperties))
+                if (EngineScriptBuilderStateMachine.ValidateModel(_automationProperties))
                 {
                     var engine = new StateMachineEngineInfo()
                     {
@@ -349,7 +349,7 @@ public class StateMachineHandler : IAutomationHandler
 
                     try
                     {
-                        engine.Engine.Execute(EngineScriptBuilder.BuildEngineScript(_automationProperties, true, engine.Id, null));
+                        engine.Engine.Execute(EngineScriptBuilderStateMachine.BuildEngineScript(_automationProperties, true, engine.Id, null));
                         RunningState = StateMachineRunningState.Running;
                         RequestTriggerStateMachine();
                     }

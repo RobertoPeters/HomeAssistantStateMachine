@@ -139,7 +139,7 @@
 
 	private async Task AddOrEditClientAsync(IClientHandler? client)
 	{
-		await DialogService.ShowDialogAsync<Dialogs.AddOrEditClientDialog>($"{(client == null ? "Add" : "Edit")} Client", dialog =>
+		await DialogService.ShowDialogAsync<AddOrEditClientDialog>($"{(client == null ? "Add" : "Edit")} Client", dialog =>
 		{
 			dialog.Id = client?.Client.Id;
 		});

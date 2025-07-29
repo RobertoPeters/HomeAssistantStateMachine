@@ -1,0 +1,13 @@
+﻿@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Models
+@using Hasm.Services
+@inject DialogService DialogService
+@inherits ComponentBase
+<div style="position: relative;@(Node.Selected ? "border:solid" : "border:none");">
+    <pre style="margin:0px;padding:0px;">@(Node.Step.StepData.Description ?? "")</pre>
+</div>
+
+@code {
+    [Parameter]
+    public StepNodeModel Node { get; set; } = null!;
+}

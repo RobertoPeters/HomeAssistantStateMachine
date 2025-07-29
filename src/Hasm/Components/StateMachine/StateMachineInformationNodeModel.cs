@@ -1,7 +1,7 @@
 ﻿using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using Hasm.Models;
-using Hasm.Services.Automations;
+using Hasm.Services.Automations.StateMachine;
 
 namespace Hasm.Components;
 

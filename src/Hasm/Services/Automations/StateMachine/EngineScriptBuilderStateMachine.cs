@@ -1,20 +1,10 @@
 ﻿using System.Text;
 using Hasm.Models;
-using Hasm.Services.Automations;
 
-namespace Hasm.Services;
+namespace Hasm.Services.Automations.StateMachine;
 
-public static class EngineScriptBuilder
+public static class EngineScriptBuilderStateMachine
 {
-    public static string BuildEngineScriptForEditor(Automation automation)
-    {
-        if (automation.AutomationType == AutomationType.StateMachine)
-        {
-            return BuildEngineScript(StateMachineHandler.GetAutomationProperties(automation.Data), true, Guid.Empty, null);
-        }
-        return "";
-    }
-
     public static string BuildEngineScript(StateMachineHandler.AutomationProperties properties, bool asMainStateMachine, Guid instanceId, List<(string variableName, string? variableValue)>? machineStateParameters)
     {
         var script = new StringBuilder();

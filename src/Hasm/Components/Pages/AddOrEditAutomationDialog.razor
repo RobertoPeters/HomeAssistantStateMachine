@@ -1,6 +1,9 @@
-﻿@using Hasm.Models
+﻿@using Hasm.Components.Dialogs
+@using Hasm.Models
 @using Hasm.Services
 @using Hasm.Services.Automations
+@using Hasm.Services.Automations.Flow
+@using Hasm.Services.Automations.StateMachine
 @inherits ResultDialogBase<Automation>
 
 <RadzenTemplateForm @ref="Form" Data="@Model" TItem="Automation">
@@ -116,13 +119,22 @@
             <RadzenFormField Text="Pre Start Action" Variant="@Variant.Outlined">
                 <div class="textarea-wrapper">
                     <RadzenTextArea @bind-Value="@StateMachineAutomationProperties.PreStartAction" Name="PreStartAction" Rows="10" Style="width: 100%;" spellcheck="false" />
-                    <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPreStartActionAsync"></RadzenIcon>
+                    <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditStateMachinePreStartActionAsync"></RadzenIcon>
                 </div>
             </RadzenFormField>
             <RadzenFormField Text="Pre Schedule Action" Variant="@Variant.Outlined">
                 <div class="textarea-wrapper">
                     <RadzenTextArea @bind-Value="@StateMachineAutomationProperties.PreScheduleAction" Name="PreScheduleAction" Rows="3" Style="width: 100%;" spellcheck="false" />
                     <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPreScheduleActionAsync"></RadzenIcon>
+                </div>
+            </RadzenFormField>
+        }
+        else if (Model!.AutomationType == AutomationType.Flow)
+        {
+            <RadzenFormField Text="Pre Start Action" Variant="@Variant.Outlined">
+                <div class="textarea-wrapper">
+                    <RadzenTextArea @bind-Value="@FlowAutomationProperties.PreStartAction" Name="PreStartAction" Rows="10" Style="width: 100%;" spellcheck="false" />
+                    <RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditFlowPreStartActionAsync"></RadzenIcon>
                 </div>
             </RadzenFormField>
         }
@@ -143,6 +155,7 @@
 
     private Automation? Model;
     private StateMachineHandler.AutomationProperties StateMachineAutomationProperties = new();
+    private FlowHandler.AutomationProperties FlowAutomationProperties = new();
     private RadzenTemplateForm<Automation>? Form;
 
     private RadzenDataGrid<StateMachineHandler.SubStateMachineParameter>? parametersGrid;
@@ -162,6 +175,10 @@
             {
                 StateMachineAutomationProperties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(Automation.Data) ?? new();
             }
+            else if (!string.IsNullOrWhiteSpace(Automation!.Data) && Automation.AutomationType == AutomationType.Flow)
+            {
+                FlowAutomationProperties = System.Text.Json.JsonSerializer.Deserialize<FlowHandler.AutomationProperties>(Automation.Data) ?? new();
+            }
         }
         Model = Automation.CopyObject()!;
         Model.Id = Automation.Id;
@@ -173,11 +190,20 @@
         Form!.EditContext.Validate();
         if (Form.IsValid)
         {
-            if (Model!.AutomationType == AutomationType.StateMachine)
-            {
-                Model.Data = System.Text.Json.JsonSerializer.Serialize(StateMachineAutomationProperties);
-            }
+            AssignModelData();
             Close(Model!);
+        }
+    }
+
+    void AssignModelData()
+    {
+        if (Model!.AutomationType == AutomationType.StateMachine)
+        {
+            Model.Data = System.Text.Json.JsonSerializer.Serialize(StateMachineAutomationProperties);
+        }
+        else if (Model!.AutomationType == AutomationType.Flow)
+        {
+            Model.Data = System.Text.Json.JsonSerializer.Serialize(FlowAutomationProperties);
         }
     }
 
@@ -185,13 +211,35 @@
     {
         await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("System Script", dialog =>
         {
-            dialog.Script = StateMachineHandler.SystemScript;
+            if (Model!.AutomationType == AutomationType.StateMachine)
+            {
+                dialog.Script = StateMachineHandler.SystemScript;
+            }
+            else if (Model!.AutomationType == AutomationType.Flow)
+            {
+                dialog.Script = FlowHandler.SystemScript;
+            }
             dialog.ReadOnly = true;
         });
     }
 
-    async Task EditPreStartActionAsync()
+    async Task EditFlowPreStartActionAsync()
     {
+        AssignModelData();
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
+        {
+            dialog.Script = FlowAutomationProperties.PreStartAction;
+            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Model!);
+        });
+        if (result != null)
+        {
+            FlowAutomationProperties.PreStartAction = result;
+        }
+    }
+
+    async Task EditStateMachinePreStartActionAsync()
+    {
+        AssignModelData();
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
         {
             dialog.Script = StateMachineAutomationProperties.PreStartAction;
@@ -205,6 +253,7 @@
 
     async Task EditPreScheduleActionAsync()
     {
+        AssignModelData();
         var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Schedule Action", dialog =>
         {
             dialog.Script = StateMachineAutomationProperties.PreScheduleAction;

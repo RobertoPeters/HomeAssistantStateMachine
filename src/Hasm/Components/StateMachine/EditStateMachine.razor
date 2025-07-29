@@ -12,6 +12,7 @@
 @using Hasm.Models
 @using Hasm.Services
 @using Hasm.Services.Automations
+@using Hasm.Services.Automations.StateMachine
 @using Hasm.Services.Interfaces
 @inject AutomationService AutomationService
 @inject DialogService DialogService
@@ -1179,7 +1180,7 @@ else
     async Task EditStateMachineAsync()
     {
         SaveAutomationPropertiesToAutomation();
-        var result = await DialogService.ShowDialogAsync<Dialogs.AddOrEditAutomationDialog, Automation>("Edit Automation", dialog =>
+        var result = await DialogService.ShowDialogAsync<Pages.AddOrEditAutomationDialog, Automation>("Edit Automation", dialog =>
         {
             dialog.Automation = Automation;
         });

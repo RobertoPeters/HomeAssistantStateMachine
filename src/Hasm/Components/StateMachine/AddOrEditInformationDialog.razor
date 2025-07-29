@@ -2,6 +2,7 @@
 @using Hasm.Models
 @using Hasm.Services
 @using Hasm.Services.Automations
+@using Hasm.Services.Automations.StateMachine
 @inherits ResultDialogBase<StateMachineHandler.Information>
 
 <RadzenTemplateForm @ref="Form" Data="@Model" TItem="StateMachineHandler.Information">
@@ -51,12 +52,12 @@
 
     async Task EditEvaluationAsync()
     {
-        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Transition Condition", dialog =>
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Evaluation", dialog =>
         {
             dialog.Script = Model!.Evaluation;
             if (Automation != null)
             {
-                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+                dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
             }
         });
         if (result != null)

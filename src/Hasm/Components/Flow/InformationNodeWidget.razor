@@ -1,0 +1,15 @@
+﻿@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Models
+@using Hasm.Services
+@inject DialogService DialogService
+@inherits ComponentBase
+<div style="position: relative;@(Node.Selected ? "border:solid" : "border:none");">
+    <pre style="margin:0px;padding:0px;">@(Node.Information.Description ?? Node.Information.Evaluation ?? "")</pre>
+    <pre style ="margin:0px;padding:0px;"><strong>@(Node.Information.EvaluationResult ?? "")</strong></pre>
+ </div>
+
+@code {
+
+    [Parameter]
+    public InformationNodeModel Node { get; set; } = null!;
+}

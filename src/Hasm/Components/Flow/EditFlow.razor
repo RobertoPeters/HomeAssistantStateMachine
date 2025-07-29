@@ -1,0 +1,670 @@
+﻿@page "/editflow/{Id:int}"
+@using Blazor.Diagrams;
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Components.Widgets;
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Geometry;
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.Models.Base
+@using Blazor.Diagrams.Core.PathGenerators;
+@using Blazor.Diagrams.Core.Routers;
+@using Blazor.Diagrams.Options;
+@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
+@using Hasm.Services.Automations.Flow
+@using Hasm.Services.Interfaces
+@inject AutomationService AutomationService
+@inject DialogService DialogService
+@inject DataService DataService
+@inject ContextMenuService ContextMenuService
+@inject ClipboardService ClipboardService
+@inject NavigationManager Navigation
+@inject UIEventRegistration UIEventRegistration
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>HASM - Edit Flow</PageTitle>
+
+<NavigationLock ConfirmExternalNavigation="true"
+                OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private sealed class NodeUIData
+    {
+        public int X { get; set; } = 50;
+        public int Y { get; set; } = 50;
+    }
+
+    private sealed class LogData
+    {
+        public string Message { get; set; } = string.Empty;
+        public DateTime Time { get; set; } = DateTime.Now;
+    }
+
+    private List<(string name, Type stepType, Type nodeModel, Type nodeWidget, Type dialog)> stepNodeMappings = [
+        ("Variable", typeof(StepVariableValue), typeof(StepVariableValueNodeModel), typeof(StepVariableValueNodeWidget), typeof(AddOrEditStepVariableValueDialog))
+    ];
+
+    private BlazorDiagram Diagram { get; set; } = null!;
+    private readonly UndoRedo<string> _undoRedo = new();
+    private string? _unsavedData = null;
+    private Automation Automation = null!;
+    private FlowHandler FlowHandler = null!;
+    private readonly List<LogData> logLines = [];
+    private string? executeCommand;
+    private string? executeCommandResult;
+    private bool _pauseLog;
+    private bool _draggingElement;
+    private FlowHandler.AutomationProperties AutomationProperties = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        UIEventRegistration.LogEntryAdded += LogEvent;
+        UIEventRegistration.FlowHandlerInfoChanged += FlowHandlerInfoChanged;
+        UIEventRegistration.AutomationHandlerChanged += AutomationHandlerChanged;
+        UIEventRegistration.AutomationInfoChanged += AutomationInfoChanged;
+        FlowHandler = (FlowHandler)AutomationService.GetAutomation(Id);
+        var options = new BlazorDiagramOptions
+        {
+            AllowMultiSelection = true,
+            Zoom =
+                                                        {
+                        Enabled = true
+                                                        },
+            Links =
+                                                        {
+                        DefaultRouter = new NormalRouter(),
+                        DefaultPathGenerator = new SmoothPathGenerator(),
+                        RequireTarget = true,
+                        Factory = (diagram, source, targetAnchor) =>
+                        {
+                            Anchor? source2;
+                            if (!(source is NodeModel model3))
+                            {
+                                if (!(source is PortModel port2))
+                                {
+                                    throw new NotImplementedException();
+                                }
+
+                                source2 = new SinglePortAnchor(port2);
+                            }
+                            else
+                            {
+                                source2 = new ShapeIntersectionAnchor(model3);
+                            }
+
+                            var linkModel = new LinkModel(source2, targetAnchor);
+                            linkModel.TargetMarker = LinkMarker.Arrow;
+                            linkModel.AddLabel("true");
+                            _draggingElement = true;
+                            return linkModel;
+                        }
+                                                        }
+        };
+
+        Diagram = new BlazorDiagram(options);
+        foreach(var mapping in stepNodeMappings)
+        {
+            Diagram.RegisterComponent(mapping.nodeModel, mapping.nodeWidget);
+        }
+        Diagram.RegisterComponent<InformationNodeModel, InformationNodeWidget>();
+
+        var keyboardBehavior = Diagram.GetBehavior<Blazor.Diagrams.Core.Behaviors.KeyboardShortcutsBehavior>();
+        keyboardBehavior!.RemoveShortcut("g", ctrl: true, shift: false, alt: true);
+        keyboardBehavior.RemoveShortcut("Delete", ctrl: false, shift: false, alt: false);
+        keyboardBehavior.SetShortcut("Delete", ctrl: false, shift: false, alt: false, DeleteSelection);
+        keyboardBehavior.SetShortcut("a", ctrl: true, shift: false, alt: false, SelectAll);
+        keyboardBehavior.SetShortcut("z", ctrl: true, shift: false, alt: false, UndoAsync);
+        keyboardBehavior.SetShortcut("y", ctrl: true, shift: false, alt: false, RedoAsync);
+        Diagram.PointerDoubleClick += DiagramPointerDoubleClickAsync;
+        Diagram.PointerUp += DiagramPointerUpAsync;
+        Diagram.PointerMove += DiagramPointerMove;
+        Diagram.PointerDown += DiagramPointerDown;
+
+        await ReloadDiagramAsync();
+        RefreshInformations();
+        await base.OnInitializedAsync();
+    }
+
+    void LogEvent(object? sender, LogEntry logEntry)
+    {
+        if (_pauseLog || logEntry.AutomationId != Automation?.Id) return;
+
+        InvokeAsync(() =>
+        {
+            logLines.Add(new LogData() { Message = logEntry.Message, Time = logEntry.Timestamp.ToLocalTime() });
+            while (logLines.Count > 200)
+            {
+                logLines.RemoveAt(0);
+            }
+            StateHasChanged();
+        });
+    }
+
+    async Task EditPreStartActionAsync()
+    {
+        SaveAutomationPropertiesToAutomation();
+        var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Pre Start Action", dialog =>
+        {
+            dialog.Script = AutomationProperties.PreStartAction;
+            dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+        });
+        if (result != null)
+        {
+            AutomationProperties.PreStartAction = result;
+        }
+    }
+
+    void SaveAutomationPropertiesToAutomation()
+    {
+        Automation.Data = System.Text.Json.JsonSerializer.Serialize(AutomationProperties);
+    }
+
+    private ValueTask SelectAll(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        foreach (var node in diagram.Nodes)
+        {
+            diagram.SelectModel(node, false);
+        }
+        foreach (var link in diagram.Links)
+        {
+            diagram.SelectModel(link, false);
+        }
+        return ValueTask.CompletedTask;
+    }
+
+    private ValueTask DeleteSelection(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        AddUndo();
+        var selectedModels = diagram.GetSelectedModels().ToList();
+        foreach (var sm in selectedModels)
+        {
+            LinkModel? link = sm as LinkModel;
+            if (link != null)
+            {
+                RemoveLink(link);
+            }
+        }
+        foreach (var sm in selectedModels)
+        {
+            NodeModel? node = sm as NodeModel;
+            if (node != null)
+            {
+                RemoveNode(node);
+            }
+        }
+        Diagram.Refresh();
+        return ValueTask.CompletedTask;
+    }
+
+    void RemoveLink(LinkModel link)
+    {
+        var source = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link!.Source).Port.Parent;
+        var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+        var sourceStep = source.GetStep(AutomationProperties)!;
+        var targetStep = target.GetStep(AutomationProperties)!;
+        sourceStep.StepData.NextSteps.Remove(targetStep.StepData.Id);
+        Diagram.Links.Remove(link!);
+    }
+
+    void RemoveNode(NodeModel node)
+    {
+        if (node is StepNodeModel smNode)
+        {
+            var step = smNode.GetStep(AutomationProperties)!;
+            AutomationProperties.RemoveStep(step);
+            Diagram.Nodes.Remove(node!);
+        }
+        else if (node is InformationNodeModel infNode)
+        {
+            var information = infNode.GetInformation(AutomationProperties)!;
+            AutomationProperties.Informations.Remove(information);
+            Diagram.Nodes.Remove(node!);
+        }
+    }
+
+    private string? GetUndoData()
+    {
+        AddUIDataToComponents();
+        SaveAutomationPropertiesToAutomation();
+        return System.Text.Json.JsonSerializer.Serialize(Automation);
+    }
+
+    private void AddUIDataToComponents()
+    {
+        foreach (var step in AutomationProperties.Steps)
+        {
+            var uiData = new NodeUIData();
+            var node = Diagram.GetNode(step)!;
+            uiData.X = (int)node.Position.X;
+            uiData.Y = (int)node.Position.Y;
+            step.StepData.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
+        foreach (var information in AutomationProperties.Informations)
+        {
+            var uiData = new NodeUIData();
+            var node = Diagram.GetNode(information)!;
+            uiData.X = (int)node.Position.X;
+            uiData.Y = (int)node.Position.Y;
+            information.UIData = System.Text.Json.JsonSerializer.Serialize(uiData);
+        }
+    }
+
+    private void FlowHandlerInfoChanged(object? sender, FlowHandler.FlowHandlerInfo flowInfo)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (_unsavedData != GetUndoData())
+        {
+            var isConfirmed = await JS.InvokeAsync<bool>("confirm", "Changes are not saved. Are you sure you want to leave the page without saving changes?");
+
+            if (!isConfirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
+    }
+
+    private void AutomationHandlerChanged(object? sender, IAutomationHandler automationHandler)
+    {
+        InvokeAsync(async () =>
+        {
+            if (automationHandler.Automation.Id < 0)
+            {
+                NavigationManager.NavigateTo("\\");
+            }
+            else
+            {
+                await ReloadDiagramAsync();
+            }
+        });
+    }
+
+    private void AutomationInfoChanged(object? sender, AutomationInfo stateMachineScheduledInfo)
+    {
+        if (stateMachineScheduledInfo.AutomationId != Automation.Id)
+        {
+            return;
+        }
+        RefreshInformations();
+    }
+
+    private void RefreshInformations()
+    {
+        if (FlowHandler?.RunningState != FlowHandler.FlowRunningState.Active)
+        {
+            return;
+        }
+
+
+        var allEvaluations = AutomationProperties.Informations.Where(x => !string.IsNullOrWhiteSpace(x.Evaluation)).ToList();
+        if (!allEvaluations.Any())
+        {
+            return;
+        }
+
+        FlowHandler.ExecuteScript(allEvaluations);
+
+        foreach (var information in allEvaluations)
+        {
+            var node = Diagram.GetNode(information);
+            if (node is InformationNodeModel infNode)
+            {
+                infNode.Refresh();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        UIEventRegistration.AutomationInfoChanged -= AutomationInfoChanged;
+        UIEventRegistration.AutomationHandlerChanged -= AutomationHandlerChanged;
+        UIEventRegistration.LogEntryAdded -= LogEvent;
+        UIEventRegistration.FlowHandlerInfoChanged -= FlowHandlerInfoChanged;
+        Diagram.PointerUp -= DiagramPointerUpAsync;
+        Diagram.PointerDoubleClick -= DiagramPointerDoubleClickAsync;
+    }
+
+    private void AddUndo()
+    {
+        var data = GetUndoData();
+        if (data != null)
+        {
+            _undoRedo.Add(data);
+        }
+    }
+
+    private async ValueTask UndoAsync(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        if (CanUndo())
+        {
+            var data = _undoRedo.Undo();
+            if (data != null)
+            {
+                var automation = System.Text.Json.JsonSerializer.Deserialize<Automation>(data);
+                if (automation != null)
+                {
+                    await OnImport(automation);
+                }
+            }
+        }
+    }
+
+    private async ValueTask RedoAsync(Blazor.Diagrams.Core.Diagram diagram)
+    {
+        if (CanRedo())
+        {
+            var data = _undoRedo.Redo();
+            if (data != null)
+            {
+                var automation = System.Text.Json.JsonSerializer.Deserialize<Automation>(data);
+                if (automation != null)
+                {
+                    await OnImport(automation);
+                }
+            }
+        }
+    }
+
+    private bool CanUndo() => _undoRedo.CanUndo();
+    private bool CanRedo() => _undoRedo.CanRedo();
+
+    async void DiagramPointerDoubleClickAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (args.Button != 0) return;
+
+        if (model is InformationNodeModel infnode)
+        {
+            await EditInformationAsync(infnode);
+        }
+        else if (model is StepNodeModel node)
+        {
+            await EditStepAsync(node);
+        }
+    }
+
+    async Task EditStepAsync(NodeModel node)
+    {
+        var info = stepNodeMappings.FirstOrDefault(x => x.nodeModel == node.GetType());
+        if (info == default)
+        {
+            return;
+        }
+        await Task.CompletedTask;
+        //todo
+        // var result = await DialogService.ShowDialogAsync<info.dialog, StateMachineHandler.State>($"Edit Step: {state.Name}", dialog =>
+        // {
+        //     dialog.State = state;
+        //     dialog.ExistingStateNames = AutomationProperties.States.Where(x => x.Id != state.Id).Select(x => x.Name).Distinct().ToHashSet();
+        //     dialog.ShowStateMachineScript = ShowStateMachineScriptEventCallback;
+        //     dialog.Automation = Automation;
+        // });
+        // if (result != null)
+        // {
+        //     AddUndo();
+        //     state.Name = result.Name;
+        //     state.Description = result.Description;
+        //     state.EntryAction = result.EntryAction;
+        //     state.IsErrorState = result.IsErrorState;
+        //     state.IsStartState = result.IsStartState;
+        //     state.IsSubState = result.IsSubState;
+        //     state.SubStateParameters = result.SubStateParameters;
+        //     state.SubStateMachineId = result.SubStateMachineId;
+
+        //     node.Title = state.Name;
+        //     node.Refresh();
+        // }
+    }
+
+    async Task EditInformationAsync(NodeModel node)
+    {
+        SaveAutomationPropertiesToAutomation();
+        var information = node.GetInformation(AutomationProperties)!;
+        var result = await DialogService.ShowDialogAsync<AddOrEditInformationDialog, Information>($"Edit Information", dialog =>
+        {
+            dialog.Information = information;
+            dialog.Automation = Automation;
+        });
+        if (result != null)
+        {
+            AddUndo();
+            information.Description = result.Description;
+            information.Evaluation = result.Evaluation;
+            information.EvaluationResult = "";
+
+            node.Title = information.Description ?? information.Evaluation ?? "";
+            RefreshInformations();
+            node.Refresh();
+        }
+    }
+
+    Model? modelOnPointerUp = null;
+    void OnContextMenu(MouseEventArgs args)
+    {
+        if (modelOnPointerUp is NodeModel node)
+        {
+        }
+        else if (modelOnPointerUp is LinkModel link)
+        {
+        }
+        else
+        {
+        }
+    }
+
+    void DiagramPointerUpAsync(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        _draggingElement = false;
+        modelOnPointerUp = null;
+        if (args.Button == 0)
+        {
+            //check if link is added
+            var transitionEdited = false;
+            foreach (var link in Diagram.Links.ToList())
+            {
+                if (link.Target.Model == null)
+                {
+                    Diagram.Links.Remove(link);
+                    continue;
+                }
+                var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                var sourceStep = source3.GetStep(AutomationProperties)!;
+                var targetStep = target.GetStep(AutomationProperties)!;
+                var transitionExists = sourceStep.StepData.NextSteps.Contains(targetStep.StepData.Id);
+                if (!transitionExists)
+                {
+                    sourceStep.StepData.NextSteps.Add(targetStep.StepData.Id);
+                    transitionEdited = true;
+                }
+            }
+
+            if (!transitionEdited)
+            {
+                //maybe two to the same state? not allowed
+                HashSet<string> existingTransitions = [];
+                foreach (var link in Diagram.Links.ToList())
+                {
+                    var source3 = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Source).Port.Parent;
+                    var target = ((Blazor.Diagrams.Core.Anchors.SinglePortAnchor)link.Target).Port.Parent;
+                    var sourceStep = source3.GetStep(AutomationProperties)!;
+                    var targetStep = target.GetStep(AutomationProperties)!;
+                    var transitionExists = sourceStep.StepData.NextSteps.Contains(targetStep.StepData.Id);
+                    if (transitionExists)
+                    {
+                        var key = $"{sourceStep.StepData.Id}.{targetStep.StepData.Id}";
+                        if (existingTransitions.Contains(key))
+                        {
+                            Diagram.Links.Remove(link);
+                        }
+                        else
+                        {
+                            existingTransitions.Add(key);
+                        }
+                    }
+                }
+            }
+        }
+        else if (args.Button == 2)
+        {
+            modelOnPointerUp = model;
+        }
+    }
+
+    async Task OnImport(UploadChangeEventArgs args)
+    {
+        AddUndo();
+        if (!args.Files.Any())
+        {
+            return;
+        }
+        var file = args.Files.First();
+        var stream = file.OpenReadStream();
+        var flow = await System.Text.Json.JsonSerializer.DeserializeAsync<Automation>(stream);
+        if (flow != null)
+        {
+            await OnImport(flow);
+        }
+    }
+
+    async Task OnImport(Automation automation)
+    {
+        if (!string.IsNullOrWhiteSpace(automation.Data))
+        {
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<FlowHandler.AutomationProperties>(automation.Data) ?? new FlowHandler.AutomationProperties();
+        }
+        else
+        {
+            AutomationProperties = new();
+        }
+        SaveAutomationPropertiesToAutomation();
+        await ReloadDiagramAsync(Automation);
+    }
+
+    async Task ReloadDiagramAsync()
+    {
+        await ReloadDiagramAsync(null);
+        _unsavedData = GetUndoData();
+    }
+
+    Task ReloadDiagramAsync(Automation? useAutomation)
+    {
+        Diagram.Links.Clear();
+        Diagram.Nodes.Clear();
+        Automation = useAutomation ?? FlowHandler.Automation;
+        if (!string.IsNullOrWhiteSpace(Automation.Data))
+        {
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<FlowHandler.AutomationProperties>(Automation.Data) ?? new();
+        }
+        else
+        {
+            AutomationProperties = new();
+        }
+        AutomationProperties.CreateStepsFromStepDatas();
+
+        foreach (var step in AutomationProperties.Steps)
+        {
+            var stepInfo = stepNodeMappings.FirstOrDefault(x => x.stepType == step.StepData.GetType());
+            if (stepInfo == default)
+            {
+                continue;
+            }
+
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(step.StepData.UIData!);
+            var stepNodeModel = (StepNodeModel)Activator.CreateInstance(stepInfo.nodeModel, step, Automation, new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))!;
+            stepNodeModel.Title = step.StepData.Description ?? "";
+            var node = Diagram.Nodes.Add(stepNodeModel);
+
+            node.AddPort(PortAlignment.Left);
+            node.AddPort(PortAlignment.Right);
+        }
+        foreach (var step in AutomationProperties.Steps)
+        {
+            foreach(var nextStepId in step.StepData.NextSteps)
+            {
+                var targetStep = AutomationProperties.Steps.FirstOrDefault(x => x.StepData.Id == nextStepId);
+                if (targetStep != null)
+                {
+                    AddLink(step, targetStep);
+                }
+            }
+        }
+        foreach (var information in AutomationProperties.Informations)
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
+            var node = Diagram.Nodes.Add(new InformationNodeModel(information, Automation, position: new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))
+            {
+                Title = information.Description ?? information.Evaluation ?? ""
+            });
+        }
+        StateChanged(null, null);
+        RefreshInformations();
+        Diagram.Refresh();
+        return Task.CompletedTask;
+    }
+
+    void StateChanged(object? sender, Step? step)
+    {
+        InvokeAsync(() =>
+        {
+            StateHasChanged();
+        });
+    }
+
+    private void AddLink(Step sourceStep, Step targetStep)
+    {
+        var source = Diagram.GetNode(sourceStep);
+        var target = Diagram.GetNode(targetStep);
+        var link = Diagram.Links.Add(new LinkModel(source!.Ports.First(x => x.Alignment == PortAlignment.Right), target!.Ports.First(x => x.Alignment == PortAlignment.Left)));
+        link.TargetMarker = LinkMarker.Arrow;
+    }
+
+    void DiagramPointerMove(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (_draggingElement)
+        {
+            var relMouse = Diagram.GetRelativePoint(args.ClientX, args.ClientY); //pointer position on canvas element (top left = 0,0)
+            var currentPan = Diagram.Pan;
+            var moveX = 0;
+            var moveY = 0;
+            var stepSize = 20;
+            var margin = 20;
+            if (relMouse.X < margin)
+            {
+                moveX = stepSize;
+            }
+            else if (relMouse.X > Diagram.Container!.Width - margin)
+            {
+                moveX = -stepSize;
+            }
+            if (relMouse.Y < margin)
+            {
+                moveY = stepSize;
+            }
+            else if (relMouse.Y > Diagram.Container!.Height - margin)
+            {
+                moveY = -stepSize;
+            }
+
+            if (moveX != 0 || moveY != 0)
+            {
+                Diagram.SetPan(currentPan.X + moveX, currentPan.Y + moveY);
+            }
+        }
+    }
+
+    void DiagramPointerDown(Model? model, Blazor.Diagrams.Core.Events.PointerEventArgs args)
+    {
+        if (args.Button == 0)
+        {
+            AddUndo();
+        }
+    }
+}

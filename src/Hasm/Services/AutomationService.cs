@@ -1,6 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using Hasm.Models;
 using Hasm.Services.Automations;
+using Hasm.Services.Automations.Flow;
+using Hasm.Services.Automations.StateMachine;
 using Hasm.Services.Interfaces;
 
 namespace Hasm.Services;
@@ -105,6 +107,9 @@ public class AutomationService(DataService _dataService, ClientService _clientSe
         {
             case Models.AutomationType.StateMachine:
                 automationHandler = new StateMachineHandler(automation, _clientService, _dataService, _variableService, _messageBusService);
+                break;
+            case Models.AutomationType.Flow:
+                automationHandler = new FlowHandler(automation, _clientService, _dataService, _variableService, _messageBusService);
                 break;
         }
         if (automationHandler != null)

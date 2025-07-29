@@ -2,6 +2,7 @@
 @using Hasm.Models
 @using Hasm.Services
 @using Hasm.Services.Automations
+@using Hasm.Services.Automations.StateMachine
 @inject Services.DataService DataService
 @inherits ResultDialogBase<StateMachineHandler.State>
 
@@ -158,7 +159,7 @@
             dialog.Script = Model!.EntryAction;
             if (Automation != null)
             {
-                dialog.SystemScript = Services.EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+                dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
             }
         });
         if (result != null)
