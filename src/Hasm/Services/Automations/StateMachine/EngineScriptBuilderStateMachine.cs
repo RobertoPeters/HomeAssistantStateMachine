@@ -1,7 +1,11 @@
 ﻿using System.Text;
 using Hasm.Models;
 
+<<<<<<<< HEAD:src/Hasm/Services/Automations/StateMachine/EngineScriptBuilderStateMachine.cs
 namespace Hasm.Services.Automations.StateMachine;
+========
+namespace Hasm.Services.Automations;
+>>>>>>>> 66422701f816e90d376e122542c31ff04848771a:src/Hasm/Services/Automations/EngineScriptBuilderStateMachine.cs
 
 public static class EngineScriptBuilderStateMachine
 {
