@@ -243,11 +243,11 @@
 
     void OnRowClick(DataGridRowMouseEventArgs<AutomationInfo> item)
     {
-        if (item.Data.AutomationHandler.Automation.AutomationType != AutomationType.StateMachine)
+        if (item.Data.AutomationHandler.Automation.AutomationType == AutomationType.StateMachine)
         {
             NavigationManager.NavigateTo($"/editstatemachine/{item.Data.AutomationHandler.Automation.Id}");
         }
-        else if (item.Data.AutomationHandler.Automation.AutomationType != AutomationType.Flow)
+        else if (item.Data.AutomationHandler.Automation.AutomationType == AutomationType.Flow)
         {
             NavigationManager.NavigateTo($"/editflow/{item.Data.AutomationHandler.Automation.Id}");
         }
