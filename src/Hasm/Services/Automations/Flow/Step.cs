@@ -60,6 +60,10 @@ public class Step
 
     public virtual string GetInitializeStatements()
     {
-        return string.Empty;
+        return "return null";
+    }
+    public virtual string GetPayloadStatements()
+    {
+        return "return null";
     }
 }

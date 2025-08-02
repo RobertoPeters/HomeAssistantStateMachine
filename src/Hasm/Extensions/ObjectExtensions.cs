@@ -1,9 +1,5 @@
 ﻿public static class ObjectExtensions
 {
-    public static TInstance CopyInstance<TInstance>(this TInstance instance)
-        where TInstance : class, new()
-        => instance.CopyObject()!;
-
     public static T? CopyObject<T>(this T target) where T : new()
     {
         var result = default(T);
@@ -13,6 +9,10 @@
             if (s != null)
             {
                 result = (T?)System.Text.Json.JsonSerializer.Deserialize(s, typeof(T));
+                if (result is Hasm.Services.Automations.Flow.FlowHandler.AutomationProperties flowProperties)
+                {
+                    flowProperties.CreateStepsFromStepDatas();
+                }
             }
         }
         return result;

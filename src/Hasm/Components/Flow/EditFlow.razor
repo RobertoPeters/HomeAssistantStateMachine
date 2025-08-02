@@ -612,9 +612,9 @@ else
             case 5:
                 await EditFlowAsync();
                 break;
-            //     case 6:
-            //         await ShowFlowAsync();
-            //         break;
+            case 6:
+                await ShowFlowAsync();
+                break;
             //     case 7:
             //         await ExportAsync();
             //         break;
@@ -635,12 +635,12 @@ else
             //     case 13:
             //         await SelectAll(Diagram);
             //         break;
-            //     case 14:
-            //         await UndoAsync(Diagram);
-            //         break;
-            //     case 15:
-            //         await RedoAsync(Diagram);
-            //         break;
+                case 14:
+                    await UndoAsync(Diagram);
+                    break;
+                case 15:
+                    await RedoAsync(Diagram);
+                    break;
             case 20:
                 {
                     AddUndo();
@@ -650,6 +650,19 @@ else
                 break;
         }
         ContextMenuService.Close();
+    }
+
+    async Task ShowFlowAsync()
+    {
+        SaveAutomationPropertiesToAutomation();
+        var copy = Automation.CopyObject()!;
+        var cpyProperties = AutomationProperties.CopyObject();
+        copy.Data = System.Text.Json.JsonSerializer.Serialize(cpyProperties);
+        await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Flow Script", dialog =>
+         {
+             dialog.Script = EngineScriptBuilder.BuildEngineScriptForEditor(copy!);
+             dialog.ReadOnly = true;
+         });
     }
 
     async Task EditFlowAsync()

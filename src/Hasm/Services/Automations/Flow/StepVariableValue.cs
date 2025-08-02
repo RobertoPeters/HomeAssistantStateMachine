@@ -4,19 +4,25 @@ public class StepVariableValue: Step
 {
     public const string VariableNameKey = "VariableName";
     public const string ClientNameKey = "ClientName";
-    public const string IsFlowVariableKey = "IsFlowVariable";
+    public const string IsGlobalVariableKey = "IsGlobalVariable";
     public const string IsPersistantKey = "IsPersistant";
     public const string DataKey = "Data";
     public const string MockingValuesKey = "MockingValues";
+    public const string PayloadOnStartKey = "PayloadOnStart";
 
     public override string[] GetStepParameters()
     {
-        return [VariableNameKey, ClientNameKey, IsFlowVariableKey, IsPersistantKey, DataKey, MockingValuesKey];
+        return [VariableNameKey, ClientNameKey, IsGlobalVariableKey, IsPersistantKey, DataKey, MockingValuesKey];
     }
 
     public override string GetInitializeStatements()
     {
-        return string.Empty;
+        return "return null";
+    }
+
+    public override string GetPayloadStatements()
+    {
+        return "return null";
     }
 
     public string? VariableName
@@ -35,10 +41,16 @@ public class StepVariableValue: Step
         set => this[ClientNameKey] = value;
     }
 
-    public bool IsFlowVariable
+    public bool IsGlobalVariable
     {
-        get => (bool?)this[IsFlowVariableKey] ?? false;
-        set => this[IsFlowVariableKey] = value;
+        get => (bool?)this[IsGlobalVariableKey] ?? false;
+        set => this[IsGlobalVariableKey] = value;
+    }
+
+    public bool PayloadOnStart
+    {
+        get => (bool?)this[PayloadOnStartKey] ?? false;
+        set => this[PayloadOnStartKey] = value;
     }
 
     public bool IsPersistant
