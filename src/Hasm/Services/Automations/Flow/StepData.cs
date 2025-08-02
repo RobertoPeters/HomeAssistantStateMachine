@@ -6,7 +6,7 @@ public class StepData
 {
     public Guid Id { get; set; }
     public string StepTypeName { get; set; } = null!;
-    public string Name { get; set; } = null!;
+    public string? Name { get; set; } = null!;
     public bool HasInput { get; set; } = true;
     public string? Description { get; set; }
     public string? UIData { get; set; }

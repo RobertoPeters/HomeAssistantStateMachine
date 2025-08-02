@@ -14,6 +14,8 @@
 @using Hasm.Services.Automations
 @using Hasm.Services.Automations.Flow
 @using Hasm.Services.Interfaces
+@using System.Reflection
+@using System.Linq.Expressions
 @inject AutomationService AutomationService
 @inject DialogService DialogService
 @inject DataService DataService
@@ -489,12 +491,17 @@ else
         {
             return null;
         }
-        var result = await DialogService.ShowDialogAsync<AddOrEditStepVariableValueDialog, StepVariableValue>($"Edit Step: {step?.StepData.Name}", dialog =>
+
+        switch (info.dialog.Name)
         {
-            dialog.Step = step as StepVariableValue;
-            dialog.Automation = Automation;
-        });
-        return result;
+            case "AddOrEditStepVariableValueDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepVariableValueDialog, StepVariableValue>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepVariableValue;
+                    dialog.Automation = Automation;
+                });
+        }
+        return null;
     }
 
     async Task EditStepAsync(NodeModel node)
@@ -810,7 +817,7 @@ else
 
         var stepInfo = stepNodeMappings.FirstOrDefault(x => x.stepType == step.StepData.Type);
         var stepNodeModel = (StepNodeModel)Activator.CreateInstance(stepInfo.nodeModel, step, Automation, new Blazor.Diagrams.Core.Geometry.Point(x, y))!;
-        stepNodeModel.Title = step.StepData.Description ?? "";
+        stepNodeModel.Title = step.Title;
         var node = Diagram.Nodes.Add(stepNodeModel);
 
         if (step.StepData.HasInput)
@@ -846,7 +853,7 @@ else
 
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(step.StepData.UIData!);
             var stepNodeModel = (StepNodeModel)Activator.CreateInstance(stepInfo.nodeModel, step, Automation, new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))!;
-            stepNodeModel.Title = step.StepData.Description ?? "";
+            stepNodeModel.Title = step.Title;
             var node = Diagram.Nodes.Add(stepNodeModel);
 
             if (step.StepData.HasInput)

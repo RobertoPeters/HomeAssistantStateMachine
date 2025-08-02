@@ -39,6 +39,20 @@ public class Step
         }
     }
 
+    public string? Name
+    {
+        get => StepData.Name;
+        set => StepData.Name = value;
+    }
+
+    public string? Description
+    {
+        get => StepData.Description;
+        set => StepData.Description = value;
+    }
+
+    public string Title => !string.IsNullOrWhiteSpace(Name) ? Name : Description ?? "";
+
     public virtual string[] GetStepParameters()
     {
         return [];
