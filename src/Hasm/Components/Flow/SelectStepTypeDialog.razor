@@ -1,0 +1,35 @@
+﻿@using Hasm.Components.Dialogs
+@inherits ResultDialogBase<string>
+
+
+<RadzenTemplateForm @ref="Form" Data="@selectedStepType" TItem="string">
+	<RadzenStack>
+		<RadzenFormField Text="Step" Variant="@Variant.Outlined">
+			<RadzenListBox @bind-Value="@selectedStepType"
+						   Name="Step"
+						   Multiple="false"
+						   Data="@StepTypes"
+						   TextProperty="Value"
+						   ValueProperty="Key"
+						   AllowFiltering=true />
+		</RadzenFormField>
+	</RadzenStack>
+	<RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+</RadzenTemplateForm>
+
+@code {
+	[Parameter]
+	public Dictionary<string, string> StepTypes { get; set; } = [];
+
+	private RadzenTemplateForm<string>? Form;
+	private string? selectedStepType = null;
+
+	void OnSubmit()
+	{
+		Form!.EditContext.Validate();
+		if (Form.IsValid)
+		{
+			Close(selectedStepType);
+		}
+	}
+}

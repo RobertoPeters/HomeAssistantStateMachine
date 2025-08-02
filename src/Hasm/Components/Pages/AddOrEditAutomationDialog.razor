@@ -24,8 +24,8 @@
                 <RadzenRequiredValidator Component="Name" Text="This field is required" />
             </Helper>
         </RadzenFormField>
-        <RadzenFormField Text="Sub State Machine" Variant="@Variant.Outlined">
-            <RadzenRadioButtonList @bind-Value="@Model!.IsSubAutomation" TValue="bool" class="rz-m-4 rz-mt-8">
+        <RadzenFormField Text="Sub Automation" Variant="@Variant.Outlined">
+            <RadzenRadioButtonList @bind-Value="@Model!.IsSubAutomation" TValue="bool" class="rz-m-4 rz-mt-8" Disabled="@(Model!.AutomationType == AutomationType.Flow)">
                 <Items>
                     <RadzenRadioButtonListItem Text="Yes" Value="true" />
                     <RadzenRadioButtonListItem Text="No" Value="false" />

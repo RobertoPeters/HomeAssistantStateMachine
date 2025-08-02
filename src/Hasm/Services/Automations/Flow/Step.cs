@@ -2,7 +2,7 @@
 
 public class Step
 {
-    public StepData StepData { get; set; } = null!;
+    public StepData StepData { get; set; } = new();
 
     public static Step FromStepData(StepData stepData)
     {

@@ -28,6 +28,13 @@ public class FlowHandler : IAutomationHandler
             return step;
         }
 
+        public Step AddStep(Step step)
+        {
+            StepDatas.Add(step.StepData);
+            Steps.Add(step);
+            return step;
+        }
+
         public void RemoveStep(Step step)
         {
             Steps.RemoveAll(sd => sd.StepData.Id == step.StepData.Id);
@@ -335,4 +342,31 @@ public class FlowHandler : IAutomationHandler
         }
     }
 
+    public string? ExecuteScript(string script)
+    {
+        string? result = null;
+        if (_engines.Any())
+        {
+            var autoResetEvent = new AutoResetEvent(false);
+            Task.Run(() =>
+            {
+                lock (_lockEngineObject)
+                {
+                    try
+                    {
+                        var jsValue = _engines[0].Engine.Evaluate(script);
+                        result = jsValue.JsValueToString();
+                    }
+                    catch (Exception e)
+                    {
+                        result = $"Error: {e.Message}";
+                    }
+                }
+                autoResetEvent.Set();
+            });
+            autoResetEvent.WaitOne();
+            autoResetEvent.Dispose();
+        }
+        return result;
+    }
 }
