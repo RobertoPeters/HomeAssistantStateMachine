@@ -14,6 +14,8 @@
 @using Hasm.Services.Automations
 @using Hasm.Services.Automations.Flow
 @using Hasm.Services.Interfaces
+@using System.Reflection
+@using System.Linq.Expressions
 @inject AutomationService AutomationService
 @inject DialogService DialogService
 @inject DataService DataService
@@ -119,7 +121,8 @@ else
     }
 
     private List<(string name, string description, Type stepType, Type nodeModel, Type nodeWidget, Type dialog)> stepNodeMappings = [
-        ("Variable", "Get variable value", typeof(StepVariableValue), typeof(StepVariableValueNodeModel), typeof(StepVariableValueNodeWidget), typeof(AddOrEditStepVariableValueDialog))
+        ("Variable", "Get variable value", typeof(StepVariableValue), typeof(StepVariableValueNodeModel), typeof(StepVariableValueNodeWidget), typeof(AddOrEditStepVariableValueDialog)),
+        ("Logic AND", "All inputs true", typeof(StepAnd), typeof(StepAndNodeModel), typeof(StepAndNodeWidget), typeof(AddOrEditStepAndDialog))
     ];
 
     private BlazorDiagram Diagram { get; set; } = null!;
@@ -489,12 +492,23 @@ else
         {
             return null;
         }
-        var result = await DialogService.ShowDialogAsync<AddOrEditStepVariableValueDialog, StepVariableValue>($"Edit Step: {step?.StepData.Name}", dialog =>
+
+        switch (info.dialog.Name)
         {
-            dialog.Step = step as StepVariableValue;
-            dialog.Automation = Automation;
-        });
-        return result;
+            case "AddOrEditStepVariableValueDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepVariableValueDialog, StepVariableValue>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepVariableValue;
+                    dialog.Automation = Automation;
+                });
+            case "AddOrEditStepAndDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepAndDialog, StepAnd>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepAnd;
+                    dialog.Automation = Automation;
+                });
+        }
+        return null;
     }
 
     async Task EditStepAsync(NodeModel node)
@@ -810,7 +824,7 @@ else
 
         var stepInfo = stepNodeMappings.FirstOrDefault(x => x.stepType == step.StepData.Type);
         var stepNodeModel = (StepNodeModel)Activator.CreateInstance(stepInfo.nodeModel, step, Automation, new Blazor.Diagrams.Core.Geometry.Point(x, y))!;
-        stepNodeModel.Title = step.StepData.Description ?? "";
+        stepNodeModel.Title = step.Title;
         var node = Diagram.Nodes.Add(stepNodeModel);
 
         if (step.StepData.HasInput)
@@ -846,7 +860,7 @@ else
 
             var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(step.StepData.UIData!);
             var stepNodeModel = (StepNodeModel)Activator.CreateInstance(stepInfo.nodeModel, step, Automation, new Blazor.Diagrams.Core.Geometry.Point(uiData!.X, uiData.Y))!;
-            stepNodeModel.Title = step.StepData.Description ?? "";
+            stepNodeModel.Title = step.Title;
             var node = Diagram.Nodes.Add(stepNodeModel);
 
             if (step.StepData.HasInput)
