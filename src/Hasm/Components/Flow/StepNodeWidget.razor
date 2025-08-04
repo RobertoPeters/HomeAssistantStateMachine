@@ -10,6 +10,7 @@
     {
         <PortRenderer @key="port" Port="port" Class="default"></PortRenderer>
     }
+    <div style="position: absolute; right: 8px; bottom: 8px; z-index: 1;">@(Node.Step.Payload?.ToString())</div>
 </div>
 
 @code {

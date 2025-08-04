@@ -1,5 +1,6 @@
 ﻿using Hasm.Services;
 using Hasm.Services.Automations.Flow;
+using Hasm.Services.Automations.Script;
 using Hasm.Services.Automations.StateMachine;
 using Hasm.Services.Clients;
 using Hasm.Services.Interfaces;
@@ -13,6 +14,7 @@ public class UIEventRegistration
     public event EventHandler<LogEntry>? LogEntryAdded;
     public event EventHandler<StateMachineHandler.StateMachineHandlerInfo>? StateMachineHandlerInfoChanged;
     public event EventHandler<FlowHandler.FlowHandlerInfo>? FlowHandlerInfoChanged;
+    public event EventHandler<ScriptHandler.ScriptHandlerInfo>? ScriptHandlerInfoChanged;
     public event EventHandler<List<VariableService.VariableInfo>>? VariablesChanged;
     public event EventHandler<List<VariableService.VariableValueInfo>>? VariableValuesChanged;
     public event EventHandler<ClientConnectionInfo>? ClientConnectionInfoChanged;
@@ -41,6 +43,11 @@ public class UIEventRegistration
     public void Handle(FlowHandler.FlowHandlerInfo flowHandlerInfo)
     {
         FlowHandlerInfoChanged?.Invoke(this, flowHandlerInfo);
+    }
+
+    public void Handle(ScriptHandler.ScriptHandlerInfo scriptHandlerInfo)
+    {
+        ScriptHandlerInfoChanged?.Invoke(this, scriptHandlerInfo);
     }
 
     public void Handle(List<VariableService.VariableInfo> variables)
@@ -81,6 +88,11 @@ public static class UIEventRegistrationMessageHandler
         uiEventRegistration.Handle(flowHandler);
     }
 
+    public static void Handle(ScriptHandler scriptHandler, UIEventRegistration uiEventRegistration)
+    {
+        uiEventRegistration.Handle(scriptHandler);
+    }
+
     public static void Handle(LogEntry logEntry, UIEventRegistration uiEventRegistration)
     {
         uiEventRegistration.Handle(logEntry);
@@ -89,6 +101,11 @@ public static class UIEventRegistrationMessageHandler
     public static void Handle(StateMachineHandler.StateMachineHandlerInfo stateMachineHandlerInfo, UIEventRegistration uiEventRegistration)
     {
         uiEventRegistration.Handle(stateMachineHandlerInfo);
+    }
+
+    public static void Handle(FlowHandler.FlowHandlerInfo flowHandlerInfo, UIEventRegistration uiEventRegistration)
+    {
+        uiEventRegistration.Handle(flowHandlerInfo);
     }
 
     public static void Handle(VariableService.VariableInfo variable, UIEventRegistration uiEventRegistration)

@@ -57,6 +57,10 @@
                                         {
                                             NavigationManager.NavigateTo($"/editflow/{automation.Id}");
                                         }
+                                        else if (automation.AutomationType == AutomationType.Script)
+                                        {
+                                            NavigationManager.NavigateTo($"/editscript/{automation.Id}");
+                                        }
                                     })" />
                           <RadzenIcon 
                               style="cursor:pointer;" 
@@ -71,7 +75,11 @@
                                         {
                                             JSRuntime.InvokeVoidAsync("navigateToTarget", $"/editflow/{automation.Id}", "_blank");
                                         }
-                              })" />
+                                        else if (automation.AutomationType == AutomationType.Script)
+                                        {
+                                            JSRuntime.InvokeVoidAsync("navigateToTarget", $"/editscript/{automation.Id}", "_blank");
+                                        }
+                                    })" />
                       </div>
                   </Template>
               </RadzenDataGridColumn>
@@ -250,6 +258,10 @@
         else if (item.Data.AutomationHandler.Automation.AutomationType == AutomationType.Flow)
         {
             NavigationManager.NavigateTo($"/editflow/{item.Data.AutomationHandler.Automation.Id}");
+        }
+        else if (item.Data.AutomationHandler.Automation.AutomationType == AutomationType.Script)
+        {
+            NavigationManager.NavigateTo($"/editscript/{item.Data.AutomationHandler.Automation.Id}");
         }
     }
 

@@ -1,4 +1,5 @@
 ﻿using Hasm.Models;
+using Hasm.Services.Automations.Flow;
 using Hasm.Services.Automations.StateMachine;
 using Hasm.Services.Interfaces;
 using Jint.Native;
@@ -93,39 +94,63 @@ public class SystemMethods
 
     public void setRunningStateToFinished(string instanceId)
     {
-        ((StateMachineHandler)_automationHandler).SetRunningStateFinished(instanceId);
+        if (_automationHandler is StateMachineHandler stateMachineHandler)
+        {
+            stateMachineHandler.SetRunningStateFinished(instanceId);
+        }
     }
 
     public bool isSubStateMachineRunning(string instanceId)
     {
-        return ((StateMachineHandler)_automationHandler).IsSubStateMachineRunning(instanceId);
+        if (_automationHandler is StateMachineHandler stateMachineHandler)
+        {
+            return stateMachineHandler.IsSubStateMachineRunning(instanceId);
+        }
+        return false;
     }
 
     public void setCurrentState(string stateName)
     {
-        ((StateMachineHandler)_automationHandler).CurrentState = stateName;
+        if (_automationHandler is StateMachineHandler stateMachineHandler)
+        {
+            stateMachineHandler.CurrentState = stateName;
+        }
     }
 
     public void startSubStateMachine(string stateId, string instanceId)
     {
-        ((StateMachineHandler)_automationHandler).StartSubStateMachine(stateId, instanceId);
+        if (_automationHandler is StateMachineHandler stateMachineHandler)
+        {
+            stateMachineHandler.StartSubStateMachine(stateId, instanceId);
+        }
+    }
+
+    public void UpdatePayload(string instanceId, string stepId, object? payload)
+    {
+        if (_automationHandler is FlowHandler flowHandler)
+        {
+            flowHandler.UpdatePayload(instanceId, stepId, payload);
+        }
     }
 
     public static string SystemScript(AutomationType automationType)
     {
         var script = new StringBuilder();
         script.AppendLine(SystemScriptGeneric);
-        if (automationType == AutomationType.StateMachine)
-        {
-            script.AppendLine(SystemScriptStateMachine);
-        }
         return script.ToString();
     }
 
     private readonly static string SystemScriptGeneric = $$""""
 
+    //====================================================================================
+    // SYSTEM CONSTANTS
+    //====================================================================================
     var {{string.Join("\r\nvar ", ((ClientType[])Enum.GetValues(typeof(ClientType))).Select(x => $"client_{Enum.GetName(x)} = {(int)x}").ToList())}}
 
+    //====================================================================================
+    // SYSTEM METHODS
+    //====================================================================================
+    
     log = function(message) {
         system.log(instanceId, message)
     }
@@ -177,9 +202,30 @@ public class SystemMethods
         return system.isMockingVariableActive(variableId)
     }    
     
+    //====================================================================================
+    // HELPER MEHODS METHODS and VARIABLES
+    //====================================================================================
+    
     //the two system clients
     var genericClientId = getClientId('Generic')
     var timerClientId = getClientId('Timer')
+
+    isFalse = function(value) {
+        //e.g. isTrue('false') or isTrue(false)
+        if (value === undefined || value == null || value == '') {
+            return false
+        }
+        return value === false || value === 'false' || value === 0 || value === '0' || value === 'off'
+    }
+
+    isTrue = function(value) {
+        //e.g. isTrue('true') or isTrue(true)
+        if (value === undefined || value == null || value == '') {
+            return false
+        }
+        return !isFalse(value)
+    }
+
     
     //====================================================================================
     // GENERIC CLIENT HELPER METHODS
@@ -435,18 +481,15 @@ public class SystemMethods
         return null
     }
     
-    """";
-
-    private readonly static string SystemScriptStateMachine = $$""""
     //====================================================================================
     // State Machine Automation METHODS
     //====================================================================================
-
+    
     //check if sub statemachine is running
     subStateMachineRunning = function() {
         return system.isSubStateMachineRunning(instanceId)
     }
-
+    
     subStateMachineFinished = function() {
         return !subStateMachineRunning()
     }
@@ -455,6 +498,34 @@ public class SystemMethods
     startSubStateMachine = function(externalStateId, instanceId) {
         system.startSubStateMachine(externalStateId, instanceId)
     }
-           
+ 
+    //====================================================================================
+    // Flow Automation METHODS
+    //====================================================================================
+    
+    function getSteps(stepIds) {
+        return steps.filter(function(step) {
+            return stepIds.includes(step.id)
+        })
+    }
+
+    function logStepsData()
+    {
+        var allSteps = steps.map(function(step) {
+                return {
+                    id: step.id,
+                    name: step.name,
+                    currentPayload: step.currentPayload,
+                    payloadUpdatedAt: step.payloadUpdatedAt
+                }
+            })
+        log(allSteps)
+    }
+    
+    // INTERNAL USE ONLY
+    updatePayload = function(stepId, payload) {
+        system.UpdatePayload(instanceId, stepId, payload)
+    }
+
     """";
 }

@@ -2,6 +2,7 @@
 using Hasm.Models;
 using Hasm.Services.Automations;
 using Hasm.Services.Automations.Flow;
+using Hasm.Services.Automations.Script;
 using Hasm.Services.Automations.StateMachine;
 using Hasm.Services.Interfaces;
 
@@ -110,6 +111,9 @@ public class AutomationService(DataService _dataService, ClientService _clientSe
                 break;
             case Models.AutomationType.Flow:
                 automationHandler = new FlowHandler(automation, _clientService, _dataService, _variableService, _messageBusService);
+                break;
+            case Models.AutomationType.Script:
+                automationHandler = new ScriptHandler(automation, _clientService, _dataService, _variableService, _messageBusService);
                 break;
         }
         if (automationHandler != null)

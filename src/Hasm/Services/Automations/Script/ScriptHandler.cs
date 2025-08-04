@@ -1,67 +1,29 @@
 ﻿using Hasm.Models;
 using Hasm.Services.Interfaces;
-using System.Text.Json.Serialization;
 
-namespace Hasm.Services.Automations.Flow;
+namespace Hasm.Services.Automations.Script;
 
-public class FlowHandler : IAutomationHandler
+public class ScriptHandler : IAutomationHandler
 {
     public class AutomationProperties
     {
-        public string? PreStartAction { get; set; }
-        public List<StepData> StepDatas { get; set; } = [];
-        public List<Information> Informations { get; set; } = [];
-
-        [JsonIgnore]
-        public List<Step> Steps { get; set; } = [];
-
-        public void CreateStepsFromStepDatas()
-        {
-            Steps = StepDatas.Select(stepData => Step.FromStepData(stepData)).ToList();
-        }
-
-        public Step AddStepData(StepData stepData)
-        {
-            StepDatas.Add(stepData);
-            var step = Step.FromStepData(stepData);
-            Steps.Add(step);
-            return step;
-        }
-
-        public Step AddStep(Step step)
-        {
-            StepDatas.Add(step.StepData);
-            Steps.Add(step);
-            return step;
-        }
-
-        public void RemoveStep(Step step)
-        {
-            Steps.RemoveAll(sd => sd.StepData.Id == step.StepData.Id);
-            StepDatas.RemoveAll(sd => sd.Id == step.StepData.Id);
-            foreach(var x in Steps)
-            {
-                x.StepData.NextSteps.RemoveAll(ns => ns == x.StepData.Id);
-            }
-        }
+        public string Script { get; set; } = null!;
     }
 
-
-    public enum FlowRunningState
+    public enum ScriptRunningState
     {
         NotActive,
         Active,
         Error
     }
 
-    public class FlowHandlerInfo
+    public class ScriptHandlerInfo
     {
         public int AutomationId { get; set; }
-        public FlowRunningState? RunningState { get; set; }
-        public Step? UpdatedStep { get; set; }
+        public ScriptRunningState? RunningState { get; set; }
     }
 
-    public class FlowEngineInfo
+    public class ScriptEngineInfo
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Automation Automation { get; set; } = null!;
@@ -79,11 +41,11 @@ public class FlowHandler : IAutomationHandler
     public Automation Automation => _automation;
 
     private readonly object _lockEngineObject = new object();
-    private List<FlowEngineInfo> _engines = [];
+    private List<ScriptEngineInfo> _engines = [];
     private SystemMethods? _systemMethods = null;
     private bool _readyForTriggers = false;
 
-    public static string SystemScript => SystemMethods.SystemScript(AutomationType.Flow);
+    public static string SystemScript => SystemMethods.SystemScript(AutomationType.Script);
 
     private static System.Text.Json.JsonSerializerOptions logJsonOptions = new System.Text.Json.JsonSerializerOptions
     {
@@ -93,8 +55,8 @@ public class FlowHandler : IAutomationHandler
 
     public string? ErrorMessage { get; private set; }
 
-    private FlowRunningState _runningState = FlowRunningState.NotActive;
-    public FlowRunningState RunningState
+    private ScriptRunningState _runningState = ScriptRunningState.NotActive;
+    public ScriptRunningState RunningState
     {
         get => _runningState;
         set
@@ -102,12 +64,12 @@ public class FlowHandler : IAutomationHandler
             if (_runningState != value)
             {
                 _runningState = value;
-                PublishFlowHandlerInfo();
+                PublishScriptHandlerInfo();
             }
         }
     }
 
-    public FlowHandler(Automation automation, ClientService clientService, DataService dataService, VariableService variableService, MessageBusService messageBusService)
+    public ScriptHandler(Automation automation, ClientService clientService, DataService dataService, VariableService variableService, MessageBusService messageBusService)
     {
         _automation = automation;
         _clientService = clientService;
@@ -127,26 +89,14 @@ public class FlowHandler : IAutomationHandler
         return new();
     }
 
-    public List<Step> GetSteps()
+    public void PublishScriptHandlerInfo()
     {
-        return _automationProperties.Steps.ToList();
-    }
-
-    public void UpdatePayload(string instanceId, string stepId, object? payload)
-    {
-        var indexOfEngine = _engines.FindIndex(x => x.Id.ToString() == instanceId);
-        if (indexOfEngine < 0 || indexOfEngine > 1)
+        var info = new ScriptHandlerInfo
         {
-            return;
-        }
-        var step = _automationProperties.Steps.FirstOrDefault(x => x.StepData.Id.ToString() == stepId);
-        if (step == null)
-        {
-            return;
-        }
-        step.Payload = payload;
-        step.PayloadUpdatedAt = DateTime.UtcNow;
-        PublishFlowHandlerInfo(step);
+            AutomationId = Automation.Id,
+            RunningState = RunningState
+        };
+        _messageBusService.PublishAsync(info);
     }
 
     public async Task AddLogAsync(string instanceId, object? logObject)
@@ -227,7 +177,7 @@ public class FlowHandler : IAutomationHandler
 
         lock (_lockEngineObject)
         {
-            if (RunningState == FlowRunningState.Active && _engines.Any())
+            if (RunningState == ScriptRunningState.Active && _engines.Any())
             {
                 try
                 {
@@ -241,7 +191,7 @@ public class FlowHandler : IAutomationHandler
                 catch (Exception e)
                 {
                     ErrorMessage = $"Error in script{e.Message}";
-                    RunningState = FlowRunningState.Error;
+                    RunningState = ScriptRunningState.Error;
                 }
             }
         }
@@ -260,41 +210,33 @@ public class FlowHandler : IAutomationHandler
         {
             lock (_lockEngineObject)
             {
-                if (EngineScriptBuilderFlow.ValidateModel(_automationProperties))
+                var engine = new ScriptEngineInfo()
                 {
-                    var engine = new FlowEngineInfo()
-                    {
-                        Engine = new Jint.Engine(),
-                        Automation = Automation
-                    };
-                    _engines.Add(engine);
-                    _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
-                    engine.Engine.SetValue("system", _systemMethods);
+                    Engine = new Jint.Engine(),
+                    Automation = Automation
+                };
+                _engines.Add(engine);
+                _systemMethods = new SystemMethods(_clientService, _dataService, _variableService, this);
+                engine.Engine.SetValue("system", _systemMethods);
 
-                    try
-                    {
-                        engine.Engine.Execute(EngineScriptBuilderFlow.BuildEngineScript(_automationProperties, engine.Id, null));
-                        RunningState = FlowRunningState.Active;
-                        RequestTriggerFlow();
-                    }
-                    catch (Exception e)
-                    {
-                        DisposeEngines();
-                        ErrorMessage = $"Error initializing flow: {e.Message}";
-                        RunningState = FlowRunningState.Error;
-                    }
-                }
-                else
+                try
                 {
-                    ErrorMessage = $"Flow is not valid";
-                    RunningState = FlowRunningState.Error;
+                    engine.Engine.Execute(EngineScriptBuilderScript.BuildEngineScript(_automationProperties, engine.Id, null));
+                    RunningState = ScriptRunningState.Active;
+                    RequestTriggerFlow();
+                }
+                catch (Exception e)
+                {
+                    DisposeEngines();
+                    ErrorMessage = $"Error initializing flow: {e.Message}";
+                    RunningState = ScriptRunningState.Error;
                 }
             }
             _readyForTriggers = true;
         }
         else
         {
-            RunningState = FlowRunningState.NotActive;
+            RunningState = ScriptRunningState.NotActive;
         }
     }
 
@@ -309,7 +251,7 @@ public class FlowHandler : IAutomationHandler
         _readyForTriggers = false;
         lock (_lockEngineObject)
         {
-            RunningState = FlowRunningState.NotActive;
+            RunningState = ScriptRunningState.NotActive;
             DisposeEngines();
         }
     }
@@ -325,47 +267,7 @@ public class FlowHandler : IAutomationHandler
         }
         return Task.CompletedTask;
     }
-
-    public void PublishFlowHandlerInfo(Step? updatedStep = null)
-    {
-        var info = new FlowHandlerInfo
-        {
-            AutomationId = Automation.Id,
-            RunningState = RunningState,
-            UpdatedStep = updatedStep
-        };
-        _messageBusService.PublishAsync(info);
-    }
-
-    public void ExecuteScript(List<Information> informations)
-    {
-        if (_engines.Any())
-        {
-            var autoResetEvent = new AutoResetEvent(false);
-            Task.Run(() =>
-            {
-                lock (_lockEngineObject)
-                {
-                    foreach (var information in informations)
-                    {
-                        try
-                        {
-                            var jsValue = _engines[0].Engine.Evaluate(information.Evaluation!);
-                            information.EvaluationResult = jsValue.JsValueToString();
-                        }
-                        catch (Exception e)
-                        {
-                            information.EvaluationResult = $"Error: {e.Message}";
-                        }
-                    }
-                }
-                autoResetEvent.Set();
-            });
-            autoResetEvent.WaitOne();
-            autoResetEvent.Dispose();
-        }
-    }
-
+   
     public string? ExecuteScript(string script)
     {
         string? result = null;

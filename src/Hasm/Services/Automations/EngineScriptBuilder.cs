@@ -1,5 +1,6 @@
 ﻿using Hasm.Models;
 using Hasm.Services.Automations.Flow;
+using Hasm.Services.Automations.Script;
 using Hasm.Services.Automations.StateMachine;
 
 namespace Hasm.Services.Automations;
@@ -15,6 +16,10 @@ public static class EngineScriptBuilder
         else if (automation.AutomationType == AutomationType.Flow)
         {
             return EngineScriptBuilderFlow.BuildEngineScript(FlowHandler.GetAutomationProperties(automation.Data), Guid.Empty, null);
+        }
+        else if (automation.AutomationType == AutomationType.Script)
+        {
+            return EngineScriptBuilderScript.BuildEngineScript(ScriptHandler.GetAutomationProperties(automation.Data), Guid.Empty, null);
         }
         return "";
     }

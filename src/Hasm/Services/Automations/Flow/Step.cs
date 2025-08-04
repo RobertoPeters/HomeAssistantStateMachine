@@ -1,8 +1,15 @@
-﻿namespace Hasm.Services.Automations.Flow;
+﻿using System.Text.Json.Serialization;
+
+namespace Hasm.Services.Automations.Flow;
 
 public class Step
 {
     public StepData StepData { get; set; } = new();
+
+    [JsonIgnore]
+    public object? Payload { get; set; }
+    [JsonIgnore]
+    public DateTime? PayloadUpdatedAt { get; set; }
 
     public static Step FromStepData(StepData stepData)
     {
@@ -14,12 +21,9 @@ public class Step
     public virtual void Initialize()
     {
         var stepParameters = GetStepParameters();
-        foreach (var parameter in stepParameters)
+        foreach (var parameter in stepParameters.Where(x => !StepData.StepParameters.ContainsKey(x)).ToList())
         {
-            if (!StepData.StepParameters.ContainsKey(parameter))
-            {
-                StepData.StepParameters[parameter] = null;
-            }
+            StepData.StepParameters[parameter] = null;
         }
     }
 
@@ -29,6 +33,21 @@ public class Step
         {
             if (StepData.StepParameters.TryGetValue(key, out var value))
             {
+                if (value is System.Text.Json.JsonElement jsonElement)
+                {
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.Null)
+                    {
+                        return null;
+                    }
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.False)
+                    {
+                        return false;
+                    }
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.True)
+                    {
+                        return true;
+                    }
+                }
                 return value;
             }
             return null;
@@ -65,5 +84,10 @@ public class Step
     public virtual string GetPayloadStatements()
     {
         return "return null";
+    }
+
+    public virtual string GetPayloadEqualStatements()
+    {
+        return "return payload1 == payload2";
     }
 }

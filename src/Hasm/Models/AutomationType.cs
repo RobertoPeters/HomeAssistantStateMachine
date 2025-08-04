@@ -9,4 +9,7 @@ public enum AutomationType: int
 
     [Display(Name = "Flow")]
     Flow = 1,
+
+    [Display(Name = "Script")]
+    Script = 2,
 }

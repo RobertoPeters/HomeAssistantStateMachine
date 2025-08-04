@@ -1,0 +1,322 @@
+﻿@page "/editscript/{Id:int}"
+@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
+@using Hasm.Services.Interfaces
+@using Hasm.Services.Automations.Script
+@using System.Reflection
+@using System.Linq.Expressions
+@inject AutomationService AutomationService
+@inject DialogService DialogService
+@inject DataService DataService
+@inject ContextMenuService ContextMenuService
+@inject ClipboardService ClipboardService
+@inject NavigationManager Navigation
+@inject UIEventRegistration UIEventRegistration
+@inject IJSRuntime JS
+@implements IDisposable
+
+<style>
+    .my-editor-class {
+        height: 85vh;
+    }
+</style>
+
+<PageTitle>HASM - Edit Script</PageTitle>
+
+<NavigationLock ConfirmExternalNavigation="true"
+                OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
+@if (Automation != null)
+{
+    <span>Edit Script: @Automation.Name (@(ScriptHandler?.RunningState.ToString() ?? "-"))</span>
+    @if (!string.IsNullOrWhiteSpace(ScriptHandler?.ErrorMessage))
+    {
+        <p>@ScriptHandler.ErrorMessage</p>
+    }
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="width: 100%;height: 95vh">
+        <RadzenSplitterPane Size="75%" Min="300px">
+            <RadzenButton Size="ButtonSize.ExtraSmall" Text="Edit properties" Click="EditScriptAsync" />
+            <RadzenButton Size="ButtonSize.ExtraSmall" Text="Save" Click="SaveAsync" />
+            <RadzenButton Size="ButtonSize.ExtraSmall" Text="Restart" Click="Restart" />
+            <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="width: 98%;">
+                <RadzenSplitterPane Min="10px">
+                    <StandaloneCodeEditor @ref="standaloneCodeEditor"
+                                          CssClass="my-editor-class"
+                                          ConstructionOptions="EditorConstructionOptions" />
+                </RadzenSplitterPane>
+                <RadzenSplitterPane Size="300px" Min="10px">
+                    <StandaloneCodeEditor CssClass="my-editor-class"
+                                          ConstructionOptions="SystemScriptEditorConstructionOptions" />
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane Min="100px">
+            <RadzenTabs>
+                <Tabs>
+                    <RadzenTabsItem Text="Variables">
+                        <VariablesControl Automation="Automation" AllowColumnPicking=false />
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Intermediate">
+                        <div style="position: relative;">
+                            <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                                <RadzenButton Size="ButtonSize.Small" Text="Execute" Click="@ExecuteInteractive" Disabled="@(string.IsNullOrWhiteSpace(executeCommand) || ScriptHandler?.RunningState != ScriptHandler.ScriptRunningState.Active)" />
+                            </div>
+                            <RadzenTextArea @bind-Value=@executeCommand Style=@($"width:100%;") Rows="2" Placeholder="interactive javascript execution" />
+                            <div>
+                                <pre>@executeCommandResult</pre>
+                            </div>
+                        </div>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Log">
+                        <div style="position: relative;">
+                            <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                                <RadzenButton Size="ButtonSize.Small" Text="Clear" Click="@ClearLog" />
+                                <RadzenButton Size="ButtonSize.Small" Text="@(_pauseLog ? "Continue" : "Pause")" Click="@PauseLog" />
+                            </div>
+                            <div style="width: 100%;height: 150px;border: 1px solid black; overflow: scroll">
+                                @foreach (var data in logLines)
+                                {
+                                    <pre style="margin:0px;padding:0px;">@($"{data.Time.ToString("HH:mm.ss.fff")} {data.Message}")</pre>
+                                }
+                            </div>
+                        </div>
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+}
+else
+{
+    <h2>Edit Script</h2>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private sealed class LogData
+    {
+        public string Message { get; set; } = string.Empty;
+        public DateTime Time { get; set; } = DateTime.Now;
+    }
+
+    private StandaloneCodeEditor? standaloneCodeEditor;
+    private string? _unsavedData = null;
+    private Automation Automation = null!;
+    private ScriptHandler ScriptHandler = null!;
+    private readonly List<LogData> logLines = [];
+    private string? executeCommand;
+    private string? executeCommandResult;
+    private bool _pauseLog;
+    private ScriptHandler.AutomationProperties AutomationProperties = new();
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "javascript",
+            Value = AutomationProperties.Script,
+            ReadOnly = false
+        };
+    }
+
+    private StandaloneEditorConstructionOptions SystemScriptEditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "javascript",
+            Value = SystemMethods.SystemScript(AutomationType.Script),
+            ReadOnly = true
+        };
+    }
+
+    private async Task<string?> GetAutomationDataAsync()
+    {
+        await SaveAutomationPropertiesToAutomationAsync();
+        return System.Text.Json.JsonSerializer.Serialize(Automation);
+    }
+
+    async Task ReloadScriptAsync(Automation? useAutomation)
+    {
+        Automation = useAutomation ?? ScriptHandler.Automation;
+        if (!string.IsNullOrWhiteSpace(Automation.Data))
+        {
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<ScriptHandler.AutomationProperties>(Automation.Data) ?? new();
+        }
+        else
+        {
+            AutomationProperties = new();
+        }
+        await standaloneCodeEditor!.SetValue(AutomationProperties.Script);
+        _unsavedData = await GetAutomationDataAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ScriptHandler = (ScriptHandler)AutomationService.GetAutomation(Id);
+        Automation = ScriptHandler.Automation;
+        UIEventRegistration.LogEntryAdded += LogEvent;
+        UIEventRegistration.ScriptHandlerInfoChanged += ScriptHandlerInfoChanged;
+        UIEventRegistration.AutomationHandlerChanged += AutomationHandlerChanged;
+        UIEventRegistration.AutomationInfoChanged += AutomationInfoChanged;
+        if (!string.IsNullOrWhiteSpace(Automation.Data))
+        {
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<ScriptHandler.AutomationProperties>(Automation.Data) ?? new();
+            if (string.IsNullOrWhiteSpace(AutomationProperties.Script))
+            {
+                AutomationProperties.Script = $$""""
+                                              function schedule() {
+                                              }
+                                              """";
+            }
+        }
+        else
+        {
+            AutomationProperties = new();
+            AutomationProperties.Script = $$""""
+            function schedule() {
+            }
+            """";
+        }
+        _unsavedData = System.Text.Json.JsonSerializer.Serialize(Automation);
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        UIEventRegistration.AutomationInfoChanged -= AutomationInfoChanged;
+        UIEventRegistration.AutomationHandlerChanged -= AutomationHandlerChanged;
+        UIEventRegistration.LogEntryAdded -= LogEvent;
+        UIEventRegistration.ScriptHandlerInfoChanged -= ScriptHandlerInfoChanged;
+    }
+
+    void LogEvent(object? sender, LogEntry logEntry)
+    {
+        if (_pauseLog || logEntry.AutomationId != Automation?.Id) return;
+
+        InvokeAsync(() =>
+        {
+            logLines.Add(new LogData() { Message = logEntry.Message, Time = logEntry.Timestamp.ToLocalTime() });
+            while (logLines.Count > 200)
+            {
+                logLines.RemoveAt(0);
+            }
+            StateHasChanged();
+        });
+    }
+
+    private void ScriptHandlerInfoChanged(object? sender, ScriptHandler.ScriptHandlerInfo scriptInfo)
+    {
+        InvokeAsync(() =>
+        {
+            StateHasChanged();
+        });
+    }
+
+    private void AutomationHandlerChanged(object? sender, IAutomationHandler automationHandler)
+    {
+        InvokeAsync(async () =>
+        {
+            if (automationHandler.Automation.Id < 0)
+            {
+                NavigationManager.NavigateTo("\\");
+            }
+            else
+            {
+                await ReloadScriptAsync(null);
+            }
+        });
+    }
+
+    private void AutomationInfoChanged(object? sender, AutomationInfo scriptInfo)
+    {
+        if (scriptInfo.AutomationId != Automation.Id)
+        {
+            return;
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (_unsavedData != await GetAutomationDataAsync())
+        {
+            var isConfirmed = await JS.InvokeAsync<bool>("confirm", "Changes are not saved. Are you sure you want to leave the page without saving changes?");
+
+            if (!isConfirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
+    }
+
+    void ClearLog()
+    {
+        InvokeAsync(() =>
+    {
+        logLines.Clear();
+        StateHasChanged();
+    });
+    }
+
+    void PauseLog()
+    {
+        _pauseLog = !_pauseLog;
+    }
+
+    void ExecuteInteractive()
+    {
+        if (!string.IsNullOrWhiteSpace(executeCommand))
+        {
+            executeCommandResult = null;
+            if (ScriptHandler?.RunningState == ScriptHandler.ScriptRunningState.Active)
+            {
+                executeCommandResult = ScriptHandler.ExecuteScript(executeCommand);
+            }
+            else
+            {
+                executeCommandResult = "error: script not active";
+            }
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    async Task SaveAutomationPropertiesToAutomationAsync()
+    {
+        AutomationProperties.Script = await standaloneCodeEditor!.GetValue();
+        Automation.Data = System.Text.Json.JsonSerializer.Serialize(AutomationProperties);
+    }
+
+    async Task EditScriptAsync()
+    {
+        await SaveAutomationPropertiesToAutomationAsync();
+        var result = await DialogService.ShowDialogAsync<Pages.AddOrEditAutomationDialog, Automation>("Edit Automation", dialog =>
+        {
+            dialog.Automation = Automation;
+        });
+        if (result != null)
+        {
+            Automation.Enabled = result.Enabled;
+            Automation.Name = result.Name;
+            Automation.IsSubAutomation = result.IsSubAutomation;
+            Automation.Data = result.Data;
+            AutomationProperties = System.Text.Json.JsonSerializer.Deserialize<ScriptHandler.AutomationProperties>(result.Data) ?? new ScriptHandler.AutomationProperties();
+        }
+    }
+
+    async Task SaveAsync()
+    {
+        await SaveAutomationPropertiesToAutomationAsync();
+        await DataService.AddOrUpdateAutomationAsync(Automation);
+        _unsavedData = await GetAutomationDataAsync();
+    }
+
+    void Restart()
+    {
+        ScriptHandler.Restart();
+    }
+}
