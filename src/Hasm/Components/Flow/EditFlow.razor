@@ -599,16 +599,16 @@ else
                     await AddStepAsync((int)p.X, (int)p.Y);
                 }
                 break;
-            //     case 2:
-            //         await SaveAsync();
-            //         break;
-            //     case 3:
-            //         Restart();
-            //         break;
-            //     case 4:
-            //         AddUndo();
-            //         await ReloadDiagramAsync();
-            //         break;
+                case 2:
+                    await SaveAsync();
+                    break;
+                case 3:
+                    Restart();
+                    break;
+                case 4:
+                    AddUndo();
+                    await ReloadDiagramAsync();
+                    break;
             case 5:
                 await EditFlowAsync();
                 break;
@@ -650,6 +650,28 @@ else
                 break;
         }
         ContextMenuService.Close();
+    }
+
+    void Restart()
+    {
+        FlowHandler.Restart();
+    }
+
+    async Task SaveAsync()
+    {
+        var removedSteps = AutomationProperties.Steps.Where(x => Diagram.GetNode(x) == null).ToList();
+        foreach (var step in removedSteps)
+        {
+            AutomationProperties.Steps.Remove(step);
+        }
+        var removedInformations = AutomationProperties.Informations.Where(x => Diagram.GetNode(x) == null).ToList();
+        foreach (var information in removedInformations)
+        {
+            AutomationProperties.Informations.Remove(information);
+        }
+        AddUIDataToComponents();
+        _unsavedData = GetUndoData();
+        await DataService.AddOrUpdateAutomationAsync(Automation);
     }
 
     async Task ShowFlowAsync()
@@ -865,7 +887,7 @@ else
 
         foreach (var step in AutomationProperties.Steps)
         {
-            var stepInfo = stepNodeMappings.FirstOrDefault(x => x.stepType == step.StepData.GetType());
+            var stepInfo = stepNodeMappings.FirstOrDefault(x => x.stepType == step.StepData.Type);
             if (stepInfo == default)
             {
                 continue;

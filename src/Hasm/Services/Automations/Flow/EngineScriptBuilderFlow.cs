@@ -21,24 +21,56 @@ public static class EngineScriptBuilderFlow
         script.AppendLine("var steps = []");
         foreach (var step in properties.Steps.ToList())
         {
-            script.AppendLine($$""""
+            script.AppendLine(
+            $$""""
             steps.push({
                 'id': '{{StepId(step)}}',
+                'name': '{{step.Name}}',
                 'initialPayloadFunction': function(){
                 {{step.GetInitializeStatements()}}
                 },
-                'getPayloadFunction': function(){
+                'getPayloadFunction': function(inputPayloads){
                 {{step.GetPayloadStatements()}}
                 },
                 'currentPayload': null,
                 'inputSteps': [{{string.Join(", ", properties.Steps.Where(x => x.StepData.NextSteps.Contains(step.StepData.Id)).Select(x => $"'{StepId(x)}'").ToList())}}],
-                'inputPayloads': [{{string.Join(", ", properties.Steps.Where(x => x.StepData.NextSteps.Contains(step.StepData.Id)).Select(x => "null").ToList())}}]
+                'inputPayloads': [{{string.Join(", ", properties.Steps.Where(x => x.StepData.NextSteps.Contains(step.StepData.Id)).Select(x => "null").ToList())}}],
+                'getPayloadEqualfunction': function(payload1, payload2){
+                {{step.GetPayloadEqualStatements()}}
+                }
             })           
             """");
         }
 
         script.AppendLine(""""
+
+            function getStepsWithInput(inputStepId) {
+                return steps.filter(function(step) {
+                    return step.inputSteps.includes(inputStepId);
+                })
+            }
+
+            function checkStep(step) {
+                var newPayload = step.getPayloadFunction(step.inputPayloads);
+                if (!step.getPayloadEqualfunction(step.currentPayload, newPayload)) {
+                    step.currentPayload = newPayload
+                    log('payload changed: step="' + step.name + '", payload="' + newPayload + '"')
+
+                    var affectedSteps = getStepsWithInput(step.id);
+                    affectedSteps.forEach(function(affectedStep) {
+                        var inputIndex = affectedStep.inputSteps.indexOf(step.id);
+                        if (inputIndex !== -1) {
+                            affectedStep.inputPayloads[inputIndex] = step.currentPayload;
+                        }
+                        checkStep(affectedStep)
+                    })
+                }
+            }
+
             function schedule() {
+                steps.forEach(function(step) {
+                    checkStep(step)
+                })
             }
             
             """");
@@ -49,8 +81,8 @@ public static class EngineScriptBuilderFlow
 
         script.AppendLine(""""
             steps.forEach(function(step) {
-                step.currentPayload = step.initialPayloadFunction();
-            });
+                step.currentPayload = step.initialPayloadFunction()
+            })
             
             """");
 

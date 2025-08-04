@@ -17,13 +17,21 @@ public class StepVariableValue: Step
 
     public override string GetInitializeStatements()
     {
-        return "return null";
+        return $$""""
+            var clientId = getClientId('{{ClientName}}');
+            var variableId = createVariableOnClient('{{VariableName}}', clientId, {{(!IsGlobalVariable).ToString().ToLower()}}, {{IsPersistant.ToString().ToLower()}}, {{Data ?? "null"}}, {{MockingValues ?? "null"}})
+            return {{(PayloadOnStart ? "null" : "getVariableValue(variableId)")}}
+            """";
     }
 
     public override string GetPayloadStatements()
     {
-        return "return null";
-    }
+        return $$""""
+            var clientId = getClientId('{{ClientName}}');
+            var variableId = getVariableIdByName('{{VariableName}}', clientId, {{(!IsGlobalVariable).ToString().ToLower()}})
+            return getVariableValue(variableId)
+            """";
+     }
 
     public string? VariableName
     {

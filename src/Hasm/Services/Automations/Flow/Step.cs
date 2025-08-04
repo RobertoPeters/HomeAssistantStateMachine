@@ -29,6 +29,21 @@ public class Step
         {
             if (StepData.StepParameters.TryGetValue(key, out var value))
             {
+                if (value is System.Text.Json.JsonElement jsonElement)
+                {
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.Null)
+                    {
+                        return null;
+                    }
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.False)
+                    {
+                        return false;
+                    }
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.True)
+                    {
+                        return true;
+                    }
+                }
                 return value;
             }
             return null;
@@ -65,5 +80,10 @@ public class Step
     public virtual string GetPayloadStatements()
     {
         return "return null";
+    }
+
+    public virtual string GetPayloadEqualStatements()
+    {
+        return "return payload1 == payload2";
     }
 }
