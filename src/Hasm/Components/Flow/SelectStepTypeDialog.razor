@@ -5,8 +5,9 @@
 <RadzenTemplateForm @ref="Form" Data="@selectedStepType" TItem="string">
 	<RadzenStack>
 		<RadzenFormField Text="Step" Variant="@Variant.Outlined">
-			<RadzenListBox @bind-Value="@selectedStepType"
+			<RadzenDropDown @bind-Value="@selectedStepType"
 						   Name="Step"
+						   Style="width: 100%;"
 						   Multiple="false"
 						   Data="@StepTypes"
 						   TextProperty="Value"
@@ -20,6 +21,12 @@
 @code {
 	[Parameter]
 	public Dictionary<string, string> StepTypes { get; set; } = [];
+
+	protected override bool ShowClose => true;
+	protected override bool IsPersistent => false;
+	protected override bool CloseDialogOnOverlayClick => true;
+	protected override int? WidthInPixels => 700;
+	protected override int? HeightInPixels => 300;
 
 	private RadzenTemplateForm<string>? Form;
 	private string? selectedStepType = null;

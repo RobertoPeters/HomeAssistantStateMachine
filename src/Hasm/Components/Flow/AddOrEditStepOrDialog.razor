@@ -1,0 +1,57 @@
+﻿@using Hasm.Components.Dialogs
+@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
+@using Hasm.Services.Automations.Flow
+@inject Services.DataService DataService
+@inherits ResultDialogBase<StepOr>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StepOr">
+	<RadzenStack>
+		<RadzenFormField Text="Name" Variant="@Variant.Outlined">
+			<RadzenTextBox @bind-Value="@Model!.Name" Name="Name" spellcheck="false" />
+		</RadzenFormField>
+	</RadzenStack>
+	<RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+</RadzenTemplateForm>
+
+
+@code {
+	protected override bool ShowClose => true;
+	protected override bool IsPersistent => false;
+	protected override bool CloseDialogOnOverlayClick => true;
+	protected override int? WidthInPixels => 1400;
+
+	[Parameter]
+	public StepOr? Step { get; set; }
+
+	[Parameter]
+	public Automation? Automation { get; set; }
+
+
+	private StepOr? Model;
+	private RadzenTemplateForm<StepOr>? Form;
+
+	protected override void OnInitialized()
+	{
+		if (Step == null)
+		{
+			Step = new StepOr();
+			Step.StepData.Type = Step.GetType();
+			Step.Initialize();
+		}
+		Model = Step.CopyObject();
+
+		base.OnInitialized();
+	}
+
+	void OnSubmit()
+	{
+		Form!.EditContext.Validate();
+		if (Form.IsValid)
+		{
+			Close(Model);
+		}
+	}
+
+}

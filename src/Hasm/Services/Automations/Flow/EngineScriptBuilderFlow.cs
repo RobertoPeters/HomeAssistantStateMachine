@@ -29,7 +29,7 @@ public static class EngineScriptBuilderFlow
                 'initialPayloadFunction': function(){
                 {{step.GetInitializeStatements()}}
                 },
-                'getPayloadFunction': function(step){
+                'getPayloadFunction': function(step, newPayloadStep){
                 {{step.GetPayloadStatements()}}
                 },
                 'currentPayload': null,
@@ -50,8 +50,8 @@ public static class EngineScriptBuilderFlow
                 })
             }
 
-            function checkStep(step) {
-                var newPayload = step.getPayloadFunction(step);
+            function checkStep(step, newPayloadStep) {
+                var newPayload = step.getPayloadFunction(step, newPayloadStep);
                 if (!step.getPayloadEqualfunction(step.currentPayload, newPayload)) {
                     step.currentPayload = newPayload
                     step.payloadUpdatedAt = new Date();
@@ -60,14 +60,14 @@ public static class EngineScriptBuilderFlow
 
                     var affectedSteps = getStepsWithInput(step.id);
                     affectedSteps.forEach(function(affectedStep) {
-                        checkStep(affectedStep)
+                        checkStep(affectedStep, step)
                     })
                 }
             }
 
             function schedule() {
                 steps.forEach(function(step) {
-                    checkStep(step)
+                    checkStep(step, null)
                 })
             }
             

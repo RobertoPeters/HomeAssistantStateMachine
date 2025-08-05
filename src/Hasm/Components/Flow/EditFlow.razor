@@ -122,7 +122,9 @@ else
 
     private List<(string name, string description, Type stepType, Type nodeModel, Type nodeWidget, Type dialog)> stepNodeMappings = [
         ("Variable", "Get variable value", typeof(StepVariableValue), typeof(StepVariableValueNodeModel), typeof(StepVariableValueNodeWidget), typeof(AddOrEditStepVariableValueDialog)),
-        ("Logic AND", "All inputs true", typeof(StepAnd), typeof(StepAndNodeModel), typeof(StepAndNodeWidget), typeof(AddOrEditStepAndDialog))
+        ("Logic AND", "All inputs true", typeof(StepAnd), typeof(StepAndNodeModel), typeof(StepAndNodeWidget), typeof(AddOrEditStepAndDialog)),
+        ("Logic OR", "One of the inputs true", typeof(StepOr), typeof(StepOrNodeModel), typeof(StepOrNodeWidget), typeof(AddOrEditStepOrDialog)),
+        ("Script", "Free script", typeof(StepScript), typeof(StepScriptNodeModel), typeof(StepScriptNodeWidget), typeof(AddOrEditStepScriptDialog)),
     ];
 
     private BlazorDiagram Diagram { get; set; } = null!;
@@ -518,6 +520,18 @@ else
                 return await DialogService.ShowDialogAsync<AddOrEditStepAndDialog, StepAnd>($"Edit Step: {step?.StepData.Name}", dialog =>
                 {
                     dialog.Step = step as StepAnd;
+                    dialog.Automation = Automation;
+                });
+            case "AddOrEditStepOrDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepOrDialog, StepOr>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepOr;
+                    dialog.Automation = Automation;
+                });
+            case "AddOrEditStepScriptDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepScriptDialog, StepScript>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepScript;
                     dialog.Automation = Automation;
                 });
         }

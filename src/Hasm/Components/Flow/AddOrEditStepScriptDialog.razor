@@ -1,0 +1,148 @@
+﻿@using Hasm.Components.Dialogs
+@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
+@using Hasm.Services.Automations.Flow
+@inject Services.DataService DataService
+@inherits ResultDialogBase<StepScript>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StepScript">
+	<RadzenStack>
+		<RadzenFormField Text="Name" Variant="@Variant.Outlined">
+			<RadzenTextBox @bind-Value="@Model!.Name" Name="Name" spellcheck="false" />
+		</RadzenFormField>
+		<RadzenFormField Text="Initialize statements" Variant="@Variant.Outlined">
+			<div class="textarea-wrapper">
+				<RadzenTextArea @bind-Value="@Model!.InitializeStatements" Name="InitializeStatements" Rows="5" Style="width: 100%;" spellcheck="false" />
+				<RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditInitializeStatementsAsync"></RadzenIcon>
+			</div>
+		</RadzenFormField>
+		<RadzenFormField Text="Get payload statements" Variant="@Variant.Outlined">
+			<div class="textarea-wrapper">
+				<RadzenTextArea @bind-Value="@Model!.PayloadStatements" Name="PayloadStatements" Rows="5" Style="width: 100%;" spellcheck="false" />
+				<RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPayloadStatementsAsync"></RadzenIcon>
+			</div>
+		</RadzenFormField>
+		<RadzenFormField Text="Compare payloads statements" Variant="@Variant.Outlined">
+			<div class="textarea-wrapper">
+				<RadzenTextArea @bind-Value="@Model!.PayloadEqualStatements" Name="PayloadEqualStatements" Rows="5" Style="width: 100%;" spellcheck="false" />
+				<RadzenIcon Icon="edit" class="overlay-icon" @onclick="EditPayloadEqualStatementsAsync"></RadzenIcon>
+			</div>
+		</RadzenFormField>
+
+	</RadzenStack>
+	<RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+</RadzenTemplateForm>
+
+
+@code {
+	protected override bool ShowClose => true;
+	protected override bool IsPersistent => false;
+	protected override bool CloseDialogOnOverlayClick => true;
+	protected override int? WidthInPixels => 1400;
+
+	[Parameter]
+	public StepScript? Step { get; set; }
+
+	[Parameter]
+	public Automation? Automation { get; set; }
+
+
+	private StepScript? Model;
+	private RadzenTemplateForm<StepScript>? Form;
+
+	protected override void OnInitialized()
+	{
+		if (Step == null)
+		{
+			Step = new StepScript();
+			Step.StepData.Type = Step.GetType();
+			Step.Initialize();
+			Step.InitializeStatements = """"
+										// Initialize your script here
+										// return initial payload value here
+										// function () {
+										return null
+										// }
+										"""";
+
+			Step.PayloadStatements = """"
+										// return the payload value here
+										// return payload value here
+										// step = this step
+										// newPayloadStep is the step that has a changed payload that caused this function to be called
+										// function (step, newPayloadStep) {
+										return null
+										// }
+										"""";
+
+			Step.PayloadEqualStatements = """"
+										// return the comparison of the two payloads here here
+										// payload1 is the old payload value and the payload2 is the new payload value
+										// function (payload1, payload2) {
+										return payload1 == payload2
+										// }
+										"""";
+		}
+		Model = Step.CopyObject();
+
+		base.OnInitialized();
+	}
+
+	void OnSubmit()
+	{
+		Form!.EditContext.Validate();
+		if (Form.IsValid)
+		{
+			Close(Model);
+		}
+	}
+
+	async Task EditInitializeStatementsAsync()
+	{
+		var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Initialize statements", dialog =>
+		{
+			dialog.Script = Model!.InitializeStatements;
+			if (Automation != null)
+			{
+				dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+			}
+		});
+		if (result != null)
+		{
+			Model!.InitializeStatements = result;
+		}
+	}
+
+	async Task EditPayloadStatementsAsync()
+	{
+		var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Get payload statements", dialog =>
+		{
+			dialog.Script = Model!.PayloadStatements;
+			if (Automation != null)
+			{
+				dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+			}
+		});
+		if (result != null)
+		{
+			Model!.PayloadStatements = result;
+		}
+	}
+
+	async Task EditPayloadEqualStatementsAsync()
+	{
+		var result = await DialogService.ShowDialogAsync<Dialogs.ScriptEditorDialog, string?>("Compare payload statements", dialog =>
+		{
+			dialog.Script = Model!.PayloadEqualStatements;
+			if (Automation != null)
+			{
+				dialog.SystemScript = EngineScriptBuilder.BuildEngineScriptForEditor(Automation);
+			}
+		});
+		if (result != null)
+		{
+			Model!.PayloadEqualStatements = result;
+		}
+	}
+}
