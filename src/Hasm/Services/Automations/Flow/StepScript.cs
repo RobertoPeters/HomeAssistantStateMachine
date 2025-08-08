@@ -6,6 +6,11 @@ public class StepScript: Step
     public const string PayloadStatementsKey = "PayloadStatements";
     public const string PayloadEqualStatementsKey = "PayloadEqualStatements";
 
+    public StepScript()
+    {
+        Description = "Script";
+    }
+
     public override string[] GetStepParameters()
     {
         return [InitializeStatementsKey, PayloadStatementsKey, PayloadEqualStatementsKey];

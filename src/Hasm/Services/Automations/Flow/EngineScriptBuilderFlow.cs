@@ -26,7 +26,7 @@ public static class EngineScriptBuilderFlow
             steps.push({
                 'id': '{{StepId(step)}}',
                 'name': '{{step.Name ?? step.Description}}',
-                'initialPayloadFunction': function(){
+                'initialPayloadFunction': function(step){
                 {{step.GetInitializeStatements()}}
                 },
                 'getPayloadFunction': function(step, newPayloadStep){
@@ -70,7 +70,7 @@ public static class EngineScriptBuilderFlow
                     checkStep(step, null)
                 })
             }
-            
+                        
             """");
 
         script.AppendLine();
@@ -79,7 +79,7 @@ public static class EngineScriptBuilderFlow
 
         script.AppendLine(""""
             steps.forEach(function(step) {
-                step.currentPayload = step.initialPayloadFunction()
+                step.currentPayload = step.initialPayloadFunction(step)
             })
             
             """");

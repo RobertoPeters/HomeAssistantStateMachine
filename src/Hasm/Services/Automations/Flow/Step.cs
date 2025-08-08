@@ -47,6 +47,10 @@ public class Step
                     {
                         return true;
                     }
+                    if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    {
+                        return jsonElement.GetInt32();
+                    }
                 }
                 return value;
             }

@@ -1,0 +1,75 @@
+﻿@using Hasm.Components.Dialogs
+@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
+@using Hasm.Services.Automations.Flow
+@inject Services.DataService DataService
+@inherits ResultDialogBase<StepTimer>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StepTimer">
+    <RadzenStack>
+        <RadzenFormField Text="Name" Variant="@Variant.Outlined">
+            <RadzenTextBox @bind-Value="@Model!.Name" Name="Name" spellcheck="false" />
+        </RadzenFormField>
+        <RadzenFormField Text="Variable name *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@Model!.VariableName" Name="VariableName" spellcheck="false" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="VariableName" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Timout (seconds) *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenNumeric @bind-Value="@Model!.TimeoutSeconds" Name="TimeoutSeconds" Min=1 spellcheck="false" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="TimeoutSeconds" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+    </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    [Parameter]
+    public StepTimer? Step { get; set; }
+
+    [Parameter]
+    public Automation? Automation { get; set; }
+
+
+    private StepTimer? Model;
+    private RadzenTemplateForm<StepTimer>? Form;
+    private List<Client>? Clients;
+
+    protected override void OnInitialized()
+    {
+        Clients = DataService.GetClients();
+        if (Step == null)
+        {
+            Step = new StepTimer();
+            Step.StepData.Type = Step.GetType();
+            Step.Initialize();
+        }
+        Model = Step.CopyObject();
+
+        base.OnInitialized();
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            Close(Model);
+        }
+    }
+
+}

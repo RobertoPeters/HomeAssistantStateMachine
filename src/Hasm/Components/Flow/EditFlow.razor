@@ -124,6 +124,7 @@ else
         ("Variable", "Get variable value", typeof(StepVariableValue), typeof(StepVariableValueNodeModel), typeof(StepVariableValueNodeWidget), typeof(AddOrEditStepVariableValueDialog)),
         ("Logic AND", "All inputs true", typeof(StepAnd), typeof(StepAndNodeModel), typeof(StepAndNodeWidget), typeof(AddOrEditStepAndDialog)),
         ("Logic OR", "One of the inputs true", typeof(StepOr), typeof(StepOrNodeModel), typeof(StepOrNodeWidget), typeof(AddOrEditStepOrDialog)),
+        ("Timer", "Timer", typeof(StepTimer), typeof(StepTimerNodeModel), typeof(StepTimerNodeWidget), typeof(AddOrEditStepTimerDialog)),
         ("Script", "Free script", typeof(StepScript), typeof(StepScriptNodeModel), typeof(StepScriptNodeWidget), typeof(AddOrEditStepScriptDialog)),
     ];
 
@@ -532,6 +533,12 @@ else
                 return await DialogService.ShowDialogAsync<AddOrEditStepScriptDialog, StepScript>($"Edit Step: {step?.StepData.Name}", dialog =>
                 {
                     dialog.Step = step as StepScript;
+                    dialog.Automation = Automation;
+                });
+            case "AddOrEditStepTimerDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepTimerDialog, StepTimer>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepTimer;
                     dialog.Automation = Automation;
                 });
         }

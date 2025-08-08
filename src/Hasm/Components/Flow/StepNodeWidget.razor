@@ -10,10 +10,26 @@
     {
         <PortRenderer @key="port" Port="port" Class="default"></PortRenderer>
     }
-    <div style="position: absolute; right: 8px; bottom: 8px; z-index: 1;">@(Node.Step.Payload?.ToString())</div>
+    <div style="position: absolute; right: 8px; bottom: 8px; z-index: 1;">@GetPayloadText()</div>
 </div>
 
 @code {
     [Parameter]
     public StepNodeModel Node { get; set; } = null!;
+
+    string GetPayloadText()
+    {
+        if (Node.Step.Payload == null)
+        {
+            return "null";
+        }
+        else if (Node.Step.Payload is string text)
+        {
+            return $"'{text}'";
+        }
+        else
+        {
+            return Node.Step.Payload.ToString() ?? "";
+        }
+    }
 }

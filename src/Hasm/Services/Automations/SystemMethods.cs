@@ -152,7 +152,7 @@ public class SystemMethods
     //====================================================================================
     
     log = function(message) {
-        system.log(instanceId, message)
+        system.log(instanceId, JSON.stringify(message))
     }
 
     //returns the current (local) date and time as an object with year, month, day, hour, minute, second and dayOfWeek properties
