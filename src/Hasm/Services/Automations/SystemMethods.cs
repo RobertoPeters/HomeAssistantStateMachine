@@ -1,4 +1,5 @@
-﻿using Hasm.Models;
+﻿using Hasm.Extensions;
+using Hasm.Models;
 using Hasm.Services.Automations.Flow;
 using Hasm.Services.Automations.StateMachine;
 using Hasm.Services.Interfaces;
@@ -35,6 +36,12 @@ public class SystemMethods
     {
         var now = DateTime.Now;
         return new DateTimeInfo(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, (int)now.DayOfWeek);
+    }
+
+    public bool currentTimeBetween(string startTime, string endTime, bool includeBoundary)
+    {
+        var currentTime = DateTime.Now.TimeOfDay;
+        return currentTime.TimeOfDayBetween(startTime, endTime, includeBoundary);
     }
 
     public int createVariable(string name, int clientId, bool isAutomationVariable, bool persistant, JsValue? data, JsValue[]? mockingOptions)
@@ -158,6 +165,15 @@ public class SystemMethods
     //returns the current (local) date and time as an object with year, month, day, hour, minute, second and dayOfWeek properties
     getCurrentDateTime = function() {
         return system.getCurrentDateTime()
+    }
+
+    currentTimeBetween = function(startTime, endTime, includeBoundary) {
+        //e.g. currentTimeBetween('8:00', '18:00', true)
+        // currentTimeBetween('22:00', '4:00', true)
+        // currentTimeBetween('22:00', '0:30', true)
+        //it used the 24h clock format without leading zeros
+        //returns true if the current time is between startTime and endTime (inclusive or exclusive depending on includeBoundary)
+        return system.currentTimeBetween(startTime, endTime, includeBoundary)
     }
     
     // returns the client id or -1 if not found
