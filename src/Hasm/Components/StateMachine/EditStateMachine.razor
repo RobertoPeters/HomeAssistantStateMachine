@@ -573,7 +573,7 @@ else
         <RadzenMenuItem Text="All states and transitions" Disabled="@(!AutomationProperties.Transitions.Any() && !AutomationProperties.States.Any())" Value="10"></RadzenMenuItem>
         <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
     </RadzenMenuItem>
-    <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste(AutomationType.StateMachine))"></RadzenMenuItem>
     <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
     <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
     <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!AutomationProperties.Transitions.Any() && !AutomationProperties.States.Any())"></RadzenMenuItem>
@@ -655,7 +655,7 @@ else
         var content = new ClipboardService.ClipboardContent();
 
         AddUIDataToStatesAndTransitions();
-        content.Automation = Automation;
+        content.StateMachineAutomation = Automation;
 
         ClipboardService.Copy(content);
     }
@@ -666,8 +666,8 @@ else
 
         AddUIDataToStatesAndTransitions();
         var selectedModels = Diagram.GetSelectedModels().ToList();
-        content.States.AddRange(AutomationProperties.States.ToList());
-        content.Transitions.AddRange(AutomationProperties.Transitions.ToList());
+        content.StateMachineStates.AddRange(AutomationProperties.States.ToList());
+        content.StateMachineTransitions.AddRange(AutomationProperties.Transitions.ToList());
 
         ClipboardService.Copy(content);
     }
@@ -683,12 +683,12 @@ else
             if (sm is StateMachineStateNodeModel node)
             {
                 var state = node.GetState(AutomationProperties)!;
-                content.States.Add(state);
+                content.StateMachineStates.Add(state);
             }
             else if (sm is StateMachineInformationNodeModel infnode)
             {
                 var information = infnode.GetInformation(AutomationProperties)!;
-                content.Informations.Add(information);
+                content.StateMachineInformations.Add(information);
             }
         }
         foreach (var sm in selectedModels)
@@ -703,7 +703,7 @@ else
                 if (sourceState != null && targetState != null)
                 {
                     var transition = AutomationProperties.Transitions.First(x => x.FromStateId == sourceState.Id && x.ToStateId == targetState.Id);
-                    content.Transitions.Add(transition);
+                    content.StateMachineTransitions.Add(transition);
                 }
             }
         }
@@ -720,18 +720,18 @@ else
         }
 
         AddUndo();
-        List<StateMachineHandler.Transition> transitions = content.Transitions;
-        List<StateMachineHandler.State> states = content.States;
-        List<StateMachineHandler.Information> informations = content.Informations;
+        List<StateMachineHandler.Transition> transitions = content.StateMachineTransitions;
+        List<StateMachineHandler.State> states = content.StateMachineStates;
+        List<StateMachineHandler.Information> informations = content.StateMachineInformations;
 
-        if (content.Automation != null)
+        if (content.StateMachineAutomation != null)
         {
-            Automation.IsSubAutomation = content.Automation.IsSubAutomation;
-            Automation.Enabled = content.Automation.Enabled;
+            Automation.IsSubAutomation = content.StateMachineAutomation.IsSubAutomation;
+            Automation.Enabled = content.StateMachineAutomation.Enabled;
             StateMachineHandler.AutomationProperties properties = new();
-            if (!string.IsNullOrWhiteSpace(content.Automation.Data))
+            if (!string.IsNullOrWhiteSpace(content.StateMachineAutomation.Data))
             {
-                properties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(content.Automation.Data) ?? new();
+                properties = System.Text.Json.JsonSerializer.Deserialize<StateMachineHandler.AutomationProperties>(content.StateMachineAutomation.Data) ?? new();
             }
             AutomationProperties.PreStartAction = properties.PreStartAction;
             AutomationProperties.PreScheduleAction = properties.PreScheduleAction;
@@ -1288,7 +1288,7 @@ else
     async Task ExportAsync()
     {
         var fileStream = GetFileStream();
-        var fileName = "hasm_export.json";
+        var fileName = "hasm_export_statemachine.json";
 
         using var streamRef = new DotNetStreamReference(stream: fileStream);
 

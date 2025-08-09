@@ -90,7 +90,7 @@ public static class BlazorDiagramExtensions
     {
         if (node is StateMachineStateNodeModel smNode)
         {
-            return content.States.First(x => x.Id == smNode.State.Id);
+            return content.StateMachineStates.First(x => x.Id == smNode.State.Id);
         }
         return null;
     }

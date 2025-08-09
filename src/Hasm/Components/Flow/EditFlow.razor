@@ -347,7 +347,7 @@ else
                 }
             }
             StateHasChanged();
-    }   );
+        }   );
     }
 
     private async Task OnBeforeInternalNavigation(LocationChangingContext context)
@@ -378,9 +378,9 @@ else
         });
     }
 
-    private void AutomationInfoChanged(object? sender, AutomationInfo stateMachineScheduledInfo)
+    private void AutomationInfoChanged(object? sender, AutomationInfo flowInfo)
     {
-        if (stateMachineScheduledInfo.AutomationId != Automation.Id)
+        if (flowInfo.AutomationId != Automation.Id)
         {
             return;
         }
@@ -592,6 +592,12 @@ else
     {
         if (modelOnPointerUp is NodeModel node)
         {
+           ContextMenuService.Open(args, ds =>
+    @<RadzenMenu Click="OnNodeContextMenuItemClick">
+                <RadzenMenuItem Text="Edit" Value="1"></RadzenMenuItem>
+                <RadzenMenuItem Text="Copy" Value="3" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
+                <RadzenMenuItem Text="Delete" Value="2"></RadzenMenuItem>
+            </RadzenMenu>);            
         }
         else if (modelOnPointerUp is LinkModel link)
         {
@@ -607,9 +613,9 @@ else
     <RadzenMenuItem Text="Copy" Value="8">
         <RadzenMenuItem Text="Selection" Value="9" Disabled="@(!Diagram.GetSelectedModels().Any())"></RadzenMenuItem>
         <RadzenMenuItem Text="All steps" Disabled="@(!AutomationProperties.Steps.Any() && !AutomationProperties.Steps.Any())" Value="10"></RadzenMenuItem>
-        <RadzenMenuItem Text="Complete state machine" Value="11"></RadzenMenuItem>
+        <RadzenMenuItem Text="Complete flow" Value="11"></RadzenMenuItem>
     </RadzenMenuItem>
-    <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste())"></RadzenMenuItem>
+    <RadzenMenuItem Text="Paste" Value="12" Disabled="@(!ClipboardService.CanPaste(AutomationType.Flow))"></RadzenMenuItem>
     <RadzenMenuItem Text="Undo" Value="14" Disabled="@(!CanUndo())"></RadzenMenuItem>
     <RadzenMenuItem Text="Redo" Value="15" Disabled="@(!CanRedo())"></RadzenMenuItem>
     <RadzenMenuItem Text="Select all" Value="13" Disabled="@(!AutomationProperties.Steps.Any())"></RadzenMenuItem>
@@ -619,6 +625,25 @@ else
     <RadzenMenuItem Text="Export" Value="7"></RadzenMenuItem>
 </RadzenMenu>
     );            
+        }
+    }
+
+  async void OnNodeContextMenuItemClick(MenuItemEventArgs args)
+    {
+        ContextMenuService.Close();
+        var node = modelOnPointerUp as NodeModel;
+        switch (args.Value)
+        {
+            case 1:
+                await EditStepAsync(node!);
+                break;
+            case 2:
+                AddUndo();
+                RemoveNode(node!);
+                break;
+            case 3:
+                CopySelectionToClipboard();
+                break;
         }
     }
 
@@ -633,48 +658,48 @@ else
                     await AddStepAsync((int)p.X, (int)p.Y);
                 }
                 break;
-                case 2:
-                    await SaveAsync();
-                    break;
-                case 3:
-                    Restart();
-                    break;
-                case 4:
-                    AddUndo();
-                    await ReloadDiagramAsync();
-                    break;
+            case 2:
+                await SaveAsync();
+                break;
+            case 3:
+                Restart();
+                break;
+            case 4:
+                AddUndo();
+                await ReloadDiagramAsync();
+                break;
             case 5:
                 await EditFlowAsync();
                 break;
             case 6:
                 await ShowFlowAsync();
                 break;
-            //     case 7:
-            //         await ExportAsync();
-            //         break;
-            //     case 8:
-            //         return;
-            //     case 9:
-            //         CopySelectionToClipboard();
-            //         break;
-            //     case 10:
-            //         CopyAllStepsToClipboard();
-            //         break;
-            //     case 11:
-            //         CopyFlowToClipboard();
-            //         break;
-            //     case 12:
-            //         PasteFromClipboard(args);
-            //         break;
-            //     case 13:
-            //         await SelectAll(Diagram);
-            //         break;
-                case 14:
-                    await UndoAsync(Diagram);
-                    break;
-                case 15:
-                    await RedoAsync(Diagram);
-                    break;
+            case 7:
+                await ExportAsync();
+                break;
+            case 8:
+                return;
+            case 9:
+                CopySelectionToClipboard();
+                break;
+            case 10:
+                CopyAllStepsToClipboard();
+                break;
+            case 11:
+                CopyFlowToClipboard();
+                break;
+            case 12:
+                PasteFromClipboard(args);
+                break;
+            case 13:
+                await SelectAll(Diagram);
+                break;
+            case 14:
+                await UndoAsync(Diagram);
+                break;
+            case 15:
+                await RedoAsync(Diagram);
+                break;
             case 20:
                 {
                     AddUndo();
@@ -684,6 +709,156 @@ else
                 break;
         }
         ContextMenuService.Close();
+    }
+
+    void PasteFromClipboard(MenuItemEventArgs args)
+    {
+        var content = ClipboardService.Paste();
+        if (content == null)
+        {
+            return;
+        }
+
+        AddUndo();
+        List<Step> steps = content.FlowSteps;
+        List<Information> informations = content.FlowInformations;
+
+        if (content.FlowAutomation != null)
+        {
+            Automation.Enabled = content.FlowAutomation.Enabled;
+            FlowHandler.AutomationProperties properties = new();
+            if (!string.IsNullOrWhiteSpace(content.FlowAutomation.Data))
+            {
+                properties = System.Text.Json.JsonSerializer.Deserialize<FlowHandler.AutomationProperties>(content.FlowAutomation.Data) ?? new();
+            }
+            AutomationProperties.PreStartAction = properties.PreStartAction;
+            steps = properties.Steps.ToList();
+            informations = properties.Informations.ToList();
+        }
+
+        int? minX = null;
+        int? minY = null;
+
+        foreach (var step in steps.Where(x => !string.IsNullOrWhiteSpace(x.StepData.UIData)).ToList())
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(step.StepData.UIData!);
+            if (uiData != null && (minX == null || uiData.X < minX))
+            {
+                minX = uiData.X;
+            }
+            if (uiData != null && (minY == null || uiData.Y < minY))
+            {
+                minY = uiData.Y;
+            }
+        }
+        foreach (var information in informations.Where(x => !string.IsNullOrWhiteSpace(x.UIData)).ToList())
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
+            if (uiData != null && (minX == null || uiData.X < minX))
+            {
+                minX = uiData.X;
+            }
+            if (uiData != null && (minY == null || uiData.Y < minY))
+            {
+                minY = uiData.Y;
+            }
+        }
+        minX ??= 0;
+        minY ??= 0;
+
+        var existingStepIds = AutomationProperties.Steps.Select(x => x.StepData.Id).ToHashSet();
+        var p = Diagram.GetRelativeMousePoint((int)args.ClientX, (int)args.ClientY);
+        foreach (var step in steps.ToList())
+        {
+            var stepInstance = Step.FromStepData(step.StepData);
+            var oldId = stepInstance.StepData.Id;
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(step.StepData.UIData!);
+            var newStep = AddNewStep(stepInstance, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            if (existingStepIds.Contains(oldId))
+            {
+                foreach(var otherStep in steps.Where(x => x.StepData.NextSteps.Contains(oldId)).ToList())
+                {
+                    otherStep.StepData.NextSteps.Remove(oldId);
+                    otherStep.StepData.NextSteps.Add(stepInstance.StepData.Id);
+                }
+            }
+            Diagram.SelectModel(Diagram.GetNode(stepInstance)!, false);
+        }
+
+        foreach (var information in informations)
+        {
+            var uiData = System.Text.Json.JsonSerializer.Deserialize<NodeUIData>(information.UIData!);
+            AddNewInformation(information, (int)p.X + (uiData?.X ?? 0) - (minX ?? 0), (int)p.Y + (uiData?.Y ?? 0) - (minY ?? 0));
+            Diagram.SelectModel(Diagram.GetNode(information)!, false);
+        }
+
+        RefreshInformations();
+        Diagram.Refresh();
+    }
+
+    void CopyFlowToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToComponents();
+        content.FlowAutomation = Automation;
+
+        ClipboardService.Copy(content);
+    }
+
+    void CopyAllStepsToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToComponents();
+        var selectedModels = Diagram.GetSelectedModels().ToList();
+        content.FlowSteps.AddRange(AutomationProperties.Steps.ToList());
+
+        ClipboardService.Copy(content);
+    }
+
+    void CopySelectionToClipboard()
+    {
+        var content = new ClipboardService.ClipboardContent();
+
+        AddUIDataToComponents();
+        var selectedModels = Diagram.GetSelectedModels().ToList();
+        foreach (var sm in selectedModels)
+        {
+            if (sm is StepNodeModel node)
+            {
+                var step = node.GetStep(AutomationProperties)!;
+                content.FlowSteps.Add(step);
+            }
+            else if (sm is InformationNodeModel infnode)
+            {
+                var information = infnode.GetInformation(AutomationProperties)!;
+                content.FlowInformations.Add(information);
+            }
+        }
+
+        ClipboardService.Copy(content);
+    }
+
+    Stream GetFileStream()
+    {
+        var fileStream = new MemoryStream();
+
+        AddUIDataToComponents();
+        System.Text.Json.JsonSerializer.Serialize(fileStream, Automation);
+        fileStream.Position = 0;
+
+        return fileStream;
+    }
+
+    async Task ExportAsync()
+    {
+        var fileStream = GetFileStream();
+        var fileName = "hasm_export_flow.json";
+
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
     }
 
     void Restart()
@@ -820,7 +995,7 @@ else
 
             if (!transitionEdited)
             {
-                //maybe two to the same state? not allowed
+                //maybe two to the same step? not allowed
                 HashSet<string> existingTransitions = [];
                 foreach (var link in Diagram.Links.ToList())
                 {
@@ -921,8 +1096,8 @@ else
 
         foreach (var step in AutomationProperties.Steps)
         {
-            var flowStateHandlerSteps = FlowHandler.GetSteps().ToDictionary(x => x.StepData.Id, x => x);
-            if (flowStateHandlerSteps.TryGetValue(step.StepData.Id, out var flowStep))
+            var flowHandlerSteps = FlowHandler.GetSteps().ToDictionary(x => x.StepData.Id, x => x);
+            if (flowHandlerSteps.TryGetValue(step.StepData.Id, out var flowStep))
             {
                 step.PayloadUpdatedAt = flowStep.PayloadUpdatedAt;
                 step.Payload = flowStep.Payload;
