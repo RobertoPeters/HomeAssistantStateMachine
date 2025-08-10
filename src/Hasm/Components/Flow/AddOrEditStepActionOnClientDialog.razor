@@ -1,0 +1,125 @@
+﻿@using Hasm.Components.Dialogs
+@using Hasm.Models
+@using Hasm.Services
+@using Hasm.Services.Automations
+@using Hasm.Services.Automations.Flow
+@inject Services.DataService DataService
+@inherits ResultDialogBase<StepActionOnClient>
+
+<RadzenTemplateForm @ref="Form" Data="@Model" TItem="StepActionOnClient">
+    <RadzenStack>
+        <RadzenFormField Text="Name" Variant="@Variant.Outlined">
+            <RadzenTextBox @bind-Value="@Model!.Name" Name="Name" spellcheck="false" />
+        </RadzenFormField>
+        <RadzenFormField Text="Client *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown Data="Clients" @bind-Value="@Model!.ClientName" Name="ClientName" ValueProperty="@nameof(Client.Name)" TextProperty="@nameof(Client.Name)" Change="ClientChanged" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="ClientName" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Variable name" Variant="@Variant.Outlined">
+            <RadzenTextBox @bind-Value="@Model!.VariableName" Name="VariableName" spellcheck="false" />
+        </RadzenFormField>
+        @if (!string.IsNullOrWhiteSpace(Model!.VariableName))
+        {
+            <RadzenFormField Text="Is global variabe" Variant="@Variant.Outlined">
+                <RadzenRadioButtonList @bind-Value="@Model!.IsGlobalVariable" TValue="bool" class="rz-m-4 rz-mt-8">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="Yes" Value="true" />
+                        <RadzenRadioButtonListItem Text="No" Value="false" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </RadzenFormField>
+        }
+        <RadzenFormField Text="Command *" Variant="@Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown Data="Commands" @bind-Value="@Model!.Command" Name="Command" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="Command" Text="This field is required" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Parameter 1" Variant="@Variant.Outlined">
+            <RadzenTextBox @bind-Value="@Model!.Parameter1" Name="Parameter1" spellcheck="false" />
+        </RadzenFormField>
+        <RadzenFormField Text="Parameter 2" Variant="@Variant.Outlined">
+            <RadzenTextBox @bind-Value="@Model!.Parameter2" Name="Parameter2" spellcheck="false" />
+        </RadzenFormField>
+        <RadzenFormField Text="Parameter 3" Variant="@Variant.Outlined">
+            <RadzenTextBox @bind-Value="@Model!.Parameter3" Name="Parameter3" spellcheck="false" />
+        </RadzenFormField>
+    </RadzenStack>
+    <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
+</RadzenTemplateForm>
+
+
+@code {
+    protected override bool ShowClose => true;
+    protected override bool IsPersistent => false;
+    protected override bool CloseDialogOnOverlayClick => true;
+    protected override int? WidthInPixels => 1400;
+
+    [Parameter]
+    public StepActionOnClient? Step { get; set; }
+
+    [Parameter]
+    public Automation? Automation { get; set; }
+
+
+    private StepActionOnClient? Model;
+    private RadzenTemplateForm<StepActionOnClient>? Form;
+    private List<Client>? Clients;
+    private List<string>? Commands;
+
+    protected override void OnInitialized()
+    {
+        Clients = DataService.GetClients().Where(x => x.ClientType != ClientType.Generic).ToList();
+        if (Step == null)
+        {
+            Step = new StepActionOnClient();
+            Step.StepData.Type = Step.GetType();
+            Step.Initialize();
+        }
+        Model = Step.CopyObject();
+
+        base.OnInitialized();
+    }
+
+    void ClientChanged(object value)
+    {
+        if (string.IsNullOrWhiteSpace(Model!.ClientName))
+        {
+            Commands = [];
+            Model.Command = null;
+            return;
+        }
+        var client = Clients!.First(x => x.Name == Model.ClientName);
+        switch(client.ClientType)
+        {
+            case ClientType.Timer:
+                Commands = ["start","stop"];
+                Model.Command = null;
+				break;
+            case ClientType.HomeAssistant:
+                Commands = ["callservice", "callserviceforentities"];
+                Model.Command = null;
+                break;
+            case ClientType.Mqtt:
+                Commands = ["publish"];
+                Model.Command = null;
+                break;
+        }
+    }
+
+    void OnSubmit()
+    {
+        Form!.EditContext.Validate();
+        if (Form.IsValid)
+        {
+            Close(Model);
+        }
+    }
+
+}
