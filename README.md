@@ -1,10 +1,7 @@
 # Home Assistant State Machine (HASM)
-State Machine for Home Assistant and MQTT supported controllers (like Homey) to create automation using state machines
+State Machine for Home Assistant and MQTT supported controllers (like Homey) to create automation using state machines, flows or scripting
 
-![image](https://github.com/RobertoPeters/HomeAssistantStateMachine/assets/5654611/d25de45b-157d-4359-9b14-4b92b403b10d)
-
-![image](https://github.com/RobertoPeters/HomeAssistantStateMachine/assets/5654611/0b24c8c9-9677-4c9e-a6c8-d880de1dfcf2)
-
+<img width="1054" height="698" alt="image" src="https://github.com/user-attachments/assets/d30dc307-88a9-416f-8ae6-3f520dabe454" />
 
 For the features and user manual see the Wiki https://github.com/RobertoPeters/HomeAssistantStateMachine/wiki
 
