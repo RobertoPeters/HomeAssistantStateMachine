@@ -122,6 +122,7 @@ else
 
     private List<(string name, string description, Type stepType, Type nodeModel, Type nodeWidget, Type dialog)> stepNodeMappings = [
         ("Variable", "Get variable value", typeof(StepVariableValue), typeof(StepVariableValueNodeModel), typeof(StepVariableValueNodeWidget), typeof(AddOrEditStepVariableValueDialog)),
+        ("Set Variable", "Set variable value", typeof(StepSetVariableValue), typeof(StepSetVariableValueNodeModel), typeof(StepSetVariableValueNodeWidget), typeof(AddOrEditStepSetVariableValueDialog)),
         ("Logic AND", "All inputs true", typeof(StepAnd), typeof(StepAndNodeModel), typeof(StepAndNodeWidget), typeof(AddOrEditStepAndDialog)),
         ("Logic OR", "One of the inputs true", typeof(StepOr), typeof(StepOrNodeModel), typeof(StepOrNodeWidget), typeof(AddOrEditStepOrDialog)),
         ("Timer", "Timer", typeof(StepTimer), typeof(StepTimerNodeModel), typeof(StepTimerNodeWidget), typeof(AddOrEditStepTimerDialog)),
@@ -515,6 +516,12 @@ else
                 return await DialogService.ShowDialogAsync<AddOrEditStepVariableValueDialog, StepVariableValue>($"Edit Step: {step?.StepData.Name}", dialog =>
                 {
                     dialog.Step = step as StepVariableValue;
+                    dialog.Automation = Automation;
+                });
+            case "AddOrEditStepSetVariableValueDialog":
+                return await DialogService.ShowDialogAsync<AddOrEditStepSetVariableValueDialog, StepSetVariableValue>($"Edit Step: {step?.StepData.Name}", dialog =>
+                {
+                    dialog.Step = step as StepSetVariableValue;
                     dialog.Automation = Automation;
                 });
             case "AddOrEditStepAndDialog":

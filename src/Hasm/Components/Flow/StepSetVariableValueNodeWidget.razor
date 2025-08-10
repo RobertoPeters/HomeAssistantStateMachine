@@ -1,0 +1,12 @@
+﻿@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Models
+@using Hasm.Services
+@inject DialogService DialogService
+@inherits ComponentBase
+
+<StepNodeWidget Node="@Node" />
+
+@code {
+    [Parameter]
+    public StepNodeModel Node { get; set; } = null!;
+}
