@@ -111,6 +111,9 @@ public class ClientService(DataService _dataService, VariableService _variableSe
             case Models.ClientType.Timer:
                 clientHandler = new TimerClientHandler(client, _variableService);
                 break;
+            case Models.ClientType.SqliteDatabase:
+                clientHandler = new SqliteDatabaseClientHandler(client, _variableService);
+                break;
         }
         if (clientHandler != null)
         {

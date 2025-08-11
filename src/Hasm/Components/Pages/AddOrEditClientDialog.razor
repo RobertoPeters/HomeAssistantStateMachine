@@ -78,6 +78,20 @@
                     <RadzenPassword @bind-Value="@MqttClientProperties!.Password" Name="Password" />
                 </RadzenFormField>
             }
+            @if (Model.ClientType == ClientType.SqliteDatabase)
+            {
+                <RadzenFormField Text="Filename *" Variant="@Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@SqliteDatabaseClientProperties!.Filename" Name="Filename" spellcheck="false" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Filename" Text="This field is required" />
+                    </Helper>
+                </RadzenFormField>
+                <RadzenFormField Text="Sql statements on start" Variant="@Variant.Outlined">
+                    <RadzenTextArea @bind-Value="@SqliteDatabaseClientProperties!.OnStartQueries" Name="OnStartQueries" spellcheck="false" Rows="5" />
+                </RadzenFormField>
+            }
             <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
         </RadzenStack>
     </RadzenTemplateForm>
@@ -98,6 +112,7 @@
     private Client? Model;
     private HAClientHandler.ClientProperties HAClientProperties = new();
     private MqttClientHandler.ClientProperties MqttClientProperties = new();
+    private SqliteDatabaseClientHandler.ClientProperties SqliteDatabaseClientProperties = new();
     private RadzenTemplateForm<Client>? Form;
 
     protected override void OnInitialized()
@@ -120,6 +135,10 @@
             {
                 MqttClientProperties = System.Text.Json.JsonSerializer.Deserialize<MqttClientHandler.ClientProperties>(Model.Data) ?? new();
             }
+            else if (!string.IsNullOrWhiteSpace(Model!.Data) && Model.ClientType == ClientType.SqliteDatabase)
+            {
+                SqliteDatabaseClientProperties = System.Text.Json.JsonSerializer.Deserialize<SqliteDatabaseClientHandler.ClientProperties>(Model.Data) ?? new();
+            }
         }
         ExistingClientNames = allClients.Where(x => x.Id != Id).Select(x => x.Name).ToHashSet();
 
@@ -138,6 +157,10 @@
             else if (Model!.ClientType == ClientType.Mqtt)
             {
                 Model!.Data = System.Text.Json.JsonSerializer.Serialize(MqttClientProperties);
+            }
+            else if (Model!.ClientType == ClientType.SqliteDatabase)
+            {
+                Model!.Data = System.Text.Json.JsonSerializer.Serialize(SqliteDatabaseClientProperties);
             }
             await DataService.AddOrUpdateClientAsync(Model);
             Close();

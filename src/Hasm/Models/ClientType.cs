@@ -14,5 +14,8 @@ public enum ClientType: int
     Generic = 2,
 
     [Display(Name = "Timer")]
-    Timer = 3
+    Timer = 3,
+
+    [Display(Name = "Sqlite database")]
+    SqliteDatabase = 4
 }

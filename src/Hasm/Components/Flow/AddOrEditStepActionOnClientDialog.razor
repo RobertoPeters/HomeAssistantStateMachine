@@ -110,6 +110,10 @@
                 Commands = ["publish"];
                 Model.Command = null;
                 break;
+            case ClientType.SqliteDatabase:
+                Commands = ["nonquery", "scalar", "reader"];
+                Model.Command = null;
+                break;
         }
     }
 

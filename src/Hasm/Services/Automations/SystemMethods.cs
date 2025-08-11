@@ -543,5 +543,21 @@ public class SystemMethods
         system.UpdatePayload(instanceId, stepId, payload)
     }
 
+    //====================================================================================
+    // Sqlite Database Automation METHODS
+    //====================================================================================
+ 
+    executeNonQuery = function(clientId, query) {
+        executeOnClient(clientId, null, 'query', query)
+    }    
+
+    executeScalar = function(clientId, variableId, query) {
+        executeOnClient(clientId, variableId, 'scalar', query)
+    }  
+
+    executeReader = function(clientId, variableId, query) {
+        executeOnClient(clientId, variableId, 'reader', query)
+    }  
+
     """";
 }
