@@ -23,7 +23,7 @@ ECHO ** Creating docker image
 ECHO.
 docker compose down
 docker build -f Dockerfile -t robertpeters/homeassistantstatemachine:dev .
-docker compose up -d
+docker compose up -d --build
 
 GOTO SUCCESS
 
