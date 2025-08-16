@@ -219,7 +219,7 @@ public class SystemMethods
     }    
     
     //====================================================================================
-    // HELPER MEHODS METHODS and VARIABLES
+    // HELPER MEHODS and VARIABLES
     //====================================================================================
     
     //the two system clients
