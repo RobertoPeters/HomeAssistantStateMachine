@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="BlazorMonaco" Version="3.3.0" />
+    <PackageVersion Include="Google_GenerativeAI" Version="3.0.0" />
     <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="9.0.8" />
     <PackageVersion Include="MQTTnet" Version="5.0.1.1416" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />

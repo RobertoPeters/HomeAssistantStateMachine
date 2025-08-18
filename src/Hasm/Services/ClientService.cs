@@ -114,6 +114,9 @@ public class ClientService(DataService _dataService, VariableService _variableSe
             case Models.ClientType.SqliteDatabase:
                 clientHandler = new SqliteDatabaseClientHandler(client, _variableService);
                 break;
+            case Models.ClientType.GoogleGenerativeAI:
+                clientHandler = new GoogleGenerativeAIClientHandler(client, _variableService);
+                break;
         }
         if (clientHandler != null)
         {

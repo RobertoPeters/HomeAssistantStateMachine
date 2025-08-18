@@ -92,6 +92,25 @@
                     <RadzenTextArea @bind-Value="@SqliteDatabaseClientProperties!.OnStartQueries" Name="OnStartQueries" spellcheck="false" Rows="5" />
                 </RadzenFormField>
             }
+            @if (Model.ClientType == ClientType.GoogleGenerativeAI)
+            {
+                <RadzenFormField Text="API Key *" Variant="@Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@GoogleGenerativeAIClientProperties!.ApiKey" Name="ApiKey" spellcheck="false" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="ApiKey" Text="This field is required" />
+                    </Helper>
+                </RadzenFormField>
+                <RadzenFormField Text="Model *" Variant="@Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@GoogleGenerativeAIClientProperties!.Model" Name="Model" spellcheck="false" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="Model" Text="This field is required" />
+                    </Helper>
+                </RadzenFormField>
+            }
             <RadzenButton ButtonType="ButtonType.Button" Text="OK" Click="@OnSubmit" />
         </RadzenStack>
     </RadzenTemplateForm>
@@ -113,6 +132,7 @@
     private HAClientHandler.ClientProperties HAClientProperties = new();
     private MqttClientHandler.ClientProperties MqttClientProperties = new();
     private SqliteDatabaseClientHandler.ClientProperties SqliteDatabaseClientProperties = new();
+    private GoogleGenerativeAIClientHandler.ClientProperties GoogleGenerativeAIClientProperties = new();
     private RadzenTemplateForm<Client>? Form;
 
     protected override void OnInitialized()
@@ -139,6 +159,10 @@
             {
                 SqliteDatabaseClientProperties = System.Text.Json.JsonSerializer.Deserialize<SqliteDatabaseClientHandler.ClientProperties>(Model.Data) ?? new();
             }
+            else if (!string.IsNullOrWhiteSpace(Model!.Data) && Model.ClientType == ClientType.GoogleGenerativeAI)
+            {
+                GoogleGenerativeAIClientProperties = System.Text.Json.JsonSerializer.Deserialize<GoogleGenerativeAIClientHandler.ClientProperties>(Model.Data) ?? new();
+            }
         }
         ExistingClientNames = allClients.Where(x => x.Id != Id).Select(x => x.Name).ToHashSet();
 
@@ -161,6 +185,10 @@
             else if (Model!.ClientType == ClientType.SqliteDatabase)
             {
                 Model!.Data = System.Text.Json.JsonSerializer.Serialize(SqliteDatabaseClientProperties);
+            }
+            else if (Model!.ClientType == ClientType.GoogleGenerativeAI)
+            {
+                Model!.Data = System.Text.Json.JsonSerializer.Serialize(GoogleGenerativeAIClientProperties);
             }
             await DataService.AddOrUpdateClientAsync(Model);
             Close();
