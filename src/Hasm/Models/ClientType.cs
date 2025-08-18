@@ -17,5 +17,8 @@ public enum ClientType: int
     Timer = 3,
 
     [Display(Name = "Sqlite database")]
-    SqliteDatabase = 4
+    SqliteDatabase = 4,
+
+    [Display(Name = "Google Generative AI")]
+    GoogleGenerativeAI = 5,
 }

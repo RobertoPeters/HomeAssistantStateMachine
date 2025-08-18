@@ -548,15 +548,27 @@ public class SystemMethods
     //====================================================================================
  
     executeNonQuery = function(clientId, query) {
-        executeOnClient(clientId, null, 'query', query)
+        return executeOnClient(clientId, null, 'query', query)
     }    
 
     executeScalar = function(clientId, variableId, query) {
-        executeOnClient(clientId, variableId, 'scalar', query)
+        return executeOnClient(clientId, variableId, 'scalar', query)
     }  
 
     executeReader = function(clientId, variableId, query) {
-        executeOnClient(clientId, variableId, 'reader', query)
+        return executeOnClient(clientId, variableId, 'reader', query)
+    }  
+
+    //====================================================================================
+    // Google Generative AI Automation METHODS
+    //====================================================================================
+    
+    googleAiGenerateContent = function(clientId, variableId, prompt) {
+        return executeOnClient(clientId, variableId, 'generatecontent', prompt)
+    }
+    
+    googleAiStartGenerateContent = function(clientId, variableId, prompt) {
+        return executeOnClient(clientId, variableId, 'startgeneratecontent', prompt)
     }  
 
     """";
