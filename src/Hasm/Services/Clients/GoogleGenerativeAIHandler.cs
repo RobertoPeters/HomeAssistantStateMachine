@@ -1,7 +1,9 @@
-﻿using GenerativeAI;
+﻿using GeminiDotnet;
+using GeminiDotnet.Extensions.AI;
 using Hasm.Models;
 using Hasm.Services.Interfaces;
-using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.AI;
+
 
 namespace Hasm.Services.Clients;
 
@@ -62,10 +64,7 @@ public class GoogleGenerativeAIClientHandler(Client _client, VariableService _va
             case "generatecontent":
                 if (parameter1 != null)
                 {
-                    var googleAI = new GoogleAi(_clientProperties.ApiKey);
-                    var googleModel = googleAI.CreateGenerativeModel($"models/{_clientProperties.Model}");
-                    var googleResponse = await googleModel.GenerateContentAsync(parameter1.ToString()!);
-                    result = await _variableService.SetVariableValuesAsync([(variableId.Value, googleResponse.Text())]);
+                    return await GenerateContentAsync(variableId.Value, parameter1.ToString()!);
                 }
                 break;
             case "startgeneratecontent":
@@ -79,16 +78,35 @@ public class GoogleGenerativeAIClientHandler(Client _client, VariableService _va
         return result;
     }
 
+    private async Task<bool> GenerateContentAsync(int variableId, string prompt)
+    {
+        var geminiClient = new GeminiChatClient(new GeminiClientOptions { ApiKey = _clientProperties.ApiKey!, ModelId = _clientProperties.Model });
+
+        IChatClient client = new ChatClientBuilder(geminiClient)
+            .UseFunctionInvocation()
+            .Build();
+
+        List<ChatMessage> messages =
+        [
+            new(ChatRole.User, prompt)
+        ];
+
+        var options = new ChatOptions
+        {
+            //Tools = [AIFunctionFactory.Create(GetCurrentWeather, nameof(GetCurrentWeather))]
+        };
+
+        var response = await client.GetResponseAsync(messages, options, default);
+        return await _variableService.SetVariableValuesAsync([(variableId, response?.Text)]);
+    }
+
     private void StartGenerateContent(int variableId, object parameter1)
     {
         Task.Factory.StartNew(async () =>
         {
             try
             {
-                var googleAI = new GoogleAi(_clientProperties.ApiKey);
-                var googleModel = googleAI.CreateGenerativeModel($"models/{_clientProperties.Model}");
-                var googleResponse = await googleModel.GenerateContentAsync(parameter1.ToString()!);
-                await _variableService.SetVariableValuesAsync([(variableId, googleResponse.Text())]);
+                await GenerateContentAsync(variableId, parameter1.ToString()!);
             }
             catch
             {

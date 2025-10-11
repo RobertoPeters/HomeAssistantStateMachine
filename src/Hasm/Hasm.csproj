@@ -23,8 +23,9 @@
 
 	<ItemGroup>
 		<PackageReference Include="BlazorMonaco" />
-		<PackageReference Include="Google_GenerativeAI" />
+		<PackageReference Include="GeminiDotnet.Extensions.AI" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" />
+		<PackageReference Include="Microsoft.Extensions.AI" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
 		<PackageReference Include="Radzen.Blazor" />
 		<PackageReference Include="WolverineFx" />
